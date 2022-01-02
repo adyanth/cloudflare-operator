@@ -1,4 +1,4 @@
-module github.com/adyanth/cloudflare-operator
+module github.com/adyanth/cloudflare-controller
 
 go 1.16
 

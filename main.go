@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/adyanth/cloudflare-operator/controllers"
+	"github.com/adyanth/cloudflare-controller/controllers"
 	//+kubebuilder:scaffold:imports
 )
 
