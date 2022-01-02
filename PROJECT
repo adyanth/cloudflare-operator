@@ -1,0 +1,16 @@
+domain: adyanth
+layout:
+- go.kubebuilder.io/v3
+plugins:
+  manifests.sdk.operatorframework.io/v2: {}
+  scorecard.sdk.operatorframework.io/v2: {}
+projectName: cloudflare-controller
+repo: github.com/adyanth/cloudflare-operator
+resources:
+- controller: true
+  domain: k8s.io
+  group: networking
+  kind: Ingress
+  path: k8s.io/api/networking/v1
+  version: v1
+version: "3"
