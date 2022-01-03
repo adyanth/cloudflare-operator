@@ -18,12 +18,14 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"reflect"
 	"time"
 
 	yaml "gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,8 +50,10 @@ type TunnelReconciler struct {
 // belonging to the given Tunnel CR name.
 func labelsForTunnel(cf networkingv1alpha1.Tunnel) map[string]string {
 	return map[string]string{
+		"tunnels.networking.cfargotunnel.com":        cf.Name,
 		"tunnels.networking.cfargotunnel.com/app":    "cloudflared",
 		"tunnels.networking.cfargotunnel.com/id":     cf.Status.TunnelId,
+		"tunnels.networking.cfargotunnel.com/ns":     cf.Namespace,
 		"tunnels.networking.cfargotunnel.com/name":   cf.Spec.TunnelName,
 		"tunnels.networking.cfargotunnel.com/domain": cf.Spec.Domain,
 	}
@@ -61,7 +65,7 @@ func labelsForTunnel(cf networkingv1alpha1.Tunnel) map[string]string {
 //+kubebuilder:rbac:groups=apps,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -155,21 +159,20 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{RequeueAfter: time.Minute}, nil
 	}
 
-	// Update the Tunnel status with the pod names
-	// List the pods for this cloduflared's deployment
-	podList := &corev1.PodList{}
+	// Update the Tunnel status with the ingresses
+	// List the ingresses using this deployment
+	ingressList := &networkingv1.IngressList{}
 	listOpts := []client.ListOption{
-		client.InNamespace(tunnel.Namespace),
 		client.MatchingLabels(labelsForTunnel(*tunnel)),
 	}
-	if err := r.List(ctx, podList, listOpts...); err != nil {
-		log.Error(err, "Failed to list pods", "Tunnel.Namespace", tunnel.Namespace, "Tunnel.Name", tunnel.Name)
+	if err := r.List(ctx, ingressList, listOpts...); err != nil {
+		log.Error(err, "Failed to list ingresses")
 		return ctrl.Result{}, err
 	}
-	podNames := getPodNames(podList.Items)
-	// Update status.Nodes if needed
-	if !reflect.DeepEqual(podNames, tunnel.Status.Pods) {
-		tunnel.Status.Pods = podNames
+	ingressNames := getIngressNames(ingressList.Items)
+	// Update status.Pods if needed
+	if !reflect.DeepEqual(ingressNames, tunnel.Status.Ingresses) {
+		tunnel.Status.Ingresses = ingressNames
 		err := r.Status().Update(ctx, tunnel)
 		if err != nil {
 			log.Error(err, "Failed to update Tunnel status")
@@ -297,13 +300,13 @@ func (r *TunnelReconciler) deploymentForTunnel(cfTunnel *networkingv1alpha1.Tunn
 	return dep
 }
 
-// getPodNames returns the pod names of the array of pods passed in
-func getPodNames(pods []corev1.Pod) []string {
-	var podNames []string
-	for _, pod := range pods {
-		podNames = append(podNames, pod.Name)
+// getIngressNames returns the ingress names of the array of ingresses passed in
+func getIngressNames(ingresses []networkingv1.Ingress) []string {
+	ingressNames := make([]string, 0)
+	for _, ingress := range ingresses {
+		ingressNames = append(ingressNames, fmt.Sprintf("%s/%s", ingress.Namespace, ingress.Name))
 	}
-	return podNames
+	return ingressNames
 }
 
 // SetupWithManager sets up the controller with the Manager.

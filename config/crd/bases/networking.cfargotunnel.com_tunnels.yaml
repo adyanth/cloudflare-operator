@@ -58,10 +58,6 @@ spec:
             description: TunnelStatus defines the observed state of Tunnel
             properties:
               ingresses:
-                items:
-                  type: string
-                type: array
-              pods:
                 description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
                   of cluster Important: Run "make" to regenerate code after modifying
                   this file'
@@ -72,7 +68,6 @@ spec:
                 type: string
             required:
             - ingresses
-            - pods
             - tunnelId
             type: object
         type: object
