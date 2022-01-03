@@ -1,4 +1,4 @@
-domain: adyanth
+domain: cfargotunnel.com
 layout:
   - go.kubebuilder.io/v3
 plugins:

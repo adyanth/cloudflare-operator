@@ -28,7 +28,7 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# adyanth/cloudflare-controller-bundle:$VERSION and adyanth/cloudflare-controller-catalog:$VERSION.
+# cfargotunnel.com/cloudflare-controller-bundle:$VERSION and cfargotunnel.com/cloudflare-controller-catalog:$VERSION.
 IMAGE_TAG_BASE ?= adyanth/cloudflare-controller
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
