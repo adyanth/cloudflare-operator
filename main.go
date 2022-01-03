@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	networkingv1alpha1 "github.com/adyanth/cloudflare-controller/api/v1alpha1"
-	"github.com/adyanth/cloudflare-controller/controllers"
+	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
+	"github.com/adyanth/cloudflare-operator/controllers"
 	//+kubebuilder:scaffold:imports
 )
 
