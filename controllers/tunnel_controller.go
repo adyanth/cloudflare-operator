@@ -44,6 +44,17 @@ type TunnelReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+// labelsForTunnel returns the labels for selecting the resources
+// belonging to the given Tunnel CR name.
+func labelsForTunnel(cf networkingv1alpha1.Tunnel) map[string]string {
+	return map[string]string{
+		"tunnels.networking.cfargotunnel.com/app":    "cloudflared",
+		"tunnels.networking.cfargotunnel.com/id":     cf.Status.TunnelId,
+		"tunnels.networking.cfargotunnel.com/name":   cf.Spec.TunnelName,
+		"tunnels.networking.cfargotunnel.com/domain": cf.Spec.Domain,
+	}
+}
+
 //+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnels,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnels/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnels/finalizers,verbs=update
@@ -284,12 +295,6 @@ func (r *TunnelReconciler) deploymentForTunnel(cfTunnel *networkingv1alpha1.Tunn
 	// Set Tunnel instance as the owner and controller
 	ctrl.SetControllerReference(cfTunnel, dep, r.Scheme)
 	return dep
-}
-
-// labelsForTunnel returns the labels for selecting the resources
-// belonging to the given Tunnel CR name.
-func labelsForTunnel(cf networkingv1alpha1.Tunnel) map[string]string {
-	return map[string]string{"app": "cloudflared", "cf_tunnelName": cf.Spec.TunnelName, "cf_tunnelId": cf.Status.TunnelId, "cf_domain": cf.Spec.Domain}
 }
 
 // getPodNames returns the pod names of the array of pods passed in
