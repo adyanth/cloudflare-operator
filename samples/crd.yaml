@@ -1,0 +1,9 @@
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: Tunnel
+metadata:
+  name: k8s-tunnel
+spec:
+  tunnelName: k8s
+  size: 2
+  tunnelId: "8a3fe988-89ce-467e-a781-4f620cdcc38a"
+  domain: adyanth.site
