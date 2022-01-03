@@ -54,7 +54,6 @@ type TunnelSpec struct {
 type TunnelStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	Pods      []string `json:"pods"`
 	Ingresses []string `json:"ingresses"`
 	TunnelId  string   `json:"tunnelId"`
 }
