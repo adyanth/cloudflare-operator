@@ -1,0 +1,6 @@
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: Tunnel
+metadata:
+  name: tunnel-sample
+spec:
+  # Add fields here
