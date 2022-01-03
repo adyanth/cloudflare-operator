@@ -5,11 +5,13 @@ import (
 )
 
 type Configuration struct {
-	TunnelID      string                   `yaml:"tunnel"`
+	TunnelId      string                   `yaml:"tunnel"`
 	Ingress       []UnvalidatedIngressRule `yaml:"ingress,omitempty"`
 	WarpRouting   WarpRoutingConfig        `yaml:"warp-routing,omitempty"`
 	OriginRequest OriginRequestConfig      `yaml:"originRequest,omitempty"`
 	SourceFile    string                   `yaml:"credentials-file"`
+	Metrics       string                   `yaml:"metrics,omitempty"`
+	NoAutoUpdate  bool                     `yaml:"no-autoupdate,omitempty"`
 }
 
 type UnvalidatedIngressRule struct {
