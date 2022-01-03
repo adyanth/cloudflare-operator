@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -28,38 +27,30 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	apitypes "k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return fallback
-}
-
 const (
-	cloudflareTunnelAnnotation = "cfargotunnel.com/tunnel"
-	cloudflareHostAnnotation   = "cfargotunnel.com/host"
-	cloudflareFinalizer        = "cfargotunnel.com/finalizer"
-)
+	// One of the Tunne CRD, ID, Name is mandatory
+	// Tunnel CRD Name
+	tunnelCRDAnnotation = "tunnels.networking.cfargotunnel.com"
+	// Tunnel ID matching Tunnel Resource
+	tunnelIdAnnotation = "tunnels.networking.cfargotunnel.com/id"
+	// Tunnel Name matching Tunnel Resource Spec
+	tunnelNameAnnotation = "tunnels.networking.cfargotunnel.com/name"
+	// FQDN to create a DNS entry for and route traffic from internet on, defaults to Ingress host subdomain + cloudflare domain
+	fqdnAnnotation = "tunnels.networking.cfargotunnel.com/fqdn"
+	// If this annotation is set to false, do not limit searching Tunnel to Ingress namespace, and pick the 1st one found (Might be random?)
+	// If set to anything other than false, use it as a namspace where Tunnel exists
+	tunnelNSAnnotation = "tunnels.networking.cfargotunnel.com/ns"
 
-var (
-	cloudflareDefaultTunnel string = os.Getenv("CLOUDFLARE_DEFAULT_TUNNEL")
-	cloudflareDefaultDomain string = os.Getenv("CLOUDFLARE_DEFAULT_DOMAIN")
-	configmapNamespace      string = getEnv("CLOUDFLARE_CONFIGMAP_NAMESPACE", "cloudflare")
-	configmapName           string = getEnv("CLOUDFLARE_CONFIGMAP_NAME", "cloudflared")
-	configmapKey            string = getEnv("CLOUDFLARE_CONFIGMAP_KEY", "config.yaml")
+	tunnelFinalizerAnnotation = "tunnels.networking.cfargotunnel.com/finalizer"
+	tunnelDomainAnnotation    = "tunnels.networking.cfargotunnel.com/domain"
+	configmapKey              = "config.yaml"
 )
-
-var configmapNamespacedName = apitypes.NamespacedName{
-	Namespace: configmapNamespace,
-	Name:      configmapName,
-}
 
 // IngressReconciler reconciles a Ingress object
 type IngressReconciler struct {
@@ -67,16 +58,14 @@ type IngressReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/finalizers,verbs=update
-//+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;update;patch
 
 func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	// Fetch Ingress from API
-	var tunnel, host string
-	var ok bool
 	ingress := &networkingv1.Ingress{}
 
 	if err := r.Get(ctx, req.NamespacedName, ingress); err != nil {
@@ -92,35 +81,67 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Read Ingress annotations. If both annotations are not set, return without doing anything
-	if tunnel, ok = ingress.Annotations[cloudflareTunnelAnnotation]; !ok {
-		if host, ok = ingress.Annotations[cloudflareHostAnnotation]; !ok {
-			// If an ingress with annotation is edited to remove just annotations, cleanup wont happen.
-			// Not an issue as such, since it will be overwritten the next time it is used.
-			log.Info("annotation not found, skipping Ingress", "annotation", cloudflareTunnelAnnotation)
-			return ctrl.Result{}, nil
+	tunnelName, okName := ingress.Annotations[tunnelNameAnnotation]
+	tunnelId, okId := ingress.Annotations[tunnelIdAnnotation]
+	fqdn := ingress.Annotations[fqdnAnnotation]
+	tunnelNS, okNS := ingress.Annotations[tunnelNSAnnotation]
+	tunnelCRD, okCRD := ingress.Annotations[tunnelCRDAnnotation]
+
+	if !(okCRD || okName || okId) {
+		// If an ingress with annotation is edited to remove just annotations, cleanup wont happen.
+		// Not an issue as such, since it will be overwritten the next time it is used.
+		log.Info("No related annotations not found, skipping Ingress")
+		// Check if our finalizer is present on a non managed resource and remove it. This can happen if annotations were removed from the Ingress.
+		if controllerutil.ContainsFinalizer(ingress, tunnelFinalizerAnnotation) {
+			log.Info("Finalizer found on unmanaged Ingress, removing it")
+			controllerutil.RemoveFinalizer(ingress, tunnelFinalizerAnnotation)
+			err := r.Update(ctx, ingress)
+			if err != nil {
+				log.Error(err, "unable to remove finalizer from unmanaged Ingress")
+				return ctrl.Result{}, err
+			}
 		}
+		return ctrl.Result{}, nil
 	}
 
-	if tunnel == "" {
-		tunnel = cloudflareDefaultTunnel
-		log.Info("using default tunnel value", "tunnel", tunnel)
+	// listOpts to search for ConfigMap. Set labels, and namespace restriction if
+	listOpts := []client.ListOption{}
+	labels := map[string]string{}
+	if okId {
+		labels[tunnelIdAnnotation] = tunnelId
+	}
+	if okName {
+		labels[tunnelNameAnnotation] = tunnelName
+	}
+	if okCRD {
+		labels[tunnelCRDAnnotation] = tunnelCRD
 	}
 
-	log.Info("setting tunnel", "tunnel", tunnel)
+	if tunnelNS == "true" || !okNS {
+		labels[tunnelNSAnnotation] = ingress.Namespace
+		listOpts = append(listOpts, client.InNamespace(ingress.Namespace))
+	} else if okNS && tunnelNS != "false" {
+		labels[tunnelNSAnnotation] = tunnelNS
+		listOpts = append(listOpts, client.InNamespace(tunnelNS))
+	} // else, no filter on namespace, pick the 1st one
+
+	listOpts = append(listOpts, client.MatchingLabels(labels))
+
+	log.Info("setting tunnel", "listOpts", listOpts)
 
 	// Check if Ingress is marked for deletion
 	if ingress.GetDeletionTimestamp() != nil {
-		if controllerutil.ContainsFinalizer(ingress, cloudflareFinalizer) {
+		if controllerutil.ContainsFinalizer(ingress, tunnelFinalizerAnnotation) {
 			// Run finalization logic. If the finalization logic fails,
 			// don't remove the finalizer so that we can retry during the next reconciliation.
 
-			if err := r.configureCloudflare(log, ctx, ingress, host, true); err != nil {
+			if err := r.configureCloudflare(log, ctx, ingress, fqdn, listOpts, true); err != nil {
 				return ctrl.Result{}, err
 			}
 
-			// Remove cloudflareFinalizer. Once all finalizers have been
+			// Remove tunnelFinalizer. Once all finalizers have been
 			// removed, the object will be deleted.
-			controllerutil.RemoveFinalizer(ingress, cloudflareFinalizer)
+			controllerutil.RemoveFinalizer(ingress, tunnelFinalizerAnnotation)
 			err := r.Update(ctx, ingress)
 			if err != nil {
 				log.Error(err, "unable to continue with Ingress deletion")
@@ -129,14 +150,14 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	} else {
 		// Add finalizer for Ingress
-		if !controllerutil.ContainsFinalizer(ingress, cloudflareFinalizer) {
-			controllerutil.AddFinalizer(ingress, cloudflareFinalizer)
+		if !controllerutil.ContainsFinalizer(ingress, tunnelFinalizerAnnotation) {
+			controllerutil.AddFinalizer(ingress, tunnelFinalizerAnnotation)
 			if err := r.Update(ctx, ingress); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 		// Configure ConfigMap
-		if err := r.configureCloudflare(log, ctx, ingress, host, false); err != nil {
+		if err := r.configureCloudflare(log, ctx, ingress, fqdn, listOpts, false); err != nil {
 			log.Error(err, "unable to configure ConfigMap", "key", configmapKey)
 			return ctrl.Result{}, err
 		}
@@ -145,18 +166,23 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return ctrl.Result{}, nil
 }
 
-func (r *IngressReconciler) getConfigMapConfiguration(ctx context.Context, log logr.Logger) (corev1.ConfigMap, Configuration, error) {
+func (r *IngressReconciler) getConfigMapConfiguration(ctx context.Context, log logr.Logger, listOpts []client.ListOption) (corev1.ConfigMap, Configuration, error) {
 	// Fetch ConfigMap from API
-	var configmap corev1.ConfigMap
-	var ok bool
-	if err := r.Get(ctx, configmapNamespacedName, &configmap); err != nil {
-		log.Error(err, "unable to fetch ConfigMap", "namespace", configmapNamespacedName.Namespace, "name", configmapNamespacedName.Name)
+	configMapList := &corev1.ConfigMapList{}
+	if err := r.List(ctx, configMapList, listOpts...); err != nil {
+		log.Error(err, "Failed to list ConfigMaps", "listOpts", listOpts)
 		return corev1.ConfigMap{}, Configuration{}, err
 	}
+	if len(configMapList.Items) == 0 {
+		err := fmt.Errorf("no configmaps found")
+		log.Error(err, "Failed to list ConfigMaps", "listOpts", listOpts)
+		return corev1.ConfigMap{}, Configuration{}, err
+	}
+	configmap := configMapList.Items[0]
 
 	// Read ConfigMap YAML
-	var configStr string
-	if configStr, ok = configmap.Data[configmapKey]; !ok {
+	configStr, ok := configmap.Data[configmapKey]
+	if !ok {
 		err := fmt.Errorf("unable to find key `%s` in ConfigMap", configmapKey)
 		log.Error(err, "unable to find key in ConfigMap", "key", configmapKey)
 		return corev1.ConfigMap{}, Configuration{}, err
@@ -183,14 +209,16 @@ func (r *IngressReconciler) setConfigMapConfiguration(ctx context.Context, log l
 	return r.Update(ctx, &configmap)
 }
 
-func (r *IngressReconciler) configureCloudflare(log logr.Logger, ctx context.Context, ingress *networkingv1.Ingress, host string, cleanup bool) error {
+func (r *IngressReconciler) configureCloudflare(log logr.Logger, ctx context.Context, ingress *networkingv1.Ingress, fqdn string, listOpts []client.ListOption, cleanup bool) error {
 	var config Configuration
 	var configmap corev1.ConfigMap
 	var err error
-	if configmap, config, err = r.getConfigMapConfiguration(ctx, log); err != nil {
+
+	if configmap, config, err = r.getConfigMapConfiguration(ctx, log, listOpts); err != nil {
 		log.Error(err, "unable to get ConfigMap")
 		return err
 	}
+	tunnelDomain := configmap.Labels[tunnelDomainAnnotation]
 
 	var finalIngress []UnvalidatedIngressRule
 	if cleanup {
@@ -200,22 +228,22 @@ func (r *IngressReconciler) configureCloudflare(log logr.Logger, ctx context.Con
 	for _, rule := range ingress.Spec.Rules {
 		ingressSpecHost := rule.Host
 
-		// Generate host string from Ingress Spec if not provided
-		if host == "" {
+		// Generate fqdn string from Ingress Spec if not provided
+		if fqdn == "" {
 			ingressHost := strings.Split(ingressSpecHost, ".")[0]
-			host = fmt.Sprintf("%s.%s", ingressHost, cloudflareDefaultDomain)
-			log.Info("using default domain value", "domain", cloudflareDefaultDomain)
+			fqdn = fmt.Sprintf("%s.%s", ingressHost, tunnelDomain)
+			log.Info("using default domain value", "domain", tunnelDomain)
 		}
-		log.Info("setting host", "host", host)
+		log.Info("setting fqdn", "fqdn", fqdn)
 
 		// Find if the host already exists in config. If so, modify
 		found := false
 		for i, v := range config.Ingress {
 			if cleanup {
-				if v.Hostname != host {
+				if v.Hostname != fqdn {
 					finalIngress = append(finalIngress, v)
 				}
-			} else if v.Hostname == host {
+			} else if v.Hostname == fqdn {
 				log.Info("found existing ingress for host, modifying the service", "service", ingressSpecHost)
 				config.Ingress[i].Service = ingressSpecHost
 				found = true
@@ -227,7 +255,7 @@ func (r *IngressReconciler) configureCloudflare(log logr.Logger, ctx context.Con
 		if !cleanup && !found {
 			log.Info("adding ingress for host to point to service", "service", ingressSpecHost)
 			config.Ingress = append(config.Ingress, UnvalidatedIngressRule{
-				Hostname: host,
+				Hostname: fqdn,
 				Service:  ingressSpecHost,
 			})
 		}
