@@ -19,13 +19,10 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"os"
-	"reflect"
 	"time"
 
 	yaml "gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,7 +62,6 @@ func labelsForTunnel(cf networkingv1alpha1.Tunnel) map[string]string {
 //+kubebuilder:rbac:groups=apps,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -78,18 +74,90 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// Lookup the Tunnel resource
 	tunnel := &networkingv1alpha1.Tunnel{}
 	if err := r.Get(ctx, req.NamespacedName, tunnel); err != nil {
+		if apierrors.IsNotFound(err) {
+			// Tunnel object not found, could have been deleted after reconcile request.
+			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+			// Return and don't requeue
+			log.Info("Tunnel deleted, nothing to do")
+			return ctrl.Result{}, nil
+		}
 		log.Error(err, "unable to fetch Tunnel")
 		return ctrl.Result{}, err
 	}
 
-	// Set tunnelId in status
-	if tunnel.Spec.TunnelId != "" {
-		tunnel.Status.TunnelId = tunnel.Spec.TunnelId
-	} else {
-		// TODO: Create tunnel here
-		tunnel.Status.TunnelId = "tunnel-id"
+	// Creds is the tunnel credential JSON
+	var tunnelCreds string
+
+	// Get secret containing API token
+	cfCloudflareSecret := &corev1.Secret{}
+	if err := r.Get(ctx, apitypes.NamespacedName{Name: tunnel.Spec.Secret, Namespace: tunnel.Namespace}, cfCloudflareSecret); err != nil {
+		log.Error(err, "secret not found", "secret", tunnel.Spec.Secret)
+		return ctrl.Result{}, err
 	}
+
+	// Set tunnelId in status and get creds file
+	if tunnel.Spec.TunnelId != "" {
+		// Read secret for credentials file
+		cfCredFileB64, ok := cfCloudflareSecret.Data[tunnel.Spec.SecretKeyCreds]
+		if !ok {
+			err := fmt.Errorf("key not found in secret")
+			log.Error(err, "Key not found in secret", "secret", tunnel.Spec.Secret, "SecretKeyCreds", tunnel.Spec.SecretKeyCreds)
+			return ctrl.Result{}, err
+		}
+		tunnel.Status.TunnelId = tunnel.Spec.TunnelId
+		tunnelCreds = string(cfCredFileB64)
+		if err := r.Status().Update(ctx, tunnel); err != nil {
+			log.Error(err, "Failed to update Tunnel status", "Tunnel.Namespace", tunnel.Namespace, "Tunnel.Name", tunnel.Name)
+			return ctrl.Result{}, err
+		}
+		log.Info("tunnel id set", "id", tunnel.Spec.TunnelId)
+	} else if tunnel.Status.TunnelId == "" {
+		// Read secret for API Key
+		cfAPITokenB64, ok := cfCloudflareSecret.Data[tunnel.Spec.SecretKeyAPI]
+		if !ok {
+			err := fmt.Errorf("key not found in secret")
+			log.Error(err, "Key not found in secret", "secret", tunnel.Spec.Secret, "secretKeyAPI", tunnel.Spec.SecretKeyAPI)
+			return ctrl.Result{}, err
+		}
+		tunnelId, creds, err := CloudflarAPI{
+			Log:         log,
+			TunnelName:  tunnel.Spec.TunnelName,
+			AccountName: tunnel.Spec.AccountName,
+			Domain:      tunnel.Spec.Domain,
+			APIKey:      string(cfAPITokenB64),
+		}.CreateCloudflareTunnel()
+		if err == nil {
+			tunnel.Status.TunnelId = tunnelId
+			tunnelCreds = creds
+			if err := r.Status().Update(ctx, tunnel); err != nil {
+				log.Error(err, "Failed to update Tunnel status", "Tunnel.Namespace", tunnel.Namespace, "Tunnel.Name", tunnel.Name)
+				return ctrl.Result{}, err
+			}
+			log.Info("tunnel created, id set", "id", tunnelId)
+		} else {
+			log.Error(err, "unable to create Tunnel")
+			return ctrl.Result{}, err
+		}
+	}
+
 	// TODO: Add finalizers to delete tunnel on resource delete
+
+	// Check if Secret already exists
+	cfSecret := &corev1.Secret{}
+	if err := r.Get(ctx, apitypes.NamespacedName{Name: tunnel.Name, Namespace: tunnel.Namespace}, cfSecret); err != nil && apierrors.IsNotFound(err) {
+		// Define a new Secret
+		sec := r.secretForTunnel(tunnel, tunnelCreds)
+		log.Info("Creating a new Secret", "Secret.Namespace", sec.Namespace, "Secret.Name", sec.Name)
+		err = r.Create(ctx, sec)
+		if err != nil {
+			log.Error(err, "Failed to create new Secret", "Deployment.Namespace", sec.Namespace, "Deployment.Name", sec.Name)
+			return ctrl.Result{}, err
+		}
+		// Secret created successfully
+	} else if err != nil {
+		log.Error(err, "Failed to get Secret")
+		return ctrl.Result{}, err
+	}
 
 	// Check if ConfigMap already exists
 	cfConfigMap := &corev1.ConfigMap{}
@@ -102,28 +170,9 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			log.Error(err, "Failed to create new ConfigMap", "Deployment.Namespace", cm.Namespace, "Deployment.Name", cm.Name)
 			return ctrl.Result{}, err
 		}
-		// ConfigMap created successfully - return and requeue
-		return ctrl.Result{Requeue: true}, nil
+		// ConfigMap created successfully
 	} else if err != nil {
 		log.Error(err, "Failed to get ConfigMap")
-		return ctrl.Result{}, err
-	}
-
-	// Check if Secret already exists
-	cfSecret := &corev1.Secret{}
-	if err := r.Get(ctx, apitypes.NamespacedName{Name: tunnel.Name, Namespace: tunnel.Namespace}, cfSecret); err != nil && apierrors.IsNotFound(err) {
-		// Define a new Secret
-		sec := r.secretForTunnel(tunnel)
-		log.Info("Creating a new Secret", "Secret.Namespace", sec.Namespace, "Secret.Name", sec.Name)
-		err = r.Create(ctx, sec)
-		if err != nil {
-			log.Error(err, "Failed to create new Secret", "Deployment.Namespace", sec.Namespace, "Deployment.Name", sec.Name)
-			return ctrl.Result{}, err
-		}
-		// Secret created successfully - return and requeue
-		return ctrl.Result{Requeue: true}, nil
-	} else if err != nil {
-		log.Error(err, "Failed to get Secret")
 		return ctrl.Result{}, err
 	}
 
@@ -159,27 +208,6 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{RequeueAfter: time.Minute}, nil
 	}
 
-	// Update the Tunnel status with the ingresses
-	// List the ingresses using this deployment
-	ingressList := &networkingv1.IngressList{}
-	listOpts := []client.ListOption{
-		client.MatchingLabels(labelsForTunnel(*tunnel)),
-	}
-	if err := r.List(ctx, ingressList, listOpts...); err != nil {
-		log.Error(err, "Failed to list ingresses")
-		return ctrl.Result{}, err
-	}
-	ingressNames := getIngressNames(ingressList.Items)
-	// Update status.Pods if needed
-	if !reflect.DeepEqual(ingressNames, tunnel.Status.Ingresses) {
-		tunnel.Status.Ingresses = ingressNames
-		err := r.Status().Update(ctx, tunnel)
-		if err != nil {
-			log.Error(err, "Failed to update Tunnel status")
-			return ctrl.Result{}, err
-		}
-	}
-
 	return ctrl.Result{}, nil
 }
 
@@ -207,18 +235,15 @@ func (r *TunnelReconciler) configMapForTunnel(cfTunnel *networkingv1alpha1.Tunne
 }
 
 // secretForTunnel returns a tunnel Secret object
-func (r *TunnelReconciler) secretForTunnel(cfTunnel *networkingv1alpha1.Tunnel) *corev1.Secret {
+func (r *TunnelReconciler) secretForTunnel(cfTunnel *networkingv1alpha1.Tunnel, tunnelCreds string) *corev1.Secret {
 	ls := labelsForTunnel(*cfTunnel)
-	// TODO: Get the tunel credentials after creating it. Fake for now with env var
-	creds := os.Getenv("CLOUDFLARE_TUNNEL_CREDENTIALS")
-
 	sec := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cfTunnel.Name,
 			Namespace: cfTunnel.Namespace,
 			Labels:    ls,
 		},
-		StringData: map[string]string{"credentials.json": creds},
+		StringData: map[string]string{"credentials.json": tunnelCreds},
 	}
 	// Set Tunnel instance as the owner and controller
 	ctrl.SetControllerReference(cfTunnel, sec, r.Scheme)
@@ -298,15 +323,6 @@ func (r *TunnelReconciler) deploymentForTunnel(cfTunnel *networkingv1alpha1.Tunn
 	// Set Tunnel instance as the owner and controller
 	ctrl.SetControllerReference(cfTunnel, dep, r.Scheme)
 	return dep
-}
-
-// getIngressNames returns the ingress names of the array of ingresses passed in
-func getIngressNames(ingresses []networkingv1.Ingress) []string {
-	ingressNames := make([]string, 0)
-	for _, ingress := range ingresses {
-		ingressNames = append(ingressNames, fmt.Sprintf("%s/%s", ingress.Namespace, ingress.Name))
-	}
-	return ingressNames
 }
 
 // SetupWithManager sets up the controller with the Manager.
