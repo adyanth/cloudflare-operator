@@ -1,9 +1,42 @@
+# New tunnel
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cloudflare-api-key
+type: Opaque
+data:
+  CLOUDFLARE_API_KEY: <API Key, base64 encoded>
+---
 apiVersion: networking.cfargotunnel.com/v1alpha1
 kind: Tunnel
 metadata:
-  name: k8s-tunnel
+  name: new-tunnel
+spec:
+  tunnelName: new-tunnel
+  size: 2
+  accountName: <Cloudflare account name>
+  domain: example.com
+  secret: cloudflare-api-key
+  # secretKeyAPI: CLOUDFLARE_API_KEY
+---
+# Existing tunnel
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cloudflare-tunnel-creds
+type: Opaque
+data:
+  CLOUDFLARE_TUNNEL_CREDENTIAL_FILE: <~/.cloudflared/tunnelID.json, base64 encoded>
+---
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: Tunnel
+metadata:
+  name: existing-tunnel
 spec:
   tunnelName: k8s
   size: 2
-  tunnelId: "8a3fe988-89ce-467e-a781-4f620cdcc38a"
-  domain: adyanth.site
+  tunnelId: <tunnelID>
+  accountName: <Cloudflare account name>
+  domain: example.com
+  secret: cloudflare-tunnel-creds
+  # secretKeyCreds: CLOUDFLARE_TUNNEL_CREDENTIAL_FILE
