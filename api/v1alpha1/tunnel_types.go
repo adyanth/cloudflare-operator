@@ -27,9 +27,6 @@ import (
 type TunnelSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of CloudflareTunnel. Edit cloudflaretunnel_types.go to remove/update
-	// Foo  string `json:"foo,omitempty"`
-
 	//+kubebuilder:validation:Minimum=0
 	//+kubebuilder:default:=1
 	//+kubebuilder:validation:Optional
@@ -47,15 +44,34 @@ type TunnelSpec struct {
 	//+kubebuilder:validation:Optional
 	// Existing Tunnel ID to run on
 	TunnelId string `json:"tunnelId,omitempty"`
-	// TODO: Further attributes to take credentials
+
+	//+kubebuilder:validation:Required
+	// Account Name in Cloudflare
+	AccountName string `json:"accountName,omitempty"`
+
+	//+kubebuilder:validation:Required
+	// Secret containing Cloudflare API key
+	Secret string `json:"secret,omitempty"`
+
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:=CLOUDFLARE_API_KEY
+	// Key in the secret to use for Cloudflare API key, defaults to CLOUDFLARE_API_KEY
+	// Used when TunnelId is not provided
+	SecretKeyAPI string `json:"secretKeyAPI,omitempty"`
+
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:=CLOUDFLARE_TUNNEL_CREDENTIAL_FILE
+	// Key in the secret to use as credentials.json for the tunnel, defaults to CLOUDFLARE_TUNNEL_CREDENTIAL_FILE
+	// Used when TunnelId is provided
+	SecretKeyCreds string `json:"secretKeyCreds,omitempty"`
 }
 
 // TunnelStatus defines the observed state of Tunnel
 type TunnelStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	Ingresses []string `json:"ingresses"`
-	TunnelId  string   `json:"tunnelId"`
+	TunnelId     string `json:"tunnelId"`
+	TunnelSecret string `json:"tunnelSecret"`
 }
 
 //+kubebuilder:object:root=true

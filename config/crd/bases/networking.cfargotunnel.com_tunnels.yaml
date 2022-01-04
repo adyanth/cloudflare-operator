@@ -36,8 +36,25 @@ spec:
           spec:
             description: TunnelSpec defines the desired state of Tunnel
             properties:
+              accountName:
+                description: Account Name in Cloudflare
+                type: string
               domain:
                 description: Cloudflare Domain to which this tunnel belongs to
+                type: string
+              secret:
+                description: Secret containing Cloudflare API key
+                type: string
+              secretKeyAPI:
+                default: CLOUDFLARE_API_KEY
+                description: Key in the secret to use for Cloudflare API key, defaults
+                  to CLOUDFLARE_API_KEY Used when TunnelId is not provided
+                type: string
+              secretKeyCreds:
+                default: CLOUDFLARE_TUNNEL_CREDENTIAL_FILE
+                description: Key in the secret to use as credentials.json for the
+                  tunnel, defaults to CLOUDFLARE_TUNNEL_CREDENTIAL_FILE Used when
+                  TunnelId is provided
                 type: string
               size:
                 default: 1
@@ -57,18 +74,16 @@ spec:
           status:
             description: TunnelStatus defines the observed state of Tunnel
             properties:
-              ingresses:
+              tunnelId:
                 description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
                   of cluster Important: Run "make" to regenerate code after modifying
                   this file'
-                items:
-                  type: string
-                type: array
-              tunnelId:
+                type: string
+              tunnelSecret:
                 type: string
             required:
-            - ingresses
             - tunnelId
+            - tunnelSecret
             type: object
         type: object
     served: true
