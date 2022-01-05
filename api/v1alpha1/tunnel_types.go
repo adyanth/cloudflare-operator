@@ -114,6 +114,7 @@ type TunnelStatus struct {
 	TunnelId   string `json:"tunnelId"`
 	TunnelName string `json:"tunnelName"`
 	AccountId  string `json:"accountId"`
+	ZoneId     string `json:"zoneId"`
 }
 
 //+kubebuilder:object:root=true

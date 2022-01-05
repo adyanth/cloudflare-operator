@@ -27,6 +27,7 @@ type CloudflarAPI struct {
 	ValidAccountId  string
 	ValidTunnelId   string
 	ValidTunnelName string
+	ValidZoneId     string
 }
 
 type CloudflareAPINameResponse struct {
@@ -186,6 +187,10 @@ func (c *CloudflarAPI) ValidateAll() error {
 	}
 
 	if _, err := c.GetTunnelId(); err != nil {
+		return err
+	}
+
+	if _, err := c.GetZoneId(); err != nil {
 		return err
 	}
 
@@ -398,4 +403,57 @@ func (c *CloudflarAPI) GetTunnelCreds(tunnelSecret string) (string, error) {
 	})
 
 	return string(creds), err
+}
+
+func (c *CloudflarAPI) GetZoneId() (string, error) {
+	if c.ValidZoneId != "" {
+		return c.ValidZoneId, nil
+	}
+
+	if c.Domain == "" {
+		err := fmt.Errorf("domain cannot be empty")
+		c.Log.Error(err, "Domain cannot be empty")
+		return "", err
+	}
+
+	zoneIdFromName, err := c.getZoneIdByName()
+	if err != nil {
+		return "", fmt.Errorf("error fetching Zone ID by Zone Name")
+	}
+	c.ValidZoneId = zoneIdFromName
+	return c.ValidZoneId, nil
+}
+
+func (c *CloudflarAPI) getZoneIdByName() (string, error) {
+	req, _ := http.NewRequest("GET", CLOUDFLARE_ENDPOINT+"zones/?name="+url.QueryEscape(c.Domain), nil)
+	if err := c.addAuthHeader(req, false); err != nil {
+		return "", err
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.Log.Error(err, "error code in getting zoneId, check domain", "domain", c.Domain)
+		return "", err
+	}
+
+	defer resp.Body.Close()
+	var zoneResponse CloudflareAPINameResponse
+	if err := json.NewDecoder(resp.Body).Decode(&zoneResponse); err != nil || !zoneResponse.Success {
+		c.Log.Error(err, "could not read body in getting zoneId, check domain", "domain", c.Domain)
+		return "", err
+	}
+
+	switch len(zoneResponse.Result) {
+	case 0:
+		err := fmt.Errorf("no zone in response")
+		c.Log.Error(err, "found no zone, check domain", "domain", c.Domain, "zoneResponse", zoneResponse)
+		return "", err
+	case 1:
+		return zoneResponse.Result[0].Id, nil
+	default:
+		err := fmt.Errorf("more than one zone in response")
+		c.Log.Error(err, "found more than one zone, check domain", "domain", c.Domain)
+		return "", err
+	}
 }

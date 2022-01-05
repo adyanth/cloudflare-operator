@@ -124,10 +124,13 @@ spec:
                 type: string
               tunnelName:
                 type: string
+              zoneId:
+                type: string
             required:
             - accountId
             - tunnelId
             - tunnelName
+            - zoneId
             type: object
         type: object
     served: true

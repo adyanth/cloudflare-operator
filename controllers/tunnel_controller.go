@@ -128,6 +128,7 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		ValidAccountId:  tunnel.Status.AccountId,
 		ValidTunnelId:   tunnel.Status.TunnelId,
 		ValidTunnelName: tunnel.Status.TunnelName,
+		ValidZoneId:     tunnel.Status.ZoneId,
 	}
 
 	// Set tunnelId in status and get creds file
@@ -230,6 +231,7 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	tunnel.Status.AccountId = cfAPI.ValidAccountId
 	tunnel.Status.TunnelId = cfAPI.ValidTunnelId
 	tunnel.Status.TunnelName = cfAPI.ValidTunnelName
+	tunnel.Status.ZoneId = cfAPI.ValidZoneId
 	if err := r.Status().Update(ctx, tunnel); err != nil {
 		log.Error(err, "Failed to update Tunnel status", "Tunnel.Namespace", tunnel.Namespace, "Tunnel.Name", tunnel.Name)
 		return ctrl.Result{}, err
