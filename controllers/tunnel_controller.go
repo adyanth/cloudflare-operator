@@ -281,7 +281,7 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
 			return ctrl.Result{}, err
 		}
-		log.Info("Deployment created", "ConfigMap.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+		log.Info("Deployment created", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
 		return ctrl.Result{Requeue: true}, nil
 	} else if err != nil {
 		log.Error(err, "Failed to get Deployment")
@@ -315,6 +315,9 @@ func (r *TunnelReconciler) configMapForTunnel(cfTunnel *networkingv1alpha1.Tunne
 		SourceFile:   "/etc/cloudflared/creds/credentials.json",
 		Metrics:      "0.0.0.0:2000",
 		NoAutoUpdate: true,
+		Ingress: []UnvalidatedIngressRule{{
+			Service: "http_status:404",
+		}},
 	})
 
 	cm := &corev1.ConfigMap{

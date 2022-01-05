@@ -9,7 +9,7 @@ metadata:
   name: myingress
   namespace: testing-crd
   annotations:
-    tunnels.networking.cfargotunnel.com: k8s-tunnel
+    tunnels.networking.cfargotunnel.com: existing-tunnel
     tunnels.networking.cfargotunnel.com/ns: "default"
   labels:
     name: myingress

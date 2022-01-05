@@ -15,7 +15,7 @@ type Configuration struct {
 }
 
 type UnvalidatedIngressRule struct {
-	Hostname      string
+	Hostname      string `yaml:"hostname,omitempty"`
 	Path          string `yaml:"path,omitempty"`
 	Service       string
 	OriginRequest OriginRequestConfig `yaml:"originRequest,omitempty"`
