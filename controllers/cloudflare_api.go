@@ -12,25 +12,45 @@ import (
 	"github.com/go-logr/logr"
 )
 
+const CLOUDFLARE_ENDPOINT = "https://api.cloudflare.com/client/v4/"
+
 type CloudflarAPI struct {
-	Log         logr.Logger
-	TunnelName  string
-	AccountName string
-	Domain      string
-	APIKey      string
+	Log             logr.Logger
+	TunnelName      string
+	TunnelId        string
+	AccountName     string
+	AccountId       string
+	Domain          string
+	APIKey          string
+	ValidAccountId  string
+	ValidTunnelId   string
+	ValidTunnelName string
 }
 
-type CloudflareAPIAccountResponse struct {
+type CloudflareAPINameResponse struct {
 	Result []struct {
 		Id   string
 		Name string
 	}
+	Success bool
+}
+type CloudflareAPIIdResponse struct {
+	Result struct {
+		Id   string
+		Name string
+	}
+	Success bool
 }
 
 type CloudflareAPITunnelResponse struct {
 	Result struct {
 		Id              string
+		Name            string
 		CredentialsFile map[string]string `json:"credentials_file"`
+	}
+	Success bool
+	Errors  []struct {
+		Message string
 	}
 }
 
@@ -39,10 +59,10 @@ type CloudflareAPITunnelCreate struct {
 	TunnelSecret string `json:"tunnel_secret"`
 }
 
-func (c CloudflarAPI) CreateCloudflareTunnel() (string, string, error) {
-	accountId, err := c.getAccountName()
-	if err != nil {
-		return "", "", fmt.Errorf("error fetching AccountName")
+func (c *CloudflarAPI) CreateCloudflareTunnel() (string, string, error) {
+	if _, err := c.GetAccountId(); err != nil {
+		c.Log.Error(err, "error code in getting account ID")
+		return "", "", err
 	}
 
 	// Generate 32 byte random string for tunnel secret
@@ -52,43 +72,6 @@ func (c CloudflarAPI) CreateCloudflareTunnel() (string, string, error) {
 	}
 	tunnelSecret := base64.StdEncoding.EncodeToString(randSecret)
 
-	id, creds, err := c.createTunnel(accountId, tunnelSecret)
-	return id, creds, err
-}
-
-func (c CloudflarAPI) getAccountName() (string, error) {
-	req, _ := http.NewRequest("GET", "https://api.cloudflare.com/client/v4/accounts?name="+url.QueryEscape(c.AccountName), nil)
-	req.Header.Add("Authorization", "Bearer "+c.APIKey)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		c.Log.Error(err, "error code in getting account, check accountName", "accountName", c.AccountName)
-		return "", err
-	}
-
-	defer resp.Body.Close()
-	var accountResponse CloudflareAPIAccountResponse
-	if err := json.NewDecoder(resp.Body).Decode(&accountResponse); err != nil {
-		c.Log.Error(err, "could not read body in getting account, check accountName", "accountName", c.AccountName)
-		return "", err
-	}
-
-	switch len(accountResponse.Result) {
-	case 0:
-		err := fmt.Errorf("no account in response")
-		c.Log.Error(err, "found no account, check accountName", "accountName", c.AccountName)
-		return "", err
-	case 1:
-		return accountResponse.Result[0].Id, nil
-	default:
-		err := fmt.Errorf("more than one account in response")
-		c.Log.Error(err, "found more than one account, check accountName", "accountName", c.AccountName)
-		return "", err
-	}
-}
-
-func (c CloudflarAPI) createTunnel(accountId, tunnelSecret string) (string, string, error) {
 	// Generate body for POST request
 	postBody, _ := json.Marshal(map[string]string{
 		"name":          c.TunnelName,
@@ -96,7 +79,7 @@ func (c CloudflarAPI) createTunnel(accountId, tunnelSecret string) (string, stri
 	})
 	reqBody := bytes.NewBuffer(postBody)
 
-	req, _ := http.NewRequest("POST", "https://api.cloudflare.com/client/v4/accounts/"+accountId+"/tunnels", reqBody)
+	req, _ := http.NewRequest("POST", CLOUDFLARE_ENDPOINT+"accounts/"+c.ValidAccountId+"/tunnels", reqBody)
 	req.Header.Add("Authorization", "Bearer "+c.APIKey)
 	req.Header.Add("Content-Type", "application/json")
 
@@ -115,7 +98,229 @@ func (c CloudflarAPI) createTunnel(accountId, tunnelSecret string) (string, stri
 		return "", "", err
 	}
 
+	if !tunnelResponse.Success {
+		err := fmt.Errorf("%v", tunnelResponse.Errors)
+		c.Log.Error(err, "received error in creating tunnel")
+		return "", "", err
+	}
+
+	c.ValidTunnelId = tunnelResponse.Result.Id
+	c.ValidTunnelName = tunnelResponse.Result.Name
+
 	// Read credentials section and marshal to string
 	creds, _ := json.Marshal(tunnelResponse.Result.CredentialsFile)
 	return tunnelResponse.Result.Id, string(creds), nil
+}
+
+func (c *CloudflarAPI) ValidateAll() error {
+	c.Log.Info("In validation")
+	if _, err := c.GetAccountId(); err != nil {
+		return err
+	}
+
+	if _, err := c.GetTunnelId(); err != nil {
+		return err
+	}
+
+	c.Log.Info("Validation successful")
+	return nil
+}
+
+func (c *CloudflarAPI) GetAccountId() (string, error) {
+	if c.ValidAccountId != "" {
+		return c.ValidAccountId, nil
+	}
+
+	if c.AccountId == "" && c.AccountName == "" {
+		err := fmt.Errorf("both account ID and Name cannot be empty")
+		c.Log.Error(err, "Both accountId and accountName cannot be empty")
+		return "", err
+	}
+
+	if c.validateAccountId() {
+		c.ValidAccountId = c.AccountId
+	} else {
+		c.Log.Info("Account ID failed, falling back to Account Name")
+		accountIdFromName, err := c.getAccountIdByName()
+		if err != nil {
+			return "", fmt.Errorf("error fetching Account ID by Account Name")
+		}
+		c.ValidAccountId = accountIdFromName
+	}
+	return c.ValidAccountId, nil
+}
+
+func (c CloudflarAPI) validateAccountId() bool {
+	if c.AccountId == "" {
+		c.Log.Info("Account ID not provided")
+		return false
+	}
+	req, _ := http.NewRequest("GET", CLOUDFLARE_ENDPOINT+"accounts/"+url.QueryEscape(c.AccountId), nil)
+	req.Header.Add("Authorization", "Bearer "+c.APIKey)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.Log.Error(err, "error code in getting account by Account ID", "accountId", c.AccountId)
+		return false
+	}
+
+	defer resp.Body.Close()
+	var accountResponse CloudflareAPIIdResponse
+	if err := json.NewDecoder(resp.Body).Decode(&accountResponse); err != nil {
+		c.Log.Error(err, "could not read body in getting account by Account ID", "accountId", c.AccountId)
+		return false
+	}
+
+	return accountResponse.Success && accountResponse.Result.Id == c.AccountId
+}
+
+func (c *CloudflarAPI) getAccountIdByName() (string, error) {
+	req, _ := http.NewRequest("GET", CLOUDFLARE_ENDPOINT+"accounts?name="+url.QueryEscape(c.AccountName), nil)
+	req.Header.Add("Authorization", "Bearer "+c.APIKey)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.Log.Error(err, "error code in getting account, check accountName", "accountName", c.AccountName)
+		return "", err
+	}
+
+	defer resp.Body.Close()
+	var accountResponse CloudflareAPINameResponse
+	if err := json.NewDecoder(resp.Body).Decode(&accountResponse); err != nil || !accountResponse.Success {
+		c.Log.Error(err, "could not read body in getting account, check accountName", "accountName", c.AccountName)
+		return "", err
+	}
+
+	switch len(accountResponse.Result) {
+	case 0:
+		err := fmt.Errorf("no account in response")
+		c.Log.Error(err, "found no account, check accountName", "accountName", c.AccountName)
+		return "", err
+	case 1:
+		return accountResponse.Result[0].Id, nil
+	default:
+		err := fmt.Errorf("more than one account in response")
+		c.Log.Error(err, "found more than one account, check accountName", "accountName", c.AccountName)
+		return "", err
+	}
+}
+
+func (c *CloudflarAPI) GetTunnelId() (string, error) {
+	if c.ValidTunnelId != "" {
+		return c.ValidTunnelId, nil
+	}
+
+	if c.TunnelId == "" && c.TunnelName == "" {
+		err := fmt.Errorf("both tunnel ID and Name cannot be empty")
+		c.Log.Error(err, "Both tunnelId and tunnelName cannot be empty")
+		return "", err
+	}
+
+	if c.validateTunnelId() {
+		c.ValidTunnelId = c.TunnelId
+		return c.TunnelId, nil
+	} else {
+		c.Log.Info("Tunnel ID failed, falling back to Tunnel Name")
+		tunnelIdFromName, err := c.getTunnelIdByName()
+		if err != nil {
+			return "", fmt.Errorf("error fetching Tunnel ID by Tunnel Name")
+		}
+		c.ValidTunnelId = tunnelIdFromName
+		c.ValidTunnelName = c.TunnelName
+	}
+	return c.ValidTunnelId, nil
+}
+
+func (c *CloudflarAPI) validateTunnelId() bool {
+	if c.TunnelId == "" {
+		c.Log.Info("Tunnel ID not provided")
+		return false
+	}
+
+	if _, err := c.GetAccountId(); err != nil {
+		c.Log.Error(err, "error code in getting account ID")
+		return false
+	}
+
+	req, _ := http.NewRequest("GET", CLOUDFLARE_ENDPOINT+"accounts/"+c.ValidAccountId+"/tunnels/"+url.QueryEscape(c.TunnelId), nil)
+	req.Header.Add("Authorization", "Bearer "+c.APIKey)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.Log.Error(err, "error code in getting tunnel by Tunnel ID", "tunnelId", c.TunnelId)
+		return false
+	}
+
+	defer resp.Body.Close()
+	var tunnelResponse CloudflareAPIIdResponse
+	if err := json.NewDecoder(resp.Body).Decode(&tunnelResponse); err != nil {
+		c.Log.Error(err, "could not read body in getting tunnel by Tunnel ID", "tunnelId", c.TunnelId)
+		return false
+	}
+
+	c.ValidTunnelName = tunnelResponse.Result.Name
+
+	return tunnelResponse.Success && tunnelResponse.Result.Id == c.TunnelId
+}
+
+func (c *CloudflarAPI) getTunnelIdByName() (string, error) {
+	if _, err := c.GetAccountId(); err != nil {
+		c.Log.Error(err, "error code in getting account ID")
+		return "", err
+	}
+
+	req, _ := http.NewRequest("GET", CLOUDFLARE_ENDPOINT+"accounts/"+c.ValidAccountId+"/tunnels?name="+url.QueryEscape(c.TunnelName), nil)
+	req.Header.Add("Authorization", "Bearer "+c.APIKey)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.Log.Error(err, "error code in getting tunnel, check tunnelName", "tunnelName", c.TunnelName)
+		return "", err
+	}
+
+	defer resp.Body.Close()
+	var tunnelResponse CloudflareAPINameResponse
+	if err := json.NewDecoder(resp.Body).Decode(&tunnelResponse); err != nil || !tunnelResponse.Success {
+		c.Log.Error(err, "could not read body in getting tunnel, check tunnelName", "tunnelName", c.TunnelName)
+		return "", err
+	}
+
+	switch len(tunnelResponse.Result) {
+	case 0:
+		err := fmt.Errorf("no tunnel in response")
+		c.Log.Error(err, "found no tunnel, check tunnelName", "tunnelName", c.TunnelName)
+		return "", err
+	case 1:
+		c.ValidTunnelName = tunnelResponse.Result[0].Name
+		return tunnelResponse.Result[0].Id, nil
+	default:
+		err := fmt.Errorf("more than one tunnel in response")
+		c.Log.Error(err, "found more than one tunnel, check tunnelName", "tunnelName", c.TunnelName)
+		return "", err
+	}
+}
+
+func (c *CloudflarAPI) GetTunnelCreds(tunnelSecret string) (string, error) {
+	if _, err := c.GetAccountId(); err != nil {
+		c.Log.Error(err, "error code in getting account ID")
+		return "", err
+	}
+
+	if _, err := c.GetTunnelId(); err != nil {
+		c.Log.Error(err, "error code in getting tunnel ID")
+		return "", err
+	}
+
+	creds, err := json.Marshal(map[string]string{
+		"AccountTag":   c.ValidAccountId,
+		"TunnelSecret": tunnelSecret,
+		"TunnelID":     c.ValidTunnelId,
+		"TunnelName":   c.ValidTunnelName,
+	})
+
+	return string(creds), err
 }
