@@ -35,6 +35,7 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
+	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 )
 
@@ -55,6 +56,43 @@ func labelsForTunnel(cf networkingv1alpha1.Tunnel) map[string]string {
 		"tunnels.networking.cfargotunnel.com/name":   cf.Status.TunnelName,
 		"tunnels.networking.cfargotunnel.com/domain": cf.Spec.Cloudflare.Domain,
 	}
+}
+
+func getAPIDetails(c client.Client, ctx context.Context, log logr.Logger, tunnel networkingv1alpha1.Tunnel) (*CloudflarAPI, *corev1.Secret, error) {
+
+	// Get secret containing API token
+	cfCloudflareSecret := &corev1.Secret{}
+	if err := c.Get(ctx, apitypes.NamespacedName{Name: tunnel.Spec.Cloudflare.Secret, Namespace: tunnel.Namespace}, cfCloudflareSecret); err != nil {
+		log.Error(err, "secret not found", "secret", tunnel.Spec.Cloudflare.Secret)
+		return &CloudflarAPI{}, &corev1.Secret{}, err
+	}
+
+	// Read secret for API Token
+	cfAPITokenB64, ok := cfCloudflareSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_API_TOKEN]
+	if !ok {
+		log.Info("key not found in secret", "secret", tunnel.Spec.Cloudflare.Secret, "key", tunnel.Spec.Cloudflare.CLOUDFLARE_API_TOKEN)
+	}
+
+	// Read secret for API Key
+	cfAPIKeyB64, ok := cfCloudflareSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_API_KEY]
+	if !ok {
+		log.Info("key not found in secret", "secret", tunnel.Spec.Cloudflare.Secret, "key", tunnel.Spec.Cloudflare.CLOUDFLARE_API_KEY)
+	}
+
+	cfAPI := &CloudflarAPI{
+		Log:             log,
+		AccountName:     tunnel.Spec.Cloudflare.AccountName,
+		AccountId:       tunnel.Spec.Cloudflare.AccountId,
+		Domain:          tunnel.Spec.Cloudflare.Domain,
+		APIToken:        string(cfAPITokenB64),
+		APIKey:          string(cfAPIKeyB64),
+		APIEmail:        tunnel.Spec.Cloudflare.Email,
+		ValidAccountId:  tunnel.Status.AccountId,
+		ValidTunnelId:   tunnel.Status.TunnelId,
+		ValidTunnelName: tunnel.Status.TunnelName,
+		ValidZoneId:     tunnel.Status.ZoneId,
+	}
+	return cfAPI, cfCloudflareSecret, nil
 }
 
 //+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnels,verbs=get;list;watch;create;update;patch;delete
@@ -89,10 +127,9 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// Creds is the tunnel credential JSON
 	var tunnelCreds string
 
-	// Get secret containing API token
-	cfCloudflareSecret := &corev1.Secret{}
-	if err := r.Get(ctx, apitypes.NamespacedName{Name: tunnel.Spec.Cloudflare.Secret, Namespace: tunnel.Namespace}, cfCloudflareSecret); err != nil {
-		log.Error(err, "secret not found", "secret", tunnel.Spec.Cloudflare.Secret)
+	cfAPI, cfCloudflareSecret, err := getAPIDetails(r.Client, ctx, log, *tunnel)
+	if err != nil {
+		log.Error(err, "error while getting API details")
 		return ctrl.Result{}, err
 	}
 
@@ -103,32 +140,6 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		err := fmt.Errorf("spec ExistingTunnel and NewTunnel cannot be both empty and are mutually exclusive")
 		log.Error(err, "spec ExistingTunnel and NewTunnel cannot be both empty and are mutually exclusive")
 		return ctrl.Result{}, err
-	}
-
-	// Read secret for API Token
-	cfAPITokenB64, ok := cfCloudflareSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_API_TOKEN]
-	if !ok {
-		log.Info("key not found in secret", "secret", tunnel.Spec.Cloudflare.Secret, "key", tunnel.Spec.Cloudflare.CLOUDFLARE_API_TOKEN)
-	}
-
-	// Read secret for API Key
-	cfAPIKeyB64, ok := cfCloudflareSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_API_KEY]
-	if !ok {
-		log.Info("key not found in secret", "secret", tunnel.Spec.Cloudflare.Secret, "key", tunnel.Spec.Cloudflare.CLOUDFLARE_API_KEY)
-	}
-
-	cfAPI := &CloudflarAPI{
-		Log:             log,
-		AccountName:     tunnel.Spec.Cloudflare.AccountName,
-		AccountId:       tunnel.Spec.Cloudflare.AccountId,
-		Domain:          tunnel.Spec.Cloudflare.Domain,
-		APIToken:        string(cfAPITokenB64),
-		APIKey:          string(cfAPIKeyB64),
-		APIEmail:        tunnel.Spec.Cloudflare.Email,
-		ValidAccountId:  tunnel.Status.AccountId,
-		ValidTunnelId:   tunnel.Status.TunnelId,
-		ValidTunnelName: tunnel.Status.TunnelName,
-		ValidZoneId:     tunnel.Status.ZoneId,
 	}
 
 	// Set tunnelId in status and get creds file
@@ -221,6 +232,11 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				}
 			}
 		}
+	}
+
+	tunnel.Labels = labelsForTunnel(*tunnel)
+	if err := r.Update(ctx, tunnel); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	// Update status
