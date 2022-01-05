@@ -1,42 +1,49 @@
-# New tunnel
 apiVersion: v1
 kind: Secret
 metadata:
-  name: cloudflare-api-key
+  name: cloudflare-secrets
 type: Opaque
 data:
   CLOUDFLARE_API_KEY: <API Key, base64 encoded>
+  # CREDENTIAL_FILE is used if found, else CLOUDFLARE_SECRET is used to build the file.
+  # Either of them is needed when using an existing tunnel
+  CLOUDFLARE_TUNNEL_CREDENTIAL_FILE: <~/.cloudflared/tunnelID.json, base64 encoded>
+  CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET: <TunnelSecret from ~/.cloudflared/tunnelID.json, base64 encoded>
 ---
+# New tunnel
 apiVersion: networking.cfargotunnel.com/v1alpha1
 kind: Tunnel
 metadata:
   name: new-tunnel
 spec:
-  tunnelName: new-tunnel
+  newTunnel:
+    name: new-k8s-tunnel
   size: 2
-  accountName: <Cloudflare account name>
-  domain: example.com
-  secret: cloudflare-api-key
-  # secretKeyAPI: CLOUDFLARE_API_KEY
+  cloudflare:
+    domain: example.com
+    secret: cloudflare-secrets
+    # accountId and accountName cannot be both empty. If both are provided, Account ID is used if valid, else falls back to Account Name.
+    accountName: <Cloudflare account name>
+    accountId: <Cloudflare account ID>
+    # CLOUDFLARE_API_KEY: <override key to be used reading from secret>
 ---
 # Existing tunnel
-apiVersion: v1
-kind: Secret
-metadata:
-  name: cloudflare-tunnel-creds
-type: Opaque
-data:
-  CLOUDFLARE_TUNNEL_CREDENTIAL_FILE: <~/.cloudflared/tunnelID.json, base64 encoded>
----
 apiVersion: networking.cfargotunnel.com/v1alpha1
 kind: Tunnel
 metadata:
   name: existing-tunnel
 spec:
-  tunnelName: k8s
+  existingTunnel:
+    # id and name cannot be both empty. If both are provided, Tunnel ID is used if valid, else falls back to Tunnel Name.
+    id: <tunnel ID>
+    name: <tunnel Name>
   size: 2
-  tunnelId: <tunnelID>
-  accountName: <Cloudflare account name>
-  domain: example.com
-  secret: cloudflare-tunnel-creds
-  # secretKeyCreds: CLOUDFLARE_TUNNEL_CREDENTIAL_FILE
+  cloudflare:
+    domain: example.com
+    secret: cloudflare-secrets
+    # accountId and accountName cannot be both empty. If both are provided, Account ID is used if valid, else falls back to Account Name.
+    accountName: <Cloudflare account name>
+    accountId: <Cloudflare account ID>
+    # CLOUDFLARE_API_KEY: <override key to be used reading from secret>
+    # CLOUDFLARE_TUNNEL_CREDENTIAL_FILE: <override key to be used reading from secret>
+    # CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET: <override key to be used reading from secret>
