@@ -23,6 +23,55 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type ExistingTunnel struct {
+	//+kubebuilder:validation:Optional
+	// Existing Tunnel ID to run on. Tunnel ID and Tunnel Name cannot be both empty. If both are provided, ID is used if valid, else falls back to Name.
+	Id string `json:"id,omitempty"`
+
+	//+kubebuilder:validation:Optional
+	// Existing Tunnel name to run on. Tunnel Name and Tunnel ID cannot be both empty. If both are provided, ID is used if valid, else falls back to Name.
+	Name string `json:"name,omitempty"`
+}
+
+type NewTunnel struct {
+	//+kubebuilder:validation:Required
+	// Tunnel name to create on Cloudflare.
+	Name string `json:"name,omitempty"`
+}
+
+type CloudflareDetails struct {
+	//+kubebuilder:validation:Required
+	// Cloudflare Domain to which this tunnel belongs to
+	Domain string `json:"domain,omitempty"`
+
+	//+kubebuilder:validation:Required
+	// Secret containing Cloudflare API key
+	Secret string `json:"secret,omitempty"`
+
+	//+kubebuilder:validation:Optional
+	// Account Name in Cloudflare. AccountName and AccountId cannot be both empty. If both are provided, Account ID is used if valid, else falls back to Account Name.
+	AccountName string `json:"accountName,omitempty"`
+
+	//+kubebuilder:validation:Optional
+	// Account ID in Cloudflare. AccountId and AccountName cannot be both empty. If both are provided, Account ID is used if valid, else falls back to Account Name.
+	AccountId string `json:"accountId,omitempty"`
+
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:=CLOUDFLARE_API_KEY
+	// Key in the secret to use for Cloudflare API key, defaults to CLOUDFLARE_API_KEY
+	CLOUDFLARE_API_KEY string `json:"CLOUDFLARE_API_KEY,omitempty"`
+
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:=CLOUDFLARE_TUNNEL_CREDENTIAL_FILE
+	// Key in the secret to use as credentials.json for the tunnel, defaults to CLOUDFLARE_TUNNEL_CREDENTIAL_FILE
+	CLOUDFLARE_TUNNEL_CREDENTIAL_FILE string `json:"CLOUDFLARE_TUNNEL_CREDENTIAL_FILE,omitempty"`
+
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:=CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET
+	// Key in the secret to use as credentials.json for the tunnel, defaults to CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET
+	CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET string `json:"CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET,omitempty"`
+}
+
 // TunnelSpec defines the desired state of Tunnel
 type TunnelSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
@@ -34,44 +83,27 @@ type TunnelSpec struct {
 	Size int32 `json:"size,omitempty"`
 
 	//+kubebuilder:validation:Required
-	// Cloudflare Domain to which this tunnel belongs to
-	Domain string `json:"domain,omitempty"`
-
-	//+kubebuilder:validation:Required
-	// Tunnel name to give in Cloudflare
-	TunnelName string `json:"tunnelName"`
+	// Cloudflare Credentials
+	Cloudflare CloudflareDetails `json:"cloudflare,omitempty"`
 
 	//+kubebuilder:validation:Optional
-	// Existing Tunnel ID to run on
-	TunnelId string `json:"tunnelId,omitempty"`
-
-	//+kubebuilder:validation:Required
-	// Account Name in Cloudflare
-	AccountName string `json:"accountName,omitempty"`
-
-	//+kubebuilder:validation:Required
-	// Secret containing Cloudflare API key
-	Secret string `json:"secret,omitempty"`
+	// Existing tunnel object.
+	// ExistingTunnel and NewTunnel cannot be both empty and are mutually exclusive.
+	ExistingTunnel ExistingTunnel `json:"existingTunnel,omitempty"`
 
 	//+kubebuilder:validation:Optional
-	//+kubebuilder:default:=CLOUDFLARE_API_KEY
-	// Key in the secret to use for Cloudflare API key, defaults to CLOUDFLARE_API_KEY
-	// Used when TunnelId is not provided
-	SecretKeyAPI string `json:"secretKeyAPI,omitempty"`
-
-	//+kubebuilder:validation:Optional
-	//+kubebuilder:default:=CLOUDFLARE_TUNNEL_CREDENTIAL_FILE
-	// Key in the secret to use as credentials.json for the tunnel, defaults to CLOUDFLARE_TUNNEL_CREDENTIAL_FILE
-	// Used when TunnelId is provided
-	SecretKeyCreds string `json:"secretKeyCreds,omitempty"`
+	// New tunnel object.
+	// NewTunnel and ExistingTunnel cannot be both empty and are mutually exclusive.
+	NewTunnel NewTunnel `json:"newTunnel,omitempty"`
 }
 
 // TunnelStatus defines the observed state of Tunnel
 type TunnelStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	TunnelId     string `json:"tunnelId"`
-	TunnelSecret string `json:"tunnelSecret"`
+	TunnelId   string `json:"tunnelId"`
+	TunnelName string `json:"tunnelName"`
+	AccountId  string `json:"accountId"`
 }
 
 //+kubebuilder:object:root=true
