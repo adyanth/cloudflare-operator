@@ -316,7 +316,7 @@ func (c *CloudflarAPI) validateTunnelId() bool {
 	}
 
 	if _, err := c.GetAccountId(); err != nil {
-		c.Log.Error(err, "error code in getting account ID")
+		c.Log.Error(err, "error in getting account ID")
 		return false
 	}
 
@@ -346,7 +346,7 @@ func (c *CloudflarAPI) validateTunnelId() bool {
 
 func (c *CloudflarAPI) getTunnelIdByName() (string, error) {
 	if _, err := c.GetAccountId(); err != nil {
-		c.Log.Error(err, "error code in getting account ID")
+		c.Log.Error(err, "error in getting account ID")
 		return "", err
 	}
 
@@ -386,12 +386,12 @@ func (c *CloudflarAPI) getTunnelIdByName() (string, error) {
 
 func (c *CloudflarAPI) GetTunnelCreds(tunnelSecret string) (string, error) {
 	if _, err := c.GetAccountId(); err != nil {
-		c.Log.Error(err, "error code in getting account ID")
+		c.Log.Error(err, "error in getting account ID")
 		return "", err
 	}
 
 	if _, err := c.GetTunnelId(); err != nil {
-		c.Log.Error(err, "error code in getting tunnel ID")
+		c.Log.Error(err, "error in getting tunnel ID")
 		return "", err
 	}
 
@@ -456,4 +456,119 @@ func (c *CloudflarAPI) getZoneIdByName() (string, error) {
 		c.Log.Error(err, "found more than one zone, check domain", "domain", c.Domain)
 		return "", err
 	}
+}
+
+func (c *CloudflarAPI) InsertOrUpdateCName(fqdn string) error {
+	method := "POST"
+	subPath := ""
+	if dnsId, err := c.getDNSCNameId(fqdn); err == nil {
+		c.Log.Info("Updating existing record", "fqdn", fqdn, "dnsId", dnsId)
+		method = "PUT"
+		subPath = "/" + dnsId
+	} else {
+		c.Log.Info("Inserting DNS record", "fqdn", fqdn)
+	}
+
+	// Generate body for POST/PUT request
+	body, _ := json.Marshal(struct {
+		Type    string
+		Name    string
+		Content string
+		Ttl     int
+		Proxied bool
+	}{
+		Type:    "CNAME",
+		Name:    fqdn,
+		Content: c.ValidTunnelId + ".cfargotunnel.com",
+		Ttl:     1,    // Automatic TTL
+		Proxied: true, // For Cloudflare tunnels
+	})
+	reqBody := bytes.NewBuffer(body)
+
+	req, _ := http.NewRequest(method, CLOUDFLARE_ENDPOINT+"zones/"+c.ValidZoneId+"/dns_records"+subPath, reqBody)
+	if err := c.addAuthHeader(req, false); err != nil {
+		return err
+	}
+	req.Header.Add("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.Log.Error(err, "error code in setting/updating DNS record, check fqdn", "fqdn", fqdn)
+		return err
+	}
+
+	defer resp.Body.Close()
+	var dnsResponse CloudflareAPIIdResponse
+	if err := json.NewDecoder(resp.Body).Decode(&dnsResponse); err != nil || !dnsResponse.Success {
+		c.Log.Error(err, "could not read body in setting DNS record", "response", dnsResponse)
+		return err
+	}
+	c.Log.Info("DNS record set successful", "fqdn", fqdn)
+	return nil
+}
+
+func (c *CloudflarAPI) DeleteDNSCName(fqdn string) error {
+	dnsId, err := c.getDNSCNameId(fqdn)
+	if err != nil {
+		c.Log.Info("Cannot find DNS record", "fqdn", fqdn)
+		return nil
+	}
+
+	req, _ := http.NewRequest("DELETE", CLOUDFLARE_ENDPOINT+"zones/"+c.ValidZoneId+"/dns_records/"+dnsId, nil)
+	if err := c.addAuthHeader(req, false); err != nil {
+		return err
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.Log.Error(err, "error code in deleting DNS record, check fqdn", "dnsId", dnsId, "fqdn", fqdn)
+		return err
+	}
+
+	defer resp.Body.Close()
+	var dnsResponse struct {
+		Result struct {
+			Id string
+		}
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&dnsResponse); err != nil || dnsResponse.Result.Id != dnsId {
+		c.Log.Error(err, "could not read body in deleting DNS record", "fqdn", fqdn, "dnsId", dnsId, "response", dnsResponse)
+		return err
+	}
+	return nil
+}
+
+func (c *CloudflarAPI) getDNSCNameId(fqdn string) (string, error) {
+	if _, err := c.GetZoneId(); err != nil {
+		c.Log.Error(err, "error in getting Zone ID")
+		return "", err
+	}
+
+	req, _ := http.NewRequest("GET", CLOUDFLARE_ENDPOINT+"zones/"+c.ValidZoneId+"/dns_records?type=CNAME&name="+url.QueryEscape(fqdn), nil)
+	if err := c.addAuthHeader(req, false); err != nil {
+		return "", err
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.Log.Error(err, "error code in getting DNS record, check fqdn", "fqdn", fqdn)
+		return "", err
+	}
+
+	defer resp.Body.Close()
+	var dnsResponse CloudflareAPINameResponse
+	if err := json.NewDecoder(resp.Body).Decode(&dnsResponse); err != nil || !dnsResponse.Success {
+		c.Log.Error(err, "could not read body in getting zoneId, check domain", "domain", c.Domain)
+		return "", err
+	}
+
+	if len(dnsResponse.Result) != 1 {
+		err := fmt.Errorf("multiple/no records returned")
+		c.Log.Error(err, "multiple/no records returned, check fqdn", "fqdn", fqdn)
+		return "", err
+	}
+	return dnsResponse.Result[0].Id, nil
 }

@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"strings"
 
+	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
 	"github.com/go-logr/logr"
 	yaml "gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
@@ -254,7 +255,24 @@ func (r *IngressReconciler) setConfigMapConfiguration(ctx context.Context, log l
 func (r *IngressReconciler) configureCloudflare(log logr.Logger, ctx context.Context, ingress *networkingv1.Ingress, fqdn string, listOpts []client.ListOption, cleanup bool) error {
 	var config Configuration
 	var configmap corev1.ConfigMap
-	var err error
+	tunnels := &networkingv1alpha1.TunnelList{}
+
+	if err := r.List(ctx, tunnels, listOpts...); err != nil {
+		log.Error(err, "unable to get tunnel")
+		return err
+	}
+
+	if len(tunnels.Items) == 0 {
+		err := fmt.Errorf("no tunnels found")
+		log.Error(err, "Failed to list Tunnels", "listOpts", listOpts)
+		return err
+	}
+	tunnel := tunnels.Items[0]
+	cfAPI, _, err := getAPIDetails(r.Client, ctx, log, tunnel)
+	if err != nil {
+		log.Error(err, "unable to get API details")
+		return err
+	}
 
 	if configmap, config, err = r.getConfigMapConfiguration(ctx, log, listOpts); err != nil {
 		log.Error(err, "unable to get ConfigMap")
@@ -310,8 +328,18 @@ func (r *IngressReconciler) configureCloudflare(log logr.Logger, ctx context.Con
 		}
 	}
 
+	// Delete record on cleanup and set/update on normal reconcile
 	if cleanup {
 		config.Ingress = finalIngress
+		if err := cfAPI.DeleteDNSCName(fqdn); err != nil {
+			return err
+		}
+		log.Info("Deleted DNS entry", "fqdn", fqdn)
+	} else {
+		if err := cfAPI.InsertOrUpdateCName(fqdn); err != nil {
+			return err
+		}
+		log.Info("Inserted/Updated DNS entry", "fqdn", fqdn)
 	}
 	return r.setConfigMapConfiguration(ctx, log, configmap, config)
 }
