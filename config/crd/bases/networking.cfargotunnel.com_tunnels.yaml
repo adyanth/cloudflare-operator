@@ -41,8 +41,15 @@ spec:
                 properties:
                   CLOUDFLARE_API_KEY:
                     default: CLOUDFLARE_API_KEY
-                    description: Key in the secret to use for Cloudflare API key,
-                      defaults to CLOUDFLARE_API_KEY
+                    description: Key in the secret to use for Cloudflare API Key,
+                      defaults to CLOUDFLARE_API_KEY. Needs Email also to be provided.
+                      For Delete operations for new tunnels only, or as an alternate
+                      to API Token
+                    type: string
+                  CLOUDFLARE_API_TOKEN:
+                    default: CLOUDFLARE_API_TOKEN
+                    description: Key in the secret to use for Cloudflare API token,
+                      defaults to CLOUDFLARE_API_TOKEN
                     type: string
                   CLOUDFLARE_TUNNEL_CREDENTIAL_FILE:
                     default: CLOUDFLARE_TUNNEL_CREDENTIAL_FILE
@@ -66,6 +73,10 @@ spec:
                     type: string
                   domain:
                     description: Cloudflare Domain to which this tunnel belongs to
+                    type: string
+                  email:
+                    description: Email to use along with API Key for Delete operations
+                      for new tunnels only, or as an alternate to API Token
                     type: string
                   secret:
                     description: Secret containing Cloudflare API key

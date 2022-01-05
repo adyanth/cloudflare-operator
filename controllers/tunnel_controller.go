@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
@@ -104,12 +105,16 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	// Read secret for API Key
-	cfAPITokenB64, ok := cfCloudflareSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_API_KEY]
+	// Read secret for API Token
+	cfAPITokenB64, ok := cfCloudflareSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_API_TOKEN]
 	if !ok {
-		err := fmt.Errorf("key not found in secret")
-		log.Error(err, "key not found in secret", "secret", tunnel.Spec.Cloudflare.Secret, "key", tunnel.Spec.Cloudflare.CLOUDFLARE_API_KEY)
-		return ctrl.Result{}, err
+		log.Info("key not found in secret", "secret", tunnel.Spec.Cloudflare.Secret, "key", tunnel.Spec.Cloudflare.CLOUDFLARE_API_TOKEN)
+	}
+
+	// Read secret for API Key
+	cfAPIKeyB64, ok := cfCloudflareSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_API_KEY]
+	if !ok {
+		log.Info("key not found in secret", "secret", tunnel.Spec.Cloudflare.Secret, "key", tunnel.Spec.Cloudflare.CLOUDFLARE_API_KEY)
 	}
 
 	cfAPI := &CloudflarAPI{
@@ -117,7 +122,9 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		AccountName:     tunnel.Spec.Cloudflare.AccountName,
 		AccountId:       tunnel.Spec.Cloudflare.AccountId,
 		Domain:          tunnel.Spec.Cloudflare.Domain,
-		APIKey:          string(cfAPITokenB64),
+		APIToken:        string(cfAPITokenB64),
+		APIKey:          string(cfAPIKeyB64),
+		APIEmail:        tunnel.Spec.Cloudflare.Email,
 		ValidAccountId:  tunnel.Status.AccountId,
 		ValidTunnelId:   tunnel.Status.TunnelId,
 		ValidTunnelName: tunnel.Status.TunnelName,
@@ -162,6 +169,59 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		tunnelCreds = creds
 	}
 
+	// Check if Tunnel is marked for deletion if new tunnel
+	if okNewTunnel {
+		if tunnel.GetDeletionTimestamp() != nil {
+			if controllerutil.ContainsFinalizer(tunnel, tunnelFinalizerAnnotation) {
+				// Run finalization logic. If the finalization logic fails,
+				// don't remove the finalizer so that we can retry during the next reconciliation.
+
+				log.Info("starting deletion cycle", "size", tunnel.Spec.Size)
+				cfDeployment := &appsv1.Deployment{}
+				var bypass bool
+				if err := r.Get(ctx, apitypes.NamespacedName{Name: tunnel.Name, Namespace: tunnel.Namespace}, cfDeployment); err != nil {
+					log.Error(err, "Error in getting deployments, might already be deleted?")
+					bypass = true
+				}
+				if *cfDeployment.Spec.Replicas != 0 {
+					log.Info("Scaling down cloudflared")
+					var size int32 = 0
+					cfDeployment.Spec.Replicas = &size
+					if err := r.Update(ctx, cfDeployment); err != nil {
+						log.Error(err, "Failed to update Deployment", "Deployment.Namespace", cfDeployment.Namespace, "Deployment.Name", cfDeployment.Name)
+						return ctrl.Result{}, err
+					}
+					log.Info("Scaling down successful", "size", tunnel.Spec.Size)
+					return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+				}
+				if bypass || *cfDeployment.Spec.Replicas == 0 {
+					if err := cfAPI.DeleteCloudflareTunnel(); err != nil {
+						return ctrl.Result{}, err
+					}
+					log.Info("Tunnel deleted", "tunnelID", tunnel.Status.TunnelId)
+
+					// Remove tunnelFinalizer. Once all finalizers have been
+					// removed, the object will be deleted.
+					controllerutil.RemoveFinalizer(tunnel, tunnelFinalizerAnnotation)
+					err := r.Update(ctx, tunnel)
+					if err != nil {
+						log.Error(err, "unable to continue with tunnel deletion")
+						return ctrl.Result{}, err
+					}
+					return ctrl.Result{}, nil
+				}
+			}
+		} else {
+			// Add finalizer for tunnel
+			if !controllerutil.ContainsFinalizer(tunnel, tunnelFinalizerAnnotation) {
+				controllerutil.AddFinalizer(tunnel, tunnelFinalizerAnnotation)
+				if err := r.Update(ctx, tunnel); err != nil {
+					return ctrl.Result{}, err
+				}
+			}
+		}
+	}
+
 	// Update status
 	if err := cfAPI.ValidateAll(); err != nil {
 		log.Error(err, "Failed to update Tunnel status", "Tunnel.Namespace", tunnel.Namespace, "Tunnel.Name", tunnel.Name)
@@ -175,8 +235,6 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 	log.Info("Tunnel status is set", "status", tunnel.Status)
-
-	// TODO: Add finalizers to delete tunnel on resource delete
 
 	// Check if Secret already exists
 	cfSecret := &corev1.Secret{}
