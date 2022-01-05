@@ -47,10 +47,21 @@ const (
 	// If set to anything other than false, use it as a namspace where Tunnel exists
 	tunnelNSAnnotation = "tunnels.networking.cfargotunnel.com/ns"
 
+	// Protocol to use between cloudflared and the Ingress. Defaults to HTTPS. Allowed values are in tunnelValidProtoMap (http, https, tcp, udp)
+	tunnelProtoAnnotation = "tunnels.networking.cfargotunnel.com/proto"
+	defaultTunnelProto    = "https"
+
 	tunnelFinalizerAnnotation = "tunnels.networking.cfargotunnel.com/finalizer"
 	tunnelDomainAnnotation    = "tunnels.networking.cfargotunnel.com/domain"
 	configmapKey              = "config.yaml"
 )
+
+var tunnelValidProtoMap map[string]bool = map[string]bool{
+	"http":  true,
+	"https": true,
+	"tcp":   true,
+	"udp":   true,
+}
 
 // IngressReconciler reconciles a Ingress object
 type IngressReconciler struct {
@@ -220,17 +231,23 @@ func (r *IngressReconciler) configureCloudflare(log logr.Logger, ctx context.Con
 	}
 	tunnelDomain := configmap.Labels[tunnelDomainAnnotation]
 
+	ingressProto := defaultTunnelProto
+	tunnelProto := ingress.Annotations[tunnelProtoAnnotation]
+	if tunnelProto != "" && tunnelValidProtoMap[tunnelProto] {
+		ingressProto = fmt.Sprintf("%s://", tunnelProto)
+	}
+
 	var finalIngress []UnvalidatedIngressRule
 	if cleanup {
 		finalIngress = make([]UnvalidatedIngressRule, 0, len(config.Ingress))
 	}
 	// Loop through the Ingress rules
 	for _, rule := range ingress.Spec.Rules {
-		ingressSpecHost := rule.Host
+		ingressSpecHost := fmt.Sprintf("%s://%s", ingressProto, rule.Host)
 
 		// Generate fqdn string from Ingress Spec if not provided
 		if fqdn == "" {
-			ingressHost := strings.Split(ingressSpecHost, ".")[0]
+			ingressHost := strings.Split(rule.Host, ".")[0]
 			fqdn = fmt.Sprintf("%s.%s", ingressHost, tunnelDomain)
 			log.Info("using default domain value", "domain", tunnelDomain)
 		}
@@ -251,13 +268,13 @@ func (r *IngressReconciler) configureCloudflare(log logr.Logger, ctx context.Con
 			}
 		}
 
-		// Else add a new entry
+		// Else add a new entry to the beginning. The last entry has to be the 404 entry
 		if !cleanup && !found {
 			log.Info("adding ingress for host to point to service", "service", ingressSpecHost)
-			config.Ingress = append(config.Ingress, UnvalidatedIngressRule{
+			config.Ingress = append([]UnvalidatedIngressRule{{
 				Hostname: fqdn,
 				Service:  ingressSpecHost,
-			})
+			}}, config.Ingress...)
 		}
 	}
 
