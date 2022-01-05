@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -27,16 +29,19 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+
+	appsv1 "k8s.io/api/apps/v1"
 )
 
 const (
 	// One of the Tunne CRD, ID, Name is mandatory
-	// Tunnel CRD Name
-	tunnelCRDAnnotation = "tunnels.networking.cfargotunnel.com"
+	// Tunnel CR Name
+	tunnelCRAnnotation = "tunnels.networking.cfargotunnel.com/cr"
 	// Tunnel ID matching Tunnel Resource
 	tunnelIdAnnotation = "tunnels.networking.cfargotunnel.com/id"
 	// Tunnel Name matching Tunnel Resource Spec
@@ -50,6 +55,9 @@ const (
 	// Protocol to use between cloudflared and the Ingress. Defaults to HTTPS. Allowed values are in tunnelValidProtoMap (http, https, tcp, udp)
 	tunnelProtoAnnotation = "tunnels.networking.cfargotunnel.com/proto"
 	defaultTunnelProto    = "https"
+
+	// Checksum of the config, used to restart pods in the deployment
+	tunnelConfigChecksum = "tunnels.networking.cfargotunnel.com/checksum"
 
 	tunnelFinalizerAnnotation = "tunnels.networking.cfargotunnel.com/finalizer"
 	tunnelDomainAnnotation    = "tunnels.networking.cfargotunnel.com/domain"
@@ -72,6 +80,7 @@ type IngressReconciler struct {
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;update;patch
 
 func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
@@ -96,7 +105,7 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	tunnelId, okId := ingress.Annotations[tunnelIdAnnotation]
 	fqdn := ingress.Annotations[fqdnAnnotation]
 	tunnelNS, okNS := ingress.Annotations[tunnelNSAnnotation]
-	tunnelCRD, okCRD := ingress.Annotations[tunnelCRDAnnotation]
+	tunnelCRD, okCRD := ingress.Annotations[tunnelCRAnnotation]
 
 	if !(okCRD || okName || okId) {
 		// If an ingress with annotation is edited to remove just annotations, cleanup wont happen.
@@ -125,7 +134,7 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		labels[tunnelNameAnnotation] = tunnelName
 	}
 	if okCRD {
-		labels[tunnelCRDAnnotation] = tunnelCRD
+		labels[tunnelCRAnnotation] = tunnelCRD
 	}
 
 	if tunnelNS == "true" || !okNS {
@@ -208,7 +217,7 @@ func (r *IngressReconciler) getConfigMapConfiguration(ctx context.Context, log l
 }
 
 func (r *IngressReconciler) setConfigMapConfiguration(ctx context.Context, log logr.Logger, configmap corev1.ConfigMap, config Configuration) error {
-	// Push updated changesv
+	// Push updated changes
 	var configStr string
 	if configBytes, err := yaml.Marshal(config); err == nil {
 		configStr = string(configBytes)
@@ -217,7 +226,29 @@ func (r *IngressReconciler) setConfigMapConfiguration(ctx context.Context, log l
 		return err
 	}
 	configmap.Data[configmapKey] = configStr
-	return r.Update(ctx, &configmap)
+	if err := r.Update(ctx, &configmap); err != nil {
+		log.Error(err, "unable to marshal config to ConfigMap", "key", configmapKey)
+		return err
+	}
+
+	// Set checksum as annotation on Deployment, causing a restart of the Pods to take config
+	cfDeployment := &appsv1.Deployment{}
+	if err := r.Get(ctx, apitypes.NamespacedName{Name: configmap.Name, Namespace: configmap.Namespace}, cfDeployment); err != nil {
+		log.Error(err, "Error in getting deployment, failed to restart")
+		return err
+	}
+	hash := md5.Sum([]byte(configStr))
+	// Restart pods
+	if cfDeployment.Spec.Template.Annotations == nil {
+		cfDeployment.Spec.Template.Annotations = map[string]string{}
+	}
+	cfDeployment.Spec.Template.Annotations[tunnelConfigChecksum] = hex.EncodeToString(hash[:])
+	if err := r.Update(ctx, cfDeployment); err != nil {
+		log.Error(err, "Failed to update Deployment for restart")
+		return err
+	}
+	log.Info("Restarted deployment")
+	return nil
 }
 
 func (r *IngressReconciler) configureCloudflare(log logr.Logger, ctx context.Context, ingress *networkingv1.Ingress, fqdn string, listOpts []client.ListOption, cleanup bool) error {
@@ -257,7 +288,8 @@ func (r *IngressReconciler) configureCloudflare(log logr.Logger, ctx context.Con
 		found := false
 		for i, v := range config.Ingress {
 			if cleanup {
-				if v.Hostname != fqdn {
+				// TODO: Enhance this logic
+				if v.Hostname != fqdn && v.Service != ingressSpecHost {
 					finalIngress = append(finalIngress, v)
 				}
 			} else if v.Hostname == fqdn {
@@ -279,12 +311,7 @@ func (r *IngressReconciler) configureCloudflare(log logr.Logger, ctx context.Con
 	}
 
 	if cleanup {
-		if len(finalIngress) > 0 {
-			config.Ingress = finalIngress
-		} else {
-			config.Ingress = nil
-			log.Info("nothing left, setting config to nil")
-		}
+		config.Ingress = finalIngress
 	}
 	return r.setConfigMapConfiguration(ctx, log, configmap, config)
 }

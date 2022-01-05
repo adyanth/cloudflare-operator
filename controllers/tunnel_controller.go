@@ -48,7 +48,7 @@ type TunnelReconciler struct {
 // belonging to the given Tunnel CR name.
 func labelsForTunnel(cf networkingv1alpha1.Tunnel) map[string]string {
 	return map[string]string{
-		"tunnels.networking.cfargotunnel.com":        cf.Name,
+		"tunnels.networking.cfargotunnel.com/cr":     cf.Name,
 		"tunnels.networking.cfargotunnel.com/app":    "cloudflared",
 		"tunnels.networking.cfargotunnel.com/id":     cf.Status.TunnelId,
 		"tunnels.networking.cfargotunnel.com/ns":     cf.Namespace,
