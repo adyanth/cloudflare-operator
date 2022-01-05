@@ -57,9 +57,19 @@ type CloudflareDetails struct {
 	AccountId string `json:"accountId,omitempty"`
 
 	//+kubebuilder:validation:Optional
+	// Email to use along with API Key for Delete operations for new tunnels only, or as an alternate to API Token
+	Email string `json:"email,omitempty"`
+
+	//+kubebuilder:validation:Optional
 	//+kubebuilder:default:=CLOUDFLARE_API_KEY
-	// Key in the secret to use for Cloudflare API key, defaults to CLOUDFLARE_API_KEY
+	// Key in the secret to use for Cloudflare API Key, defaults to CLOUDFLARE_API_KEY. Needs Email also to be provided.
+	// For Delete operations for new tunnels only, or as an alternate to API Token
 	CLOUDFLARE_API_KEY string `json:"CLOUDFLARE_API_KEY,omitempty"`
+
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:=CLOUDFLARE_API_TOKEN
+	// Key in the secret to use for Cloudflare API token, defaults to CLOUDFLARE_API_TOKEN
+	CLOUDFLARE_API_TOKEN string `json:"CLOUDFLARE_API_TOKEN,omitempty"`
 
 	//+kubebuilder:validation:Optional
 	//+kubebuilder:default:=CLOUDFLARE_TUNNEL_CREDENTIAL_FILE

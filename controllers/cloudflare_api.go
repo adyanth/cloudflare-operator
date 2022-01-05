@@ -21,7 +21,9 @@ type CloudflarAPI struct {
 	AccountName     string
 	AccountId       string
 	Domain          string
+	APIToken        string
 	APIKey          string
+	APIEmail        string
 	ValidAccountId  string
 	ValidTunnelId   string
 	ValidTunnelName string
@@ -32,12 +34,18 @@ type CloudflareAPINameResponse struct {
 		Id   string
 		Name string
 	}
+	Errors []struct {
+		Message string
+	}
 	Success bool
 }
 type CloudflareAPIIdResponse struct {
 	Result struct {
 		Id   string
 		Name string
+	}
+	Errors []struct {
+		Message string
 	}
 	Success bool
 }
@@ -57,6 +65,22 @@ type CloudflareAPITunnelResponse struct {
 type CloudflareAPITunnelCreate struct {
 	Name         string
 	TunnelSecret string `json:"tunnel_secret"`
+}
+
+func (c CloudflarAPI) addAuthHeader(req *http.Request, delete bool) error {
+	if !delete && c.APIToken != "" {
+		req.Header.Add("Authorization", "Bearer "+c.APIToken)
+		return nil
+	}
+	c.Log.Info("No API token, or performing delete operation")
+	if c.APIKey == "" || c.APIEmail == "" {
+		err := fmt.Errorf("apiKey or apiEmail not found")
+		c.Log.Error(err, "Trying to perform Delete request, or any other request with out APIToken, cannot find API Key or Email")
+		return err
+	}
+	req.Header.Add("X-Auth-Key", c.APIKey)
+	req.Header.Add("X-Auth-Email", c.APIEmail)
+	return nil
 }
 
 func (c *CloudflarAPI) CreateCloudflareTunnel() (string, string, error) {
@@ -80,7 +104,9 @@ func (c *CloudflarAPI) CreateCloudflareTunnel() (string, string, error) {
 	reqBody := bytes.NewBuffer(postBody)
 
 	req, _ := http.NewRequest("POST", CLOUDFLARE_ENDPOINT+"accounts/"+c.ValidAccountId+"/tunnels", reqBody)
-	req.Header.Add("Authorization", "Bearer "+c.APIKey)
+	if err := c.addAuthHeader(req, false); err != nil {
+		return "", "", err
+	}
 	req.Header.Add("Content-Type", "application/json")
 
 	client := &http.Client{}
@@ -110,6 +136,47 @@ func (c *CloudflarAPI) CreateCloudflareTunnel() (string, string, error) {
 	// Read credentials section and marshal to string
 	creds, _ := json.Marshal(tunnelResponse.Result.CredentialsFile)
 	return tunnelResponse.Result.Id, string(creds), nil
+}
+
+func (c *CloudflarAPI) DeleteCloudflareTunnel() error {
+	if err := c.ValidateAll(); err != nil {
+		c.Log.Error(err, "Error in validation")
+		return err
+	}
+
+	req, _ := http.NewRequest("DELETE", CLOUDFLARE_ENDPOINT+"accounts/"+c.ValidAccountId+"/tunnels/"+url.QueryEscape(c.ValidTunnelId), nil)
+	if err := c.addAuthHeader(req, true); err != nil {
+		return err
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.Log.Error(err, "error code in deleting tunnel", "tunnelId", c.TunnelId)
+		return err
+	}
+
+	// body, err := ioutil.ReadAll(resp.Body)
+	// if err != nil {
+	// 	log.Fatalln(err)
+	// }
+	// //Convert the body to type string
+	// sb := string(body)
+	// c.Log.Info("BODYYYYYYYYYYYYYYY!!!!!!!!!!!!!!!!!", "body", sb)
+
+	defer resp.Body.Close()
+	var tunnelResponse CloudflareAPIIdResponse
+	if err := json.NewDecoder(resp.Body).Decode(&tunnelResponse); err != nil {
+		c.Log.Error(err, "could not read body in deleting tunnel", "tunnelId", c.TunnelId)
+		return err
+	}
+
+	if !tunnelResponse.Success {
+		c.Log.Error(err, "failed to delete tunnel", "tunnelId", c.TunnelId, "tunnelResponse", tunnelResponse)
+		return err
+	}
+
+	return nil
 }
 
 func (c *CloudflarAPI) ValidateAll() error {
@@ -156,7 +223,9 @@ func (c CloudflarAPI) validateAccountId() bool {
 		return false
 	}
 	req, _ := http.NewRequest("GET", CLOUDFLARE_ENDPOINT+"accounts/"+url.QueryEscape(c.AccountId), nil)
-	req.Header.Add("Authorization", "Bearer "+c.APIKey)
+	if err := c.addAuthHeader(req, false); err != nil {
+		return false
+	}
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -177,7 +246,9 @@ func (c CloudflarAPI) validateAccountId() bool {
 
 func (c *CloudflarAPI) getAccountIdByName() (string, error) {
 	req, _ := http.NewRequest("GET", CLOUDFLARE_ENDPOINT+"accounts?name="+url.QueryEscape(c.AccountName), nil)
-	req.Header.Add("Authorization", "Bearer "+c.APIKey)
+	if err := c.addAuthHeader(req, false); err != nil {
+		return "", err
+	}
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -245,7 +316,9 @@ func (c *CloudflarAPI) validateTunnelId() bool {
 	}
 
 	req, _ := http.NewRequest("GET", CLOUDFLARE_ENDPOINT+"accounts/"+c.ValidAccountId+"/tunnels/"+url.QueryEscape(c.TunnelId), nil)
-	req.Header.Add("Authorization", "Bearer "+c.APIKey)
+	if err := c.addAuthHeader(req, false); err != nil {
+		return false
+	}
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -273,7 +346,9 @@ func (c *CloudflarAPI) getTunnelIdByName() (string, error) {
 	}
 
 	req, _ := http.NewRequest("GET", CLOUDFLARE_ENDPOINT+"accounts/"+c.ValidAccountId+"/tunnels?name="+url.QueryEscape(c.TunnelName), nil)
-	req.Header.Add("Authorization", "Bearer "+c.APIKey)
+	if err := c.addAuthHeader(req, false); err != nil {
+		return "", err
+	}
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
