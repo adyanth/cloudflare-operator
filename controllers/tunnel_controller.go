@@ -51,8 +51,8 @@ func labelsForTunnel(cf networkingv1alpha1.Tunnel) map[string]string {
 		"tunnels.networking.cfargotunnel.com/app":    "cloudflared",
 		"tunnels.networking.cfargotunnel.com/id":     cf.Status.TunnelId,
 		"tunnels.networking.cfargotunnel.com/ns":     cf.Namespace,
-		"tunnels.networking.cfargotunnel.com/name":   cf.Spec.TunnelName,
-		"tunnels.networking.cfargotunnel.com/domain": cf.Spec.Domain,
+		"tunnels.networking.cfargotunnel.com/name":   cf.Status.TunnelName,
+		"tunnels.networking.cfargotunnel.com/domain": cf.Spec.Cloudflare.Domain,
 	}
 }
 
@@ -90,55 +90,91 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	// Get secret containing API token
 	cfCloudflareSecret := &corev1.Secret{}
-	if err := r.Get(ctx, apitypes.NamespacedName{Name: tunnel.Spec.Secret, Namespace: tunnel.Namespace}, cfCloudflareSecret); err != nil {
-		log.Error(err, "secret not found", "secret", tunnel.Spec.Secret)
+	if err := r.Get(ctx, apitypes.NamespacedName{Name: tunnel.Spec.Cloudflare.Secret, Namespace: tunnel.Namespace}, cfCloudflareSecret); err != nil {
+		log.Error(err, "secret not found", "secret", tunnel.Spec.Cloudflare.Secret)
 		return ctrl.Result{}, err
 	}
 
+	okNewTunnel := tunnel.Spec.NewTunnel != networkingv1alpha1.NewTunnel{}
+	okExistingTunnel := tunnel.Spec.ExistingTunnel != networkingv1alpha1.ExistingTunnel{}
+
+	if okNewTunnel == okExistingTunnel {
+		err := fmt.Errorf("spec ExistingTunnel and NewTunnel cannot be both empty and are mutually exclusive")
+		log.Error(err, "spec ExistingTunnel and NewTunnel cannot be both empty and are mutually exclusive")
+		return ctrl.Result{}, err
+	}
+
+	// Read secret for API Key
+	cfAPITokenB64, ok := cfCloudflareSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_API_KEY]
+	if !ok {
+		err := fmt.Errorf("key not found in secret")
+		log.Error(err, "key not found in secret", "secret", tunnel.Spec.Cloudflare.Secret, "key", tunnel.Spec.Cloudflare.CLOUDFLARE_API_KEY)
+		return ctrl.Result{}, err
+	}
+
+	cfAPI := &CloudflarAPI{
+		Log:             log,
+		AccountName:     tunnel.Spec.Cloudflare.AccountName,
+		AccountId:       tunnel.Spec.Cloudflare.AccountId,
+		Domain:          tunnel.Spec.Cloudflare.Domain,
+		APIKey:          string(cfAPITokenB64),
+		ValidAccountId:  tunnel.Status.AccountId,
+		ValidTunnelId:   tunnel.Status.TunnelId,
+		ValidTunnelName: tunnel.Status.TunnelName,
+	}
+
 	// Set tunnelId in status and get creds file
-	if tunnel.Spec.TunnelId != "" {
+	if okExistingTunnel {
+		cfAPI.TunnelName = tunnel.Spec.ExistingTunnel.Name
+		cfAPI.TunnelId = tunnel.Spec.ExistingTunnel.Id
+
 		// Read secret for credentials file
-		cfCredFileB64, ok := cfCloudflareSecret.Data[tunnel.Spec.SecretKeyCreds]
-		if !ok {
-			err := fmt.Errorf("key not found in secret")
-			log.Error(err, "Key not found in secret", "secret", tunnel.Spec.Secret, "SecretKeyCreds", tunnel.Spec.SecretKeyCreds)
+		cfCredFileB64, okCredFile := cfCloudflareSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_FILE]
+		cfSecretB64, okSecret := cfCloudflareSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET]
+
+		if !okCredFile && !okSecret {
+			err := fmt.Errorf("neither key not found in secret")
+			log.Error(err, "neither key not found in secret", "secret", tunnel.Spec.Cloudflare.Secret, "key1", tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_FILE, "key2", tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET)
 			return ctrl.Result{}, err
 		}
-		tunnel.Status.TunnelId = tunnel.Spec.TunnelId
-		tunnelCreds = string(cfCredFileB64)
-		if err := r.Status().Update(ctx, tunnel); err != nil {
-			log.Error(err, "Failed to update Tunnel status", "Tunnel.Namespace", tunnel.Namespace, "Tunnel.Name", tunnel.Name)
-			return ctrl.Result{}, err
-		}
-		log.Info("tunnel id set", "id", tunnel.Spec.TunnelId)
-	} else if tunnel.Status.TunnelId == "" {
-		// Read secret for API Key
-		cfAPITokenB64, ok := cfCloudflareSecret.Data[tunnel.Spec.SecretKeyAPI]
-		if !ok {
-			err := fmt.Errorf("key not found in secret")
-			log.Error(err, "Key not found in secret", "secret", tunnel.Spec.Secret, "secretKeyAPI", tunnel.Spec.SecretKeyAPI)
-			return ctrl.Result{}, err
-		}
-		tunnelId, creds, err := CloudflarAPI{
-			Log:         log,
-			TunnelName:  tunnel.Spec.TunnelName,
-			AccountName: tunnel.Spec.AccountName,
-			Domain:      tunnel.Spec.Domain,
-			APIKey:      string(cfAPITokenB64),
-		}.CreateCloudflareTunnel()
-		if err == nil {
-			tunnel.Status.TunnelId = tunnelId
-			tunnelCreds = creds
-			if err := r.Status().Update(ctx, tunnel); err != nil {
-				log.Error(err, "Failed to update Tunnel status", "Tunnel.Namespace", tunnel.Namespace, "Tunnel.Name", tunnel.Name)
+
+		if okCredFile {
+			tunnelCreds = string(cfCredFileB64)
+		} else {
+			creds, err := cfAPI.GetTunnelCreds(string(cfSecretB64))
+			if err != nil {
+				log.Error(err, "error getting tunnel credentials from secret")
 				return ctrl.Result{}, err
 			}
-			log.Info("tunnel created, id set", "id", tunnelId)
-		} else {
+			tunnelCreds = creds
+		}
+	}
+
+	// New tunnel, create on Cloudflare
+	if okNewTunnel && tunnel.Status.TunnelId == "" {
+		cfAPI.TunnelName = tunnel.Spec.NewTunnel.Name
+		_, creds, err := cfAPI.CreateCloudflareTunnel()
+		if err != nil {
 			log.Error(err, "unable to create Tunnel")
 			return ctrl.Result{}, err
 		}
+		log.Info("Tunnel created on Cloudflare")
+		tunnelCreds = creds
 	}
+
+	// Update status
+	if err := cfAPI.ValidateAll(); err != nil {
+		log.Error(err, "Failed to update Tunnel status", "Tunnel.Namespace", tunnel.Namespace, "Tunnel.Name", tunnel.Name)
+		return ctrl.Result{}, err
+	}
+	tunnel.Status.AccountId = cfAPI.ValidAccountId
+	tunnel.Status.TunnelId = cfAPI.ValidTunnelId
+	tunnel.Status.TunnelName = cfAPI.ValidTunnelName
+	if err := r.Status().Update(ctx, tunnel); err != nil {
+		log.Error(err, "Failed to update Tunnel status", "Tunnel.Namespace", tunnel.Namespace, "Tunnel.Name", tunnel.Name)
+		return ctrl.Result{}, err
+	}
+	log.Info("Tunnel status is set", "status", tunnel.Status)
 
 	// TODO: Add finalizers to delete tunnel on resource delete
 
@@ -153,7 +189,7 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			log.Error(err, "Failed to create new Secret", "Deployment.Namespace", sec.Namespace, "Deployment.Name", sec.Name)
 			return ctrl.Result{}, err
 		}
-		// Secret created successfully
+		log.Info("Secret created", "Secret.Namespace", sec.Namespace, "Secret.Name", sec.Name)
 	} else if err != nil {
 		log.Error(err, "Failed to get Secret")
 		return ctrl.Result{}, err
@@ -170,7 +206,7 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			log.Error(err, "Failed to create new ConfigMap", "Deployment.Namespace", cm.Namespace, "Deployment.Name", cm.Name)
 			return ctrl.Result{}, err
 		}
-		// ConfigMap created successfully
+		log.Info("ConfigMap created", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
 	} else if err != nil {
 		log.Error(err, "Failed to get ConfigMap")
 		return ctrl.Result{}, err
@@ -187,7 +223,7 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
 			return ctrl.Result{}, err
 		}
-		// Deployment created successfully - return and requeue
+		log.Info("Deployment created", "ConfigMap.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
 		return ctrl.Result{Requeue: true}, nil
 	} else if err != nil {
 		log.Error(err, "Failed to get Deployment")
@@ -197,11 +233,13 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// Ensure the Deployment size is the same as the spec
 	size := tunnel.Spec.Size
 	if *cfDeployment.Spec.Replicas != size {
+		log.Info("Updating deployment", "currentReplica", *cfDeployment.Spec.Replicas, "desiredSize", size)
 		cfDeployment.Spec.Replicas = &size
 		if err := r.Update(ctx, cfDeployment); err != nil {
 			log.Error(err, "Failed to update Deployment", "Deployment.Namespace", cfDeployment.Namespace, "Deployment.Name", cfDeployment.Name)
 			return ctrl.Result{}, err
 		}
+		log.Info("Deployment updated")
 		// Ask to requeue after 1 minute in order to give enough time for the
 		// pods be created on the cluster side and the operand be able
 		// to do the next update step accurately.
