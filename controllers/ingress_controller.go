@@ -78,7 +78,7 @@ type IngressReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;update
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;update;patch
@@ -283,7 +283,7 @@ func (r *IngressReconciler) configureCloudflare(log logr.Logger, ctx context.Con
 	ingressProto := defaultTunnelProto
 	tunnelProto := ingress.Annotations[tunnelProtoAnnotation]
 	if tunnelProto != "" && tunnelValidProtoMap[tunnelProto] {
-		ingressProto = fmt.Sprintf("%s://", tunnelProto)
+		ingressProto = tunnelProto
 	}
 
 	var finalIngress []UnvalidatedIngressRule
