@@ -292,7 +292,8 @@ func (r *IngressReconciler) configureCloudflare(log logr.Logger, ctx context.Con
 	}
 	// Loop through the Ingress rules
 	for _, rule := range ingress.Spec.Rules {
-		ingressSpecHost := fmt.Sprintf("%s://%s", ingressProto, rule.Host)
+		// TODO: Check the Ingress TLS config for protocol
+		cfIngressService := fmt.Sprintf("%s://%s", ingressProto, rule.Host)
 
 		// Generate fqdn string from Ingress Spec if not provided
 		if fqdn == "" {
@@ -307,12 +308,12 @@ func (r *IngressReconciler) configureCloudflare(log logr.Logger, ctx context.Con
 		for i, v := range config.Ingress {
 			if cleanup {
 				// TODO: Enhance this logic
-				if v.Hostname != fqdn && v.Service != ingressSpecHost {
+				if v.Hostname != fqdn && v.Service != cfIngressService {
 					finalIngress = append(finalIngress, v)
 				}
 			} else if v.Hostname == fqdn {
-				log.Info("found existing ingress for host, modifying the service", "service", ingressSpecHost)
-				config.Ingress[i].Service = ingressSpecHost
+				log.Info("found existing ingress for host, modifying the service", "service", cfIngressService)
+				config.Ingress[i].Service = cfIngressService
 				found = true
 				break
 			}
@@ -320,10 +321,10 @@ func (r *IngressReconciler) configureCloudflare(log logr.Logger, ctx context.Con
 
 		// Else add a new entry to the beginning. The last entry has to be the 404 entry
 		if !cleanup && !found {
-			log.Info("adding ingress for host to point to service", "service", ingressSpecHost)
+			log.Info("adding ingress for host to point to service", "service", cfIngressService)
 			config.Ingress = append([]UnvalidatedIngressRule{{
 				Hostname: fqdn,
-				Service:  ingressSpecHost,
+				Service:  cfIngressService,
 			}}, config.Ingress...)
 		}
 	}
