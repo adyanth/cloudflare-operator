@@ -21,13 +21,11 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"strings"
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
 	"github.com/go-logr/logr"
 	yaml "gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -47,15 +45,21 @@ const (
 	tunnelIdAnnotation = "tunnels.networking.cfargotunnel.com/id"
 	// Tunnel Name matching Tunnel Resource Spec
 	tunnelNameAnnotation = "tunnels.networking.cfargotunnel.com/name"
-	// FQDN to create a DNS entry for and route traffic from internet on, defaults to Ingress host subdomain + cloudflare domain
+	// FQDN to create a DNS entry for and route traffic from internet on, defaults to Service name + cloudflare domain
 	fqdnAnnotation = "tunnels.networking.cfargotunnel.com/fqdn"
-	// If this annotation is set to false, do not limit searching Tunnel to Ingress namespace, and pick the 1st one found (Might be random?)
+	// If this annotation is set to false, do not limit searching Tunnel to Service namespace, and pick the 1st one found (Might be random?)
 	// If set to anything other than false, use it as a namspace where Tunnel exists
 	tunnelNSAnnotation = "tunnels.networking.cfargotunnel.com/ns"
 
-	// Protocol to use between cloudflared and the Ingress. Defaults to HTTPS. Allowed values are in tunnelValidProtoMap (http, https, tcp, udp)
+	// Protocol to use between cloudflared and the Service.
+	// Defaults to http if protocol is tcp and port is 80, https if protocol is tcp and port is 443
+	// Else, defaults to tcp if Service Proto is tcp and udp if Service Proto is udp.
+	// Allowed values are in tunnelValidProtoMap (http, https, tcp, udp)
 	tunnelProtoAnnotation = "tunnels.networking.cfargotunnel.com/proto"
-	defaultTunnelProto    = "https"
+	tunnelProtoHTTP       = "http"
+	tunnelProtoHTTPS      = "https"
+	tunnelProtoTCP        = "tcp"
+	tunnelProtoUDP        = "udp"
 
 	// Checksum of the config, used to restart pods in the deployment
 	tunnelConfigChecksum = "tunnels.networking.cfargotunnel.com/checksum"
@@ -66,59 +70,59 @@ const (
 )
 
 var tunnelValidProtoMap map[string]bool = map[string]bool{
-	"http":  true,
-	"https": true,
-	"tcp":   true,
-	"udp":   true,
+	tunnelProtoHTTP:  true,
+	tunnelProtoHTTPS: true,
+	tunnelProtoTCP:   true,
+	tunnelProtoUDP:   true,
 }
 
-// IngressReconciler reconciles a Ingress object
-type IngressReconciler struct {
+// ServiceReconciler reconciles a Service object
+type ServiceReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;update
-//+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/finalizers,verbs=update
+//+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;update
+//+kubebuilder:rbac:groups=core,resources=services/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;update;patch
 
-func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
-	// Fetch Ingress from API
-	ingress := &networkingv1.Ingress{}
+	// Fetch Service from API
+	service := &corev1.Service{}
 
-	if err := r.Get(ctx, req.NamespacedName, ingress); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, service); err != nil {
 		if apierrors.IsNotFound(err) {
-			// Ingress object not found, could have been deleted after reconcile request.
+			// Service object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			log.Info("Ingress deleted, nothing to do")
+			log.Info("Service deleted, nothing to do")
 			return ctrl.Result{}, nil
 		}
-		log.Error(err, "unable to fetch Ingress")
+		log.Error(err, "unable to fetch Service")
 		return ctrl.Result{}, err
 	}
 
-	// Read Ingress annotations. If both annotations are not set, return without doing anything
-	tunnelName, okName := ingress.Annotations[tunnelNameAnnotation]
-	tunnelId, okId := ingress.Annotations[tunnelIdAnnotation]
-	fqdn := ingress.Annotations[fqdnAnnotation]
-	tunnelNS, okNS := ingress.Annotations[tunnelNSAnnotation]
-	tunnelCRD, okCRD := ingress.Annotations[tunnelCRAnnotation]
+	// Read Service annotations. If both annotations are not set, return without doing anything
+	tunnelName, okName := service.Annotations[tunnelNameAnnotation]
+	tunnelId, okId := service.Annotations[tunnelIdAnnotation]
+	fqdn := service.Annotations[fqdnAnnotation]
+	tunnelNS, okNS := service.Annotations[tunnelNSAnnotation]
+	tunnelCRD, okCRD := service.Annotations[tunnelCRAnnotation]
 
 	if !(okCRD || okName || okId) {
-		// If an ingress with annotation is edited to remove just annotations, cleanup wont happen.
+		// If a service with annotation is edited to remove just annotations, cleanup wont happen.
 		// Not an issue as such, since it will be overwritten the next time it is used.
-		log.Info("No related annotations not found, skipping Ingress")
-		// Check if our finalizer is present on a non managed resource and remove it. This can happen if annotations were removed from the Ingress.
-		if controllerutil.ContainsFinalizer(ingress, tunnelFinalizerAnnotation) {
-			log.Info("Finalizer found on unmanaged Ingress, removing it")
-			controllerutil.RemoveFinalizer(ingress, tunnelFinalizerAnnotation)
-			err := r.Update(ctx, ingress)
+		log.Info("No related annotations not found, skipping Service")
+		// Check if our finalizer is present on a non managed resource and remove it. This can happen if annotations were removed from the Service.
+		if controllerutil.ContainsFinalizer(service, tunnelFinalizerAnnotation) {
+			log.Info("Finalizer found on unmanaged Service, removing it")
+			controllerutil.RemoveFinalizer(service, tunnelFinalizerAnnotation)
+			err := r.Update(ctx, service)
 			if err != nil {
-				log.Error(err, "unable to remove finalizer from unmanaged Ingress")
+				log.Error(err, "unable to remove finalizer from unmanaged Service")
 				return ctrl.Result{}, err
 			}
 		}
@@ -139,8 +143,8 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if tunnelNS == "true" || !okNS {
-		labels[tunnelNSAnnotation] = ingress.Namespace
-		listOpts = append(listOpts, client.InNamespace(ingress.Namespace))
+		labels[tunnelNSAnnotation] = service.Namespace
+		listOpts = append(listOpts, client.InNamespace(service.Namespace))
 	} else if okNS && tunnelNS != "false" {
 		labels[tunnelNSAnnotation] = tunnelNS
 		listOpts = append(listOpts, client.InNamespace(tunnelNS))
@@ -150,35 +154,35 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	log.Info("setting tunnel", "listOpts", listOpts)
 
-	// Check if Ingress is marked for deletion
-	if ingress.GetDeletionTimestamp() != nil {
-		if controllerutil.ContainsFinalizer(ingress, tunnelFinalizerAnnotation) {
+	// Check if Service is marked for deletion
+	if service.GetDeletionTimestamp() != nil {
+		if controllerutil.ContainsFinalizer(service, tunnelFinalizerAnnotation) {
 			// Run finalization logic. If the finalization logic fails,
 			// don't remove the finalizer so that we can retry during the next reconciliation.
 
-			if err := r.configureCloudflare(log, ctx, ingress, fqdn, listOpts, true); err != nil {
+			if err := r.configureCloudflare(log, ctx, service, fqdn, listOpts, true); err != nil {
 				return ctrl.Result{}, err
 			}
 
 			// Remove tunnelFinalizer. Once all finalizers have been
 			// removed, the object will be deleted.
-			controllerutil.RemoveFinalizer(ingress, tunnelFinalizerAnnotation)
-			err := r.Update(ctx, ingress)
+			controllerutil.RemoveFinalizer(service, tunnelFinalizerAnnotation)
+			err := r.Update(ctx, service)
 			if err != nil {
-				log.Error(err, "unable to continue with Ingress deletion")
+				log.Error(err, "unable to continue with Service deletion")
 				return ctrl.Result{}, err
 			}
 		}
 	} else {
-		// Add finalizer for Ingress
-		if !controllerutil.ContainsFinalizer(ingress, tunnelFinalizerAnnotation) {
-			controllerutil.AddFinalizer(ingress, tunnelFinalizerAnnotation)
-			if err := r.Update(ctx, ingress); err != nil {
+		// Add finalizer for Service
+		if !controllerutil.ContainsFinalizer(service, tunnelFinalizerAnnotation) {
+			controllerutil.AddFinalizer(service, tunnelFinalizerAnnotation)
+			if err := r.Update(ctx, service); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 		// Configure ConfigMap
-		if err := r.configureCloudflare(log, ctx, ingress, fqdn, listOpts, false); err != nil {
+		if err := r.configureCloudflare(log, ctx, service, fqdn, listOpts, false); err != nil {
 			log.Error(err, "unable to configure ConfigMap", "key", configmapKey)
 			return ctrl.Result{}, err
 		}
@@ -187,7 +191,7 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return ctrl.Result{}, nil
 }
 
-func (r *IngressReconciler) getConfigMapConfiguration(ctx context.Context, log logr.Logger, listOpts []client.ListOption) (corev1.ConfigMap, Configuration, error) {
+func (r *ServiceReconciler) getConfigMapConfiguration(ctx context.Context, log logr.Logger, listOpts []client.ListOption) (corev1.ConfigMap, Configuration, error) {
 	// Fetch ConfigMap from API
 	configMapList := &corev1.ConfigMapList{}
 	if err := r.List(ctx, configMapList, listOpts...); err != nil {
@@ -217,7 +221,7 @@ func (r *IngressReconciler) getConfigMapConfiguration(ctx context.Context, log l
 	return configmap, config, nil
 }
 
-func (r *IngressReconciler) setConfigMapConfiguration(ctx context.Context, log logr.Logger, configmap corev1.ConfigMap, config Configuration) error {
+func (r *ServiceReconciler) setConfigMapConfiguration(ctx context.Context, log logr.Logger, configmap corev1.ConfigMap, config Configuration) error {
 	// Push updated changes
 	var configStr string
 	if configBytes, err := yaml.Marshal(config); err == nil {
@@ -252,7 +256,7 @@ func (r *IngressReconciler) setConfigMapConfiguration(ctx context.Context, log l
 	return nil
 }
 
-func (r *IngressReconciler) configureCloudflare(log logr.Logger, ctx context.Context, ingress *networkingv1.Ingress, fqdn string, listOpts []client.ListOption, cleanup bool) error {
+func (r *ServiceReconciler) configureCloudflare(log logr.Logger, ctx context.Context, service *corev1.Service, fqdn string, listOpts []client.ListOption, cleanup bool) error {
 	var config Configuration
 	var configmap corev1.ConfigMap
 	tunnels := &networkingv1alpha1.TunnelList{}
@@ -280,53 +284,81 @@ func (r *IngressReconciler) configureCloudflare(log logr.Logger, ctx context.Con
 	}
 	tunnelDomain := configmap.Labels[tunnelDomainAnnotation]
 
-	ingressProto := defaultTunnelProto
-	tunnelProto := ingress.Annotations[tunnelProtoAnnotation]
-	if tunnelProto != "" && tunnelValidProtoMap[tunnelProto] {
-		ingressProto = tunnelProto
+	if len(service.Spec.Ports) == 0 {
+		err := fmt.Errorf("no ports found in service spec, cannot proceed")
+		log.Error(err, "unable to read service")
+		return err
+	} else if len(service.Spec.Ports) > 1 {
+		log.Info("Multiple ports definition found, picking the first in the list")
 	}
+	servicePort := service.Spec.Ports[0]
+
+	// Logic to get serviceProto
+	var serviceProto string
+	tunnelProto := service.Annotations[tunnelProtoAnnotation]
+	validProto := tunnelValidProtoMap[tunnelProto]
+
+	if tunnelProto != "" && !validProto {
+		log.Info("Invalid Protocol provided, following default protocol logic")
+	}
+
+	if tunnelProto != "" && validProto {
+		serviceProto = tunnelProto
+	} else if servicePort.Protocol == corev1.ProtocolTCP {
+		// Default protocol selection logic
+		switch servicePort.Port {
+		case 80:
+			serviceProto = tunnelProtoHTTP
+		case 443:
+			serviceProto = tunnelProtoHTTPS
+		default:
+			serviceProto = tunnelProtoTCP
+		}
+	} else if servicePort.Protocol == corev1.ProtocolUDP {
+		serviceProto = tunnelProtoUDP
+	} else {
+		err := fmt.Errorf("unsupported protocol")
+		log.Error(err, "could not select protocol", "portProtocol", servicePort.Protocol, "annotationProtocol", tunnelProto)
+	}
+
+	log.Info("Selected protocol", "protocol", serviceProto)
 
 	var finalIngress []UnvalidatedIngressRule
 	if cleanup {
 		finalIngress = make([]UnvalidatedIngressRule, 0, len(config.Ingress))
 	}
-	// Loop through the Ingress rules
-	for _, rule := range ingress.Spec.Rules {
-		// TODO: Check the Ingress TLS config for protocol
-		cfIngressService := fmt.Sprintf("%s://%s", ingressProto, rule.Host)
 
-		// Generate fqdn string from Ingress Spec if not provided
-		if fqdn == "" {
-			ingressHost := strings.Split(rule.Host, ".")[0]
-			fqdn = fmt.Sprintf("%s.%s", ingressHost, tunnelDomain)
-			log.Info("using default domain value", "domain", tunnelDomain)
-		}
-		log.Info("setting fqdn", "fqdn", fqdn)
+	cfIngressService := fmt.Sprintf("%s://%s.%s.svc:%d", serviceProto, service.Name, service.Namespace, servicePort.Port)
 
-		// Find if the host already exists in config. If so, modify
-		found := false
-		for i, v := range config.Ingress {
-			if cleanup {
-				// TODO: Enhance this logic
-				if v.Hostname != fqdn && v.Service != cfIngressService {
-					finalIngress = append(finalIngress, v)
-				}
-			} else if v.Hostname == fqdn {
-				log.Info("found existing ingress for host, modifying the service", "service", cfIngressService)
-				config.Ingress[i].Service = cfIngressService
-				found = true
-				break
+	// Generate fqdn string from Ingress Spec if not provided
+	if fqdn == "" {
+		fqdn = fmt.Sprintf("%s.%s", service.Name, tunnelDomain)
+		log.Info("using default domain value", "domain", tunnelDomain)
+	}
+	log.Info("setting fqdn", "fqdn", fqdn)
+
+	// Find if the host already exists in config. If so, modify
+	found := false
+	for i, v := range config.Ingress {
+		if cleanup {
+			if v.Hostname != fqdn && v.Service != cfIngressService {
+				finalIngress = append(finalIngress, v)
 			}
+		} else if v.Hostname == fqdn {
+			log.Info("found existing cfIngress for host, modifying the service", "service", cfIngressService)
+			config.Ingress[i].Service = cfIngressService
+			found = true
+			break
 		}
+	}
 
-		// Else add a new entry to the beginning. The last entry has to be the 404 entry
-		if !cleanup && !found {
-			log.Info("adding ingress for host to point to service", "service", cfIngressService)
-			config.Ingress = append([]UnvalidatedIngressRule{{
-				Hostname: fqdn,
-				Service:  cfIngressService,
-			}}, config.Ingress...)
-		}
+	// Else add a new entry to the beginning. The last entry has to be the 404 entry
+	if !cleanup && !found {
+		log.Info("adding cfIngress for host to point to service", "service", cfIngressService)
+		config.Ingress = append([]UnvalidatedIngressRule{{
+			Hostname: fqdn,
+			Service:  cfIngressService,
+		}}, config.Ingress...)
 	}
 
 	// Delete record on cleanup and set/update on normal reconcile
@@ -346,8 +378,8 @@ func (r *IngressReconciler) configureCloudflare(log logr.Logger, ctx context.Con
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&networkingv1.Ingress{}).
+		For(&corev1.Service{}).
 		Complete(r)
 }
