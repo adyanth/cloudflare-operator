@@ -58,13 +58,13 @@ func labelsForTunnel(cf networkingv1alpha1.Tunnel) map[string]string {
 	}
 }
 
-func getAPIDetails(c client.Client, ctx context.Context, log logr.Logger, tunnel networkingv1alpha1.Tunnel) (*CloudflarAPI, *corev1.Secret, error) {
+func getAPIDetails(c client.Client, ctx context.Context, log logr.Logger, tunnel networkingv1alpha1.Tunnel) (*CloudflareAPI, *corev1.Secret, error) {
 
 	// Get secret containing API token
 	cfCloudflareSecret := &corev1.Secret{}
 	if err := c.Get(ctx, apitypes.NamespacedName{Name: tunnel.Spec.Cloudflare.Secret, Namespace: tunnel.Namespace}, cfCloudflareSecret); err != nil {
 		log.Error(err, "secret not found", "secret", tunnel.Spec.Cloudflare.Secret)
-		return &CloudflarAPI{}, &corev1.Secret{}, err
+		return &CloudflareAPI{}, &corev1.Secret{}, err
 	}
 
 	// Read secret for API Token
@@ -79,7 +79,7 @@ func getAPIDetails(c client.Client, ctx context.Context, log logr.Logger, tunnel
 		log.Info("key not found in secret", "secret", tunnel.Spec.Cloudflare.Secret, "key", tunnel.Spec.Cloudflare.CLOUDFLARE_API_KEY)
 	}
 
-	cfAPI := &CloudflarAPI{
+	cfAPI := &CloudflareAPI{
 		Log:             log,
 		AccountName:     tunnel.Spec.Cloudflare.AccountName,
 		AccountId:       tunnel.Spec.Cloudflare.AccountId,
