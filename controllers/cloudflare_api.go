@@ -511,7 +511,7 @@ func (c *CloudflarAPI) InsertOrUpdateCName(fqdn string) error {
 func (c *CloudflarAPI) DeleteDNSCName(fqdn string) error {
 	dnsId, err := c.getDNSCNameId(fqdn)
 	if err != nil {
-		c.Log.Info("Cannot find DNS record", "fqdn", fqdn)
+		c.Log.Info("Cannot find DNS record, already deleted", "fqdn", fqdn)
 		return nil
 	}
 
