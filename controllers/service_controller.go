@@ -138,13 +138,13 @@ func (r ServiceReconciler) getListOpts() ([]client.ListOption, error) {
 		labels[tunnelCRAnnotation] = tunnelCRD
 	}
 
-	if tunnelNS == "true" || !okNS {
+	if tunnelNS == "true" || !okNS { // Either set to "true" or not specified
 		labels[tunnelNSAnnotation] = r.service.Namespace
 		listOpts = append(listOpts, client.InNamespace(r.service.Namespace))
-	} else if okNS && tunnelNS != "false" {
+	} else if okNS && tunnelNS != "false" { // Set to something that is not "false"
 		labels[tunnelNSAnnotation] = tunnelNS
 		listOpts = append(listOpts, client.InNamespace(tunnelNS))
-	} // else, no filter on namespace, pick the 1st one
+	} // else set to "false", thus no filter on namespace, pick the 1st one
 
 	listOpts = append(listOpts, client.MatchingLabels(labels))
 	return listOpts, nil
