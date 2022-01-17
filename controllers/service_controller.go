@@ -82,52 +82,12 @@ type ServiceReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;update
-//+kubebuilder:rbac:groups=core,resources=services/finalizers,verbs=update
-//+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;update;patch
-//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;update;patch
-
-func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
-
-	// Fetch Service from API
-	service := &corev1.Service{}
-
-	if err := r.Get(ctx, req.NamespacedName, service); err != nil {
-		if apierrors.IsNotFound(err) {
-			// Service object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
-			log.Info("Service deleted, nothing to do")
-			return ctrl.Result{}, nil
-		}
-		log.Error(err, "unable to fetch Service")
-		return ctrl.Result{}, err
-	}
-
+func getListOpts(log logr.Logger, service *corev1.Service) ([]client.ListOption, error) {
 	// Read Service annotations. If both annotations are not set, return without doing anything
 	tunnelName, okName := service.Annotations[tunnelNameAnnotation]
 	tunnelId, okId := service.Annotations[tunnelIdAnnotation]
-	fqdn := service.Annotations[fqdnAnnotation]
 	tunnelNS, okNS := service.Annotations[tunnelNSAnnotation]
 	tunnelCRD, okCRD := service.Annotations[tunnelCRAnnotation]
-
-	if !(okCRD || okName || okId) {
-		// If a service with annotation is edited to remove just annotations, cleanup wont happen.
-		// Not an issue as such, since it will be overwritten the next time it is used.
-		log.Info("No related annotations not found, skipping Service")
-		// Check if our finalizer is present on a non managed resource and remove it. This can happen if annotations were removed from the Service.
-		if controllerutil.ContainsFinalizer(service, tunnelFinalizerAnnotation) {
-			log.Info("Finalizer found on unmanaged Service, removing it")
-			controllerutil.RemoveFinalizer(service, tunnelFinalizerAnnotation)
-			err := r.Update(ctx, service)
-			if err != nil {
-				log.Error(err, "unable to remove finalizer from unmanaged Service")
-				return ctrl.Result{}, err
-			}
-		}
-		return ctrl.Result{}, nil
-	}
 
 	// listOpts to search for ConfigMap. Set labels, and namespace restriction if
 	listOpts := []client.ListOption{}
@@ -151,6 +111,59 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	} // else, no filter on namespace, pick the 1st one
 
 	listOpts = append(listOpts, client.MatchingLabels(labels))
+	return listOpts, nil
+}
+
+//+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;update
+//+kubebuilder:rbac:groups=core,resources=services/finalizers,verbs=update
+//+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;update;patch
+
+func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	log := ctrllog.FromContext(ctx)
+
+	// Fetch Service from API
+	service := &corev1.Service{}
+
+	if err := r.Get(ctx, req.NamespacedName, service); err != nil {
+		if apierrors.IsNotFound(err) {
+			// Service object not found, could have been deleted after reconcile request.
+			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+			// Return and don't requeue
+			log.Info("Service deleted, nothing to do")
+			return ctrl.Result{}, nil
+		}
+		log.Error(err, "unable to fetch Service")
+		return ctrl.Result{}, err
+	}
+
+	_, okName := service.Annotations[tunnelNameAnnotation]
+	_, okId := service.Annotations[tunnelIdAnnotation]
+	fqdn := service.Annotations[fqdnAnnotation]
+	_, okCRD := service.Annotations[tunnelCRAnnotation]
+
+	if !(okCRD || okName || okId) {
+		// If a service with annotation is edited to remove just annotations, cleanup wont happen.
+		// Not an issue as such, since it will be overwritten the next time it is used.
+		log.Info("No related annotations not found, skipping Service")
+		// Check if our finalizer is present on a non managed resource and remove it. This can happen if annotations were removed from the Service.
+		if controllerutil.ContainsFinalizer(service, tunnelFinalizerAnnotation) {
+			log.Info("Finalizer found on unmanaged Service, removing it")
+			controllerutil.RemoveFinalizer(service, tunnelFinalizerAnnotation)
+			err := r.Update(ctx, service)
+			if err != nil {
+				log.Error(err, "unable to remove finalizer from unmanaged Service")
+				return ctrl.Result{}, err
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+	listOpts, err := getListOpts(log, service)
+	if err != nil {
+		log.Error(err, "unable to get list options")
+		return ctrl.Result{}, err
+	}
 
 	log.Info("setting tunnel", "listOpts", listOpts)
 
