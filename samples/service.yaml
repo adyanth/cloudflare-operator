@@ -33,7 +33,7 @@ metadata:
   name: whoami-test
   namespace: testing-crd
   annotations:
-    tunnels.networking.cfargotunnel.com/cr: existing-tunnel
+    tunnels.networking.cfargotunnel.com/cr: new-tunnel
     tunnels.networking.cfargotunnel.com/ns: default
 spec:
   selector:
