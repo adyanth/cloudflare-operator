@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    tunnels.networking.cfargotunnel.com/cr: tunnel-sample
+    tunnels.networking.cfargotunnel.com/ns: default
+  creationTimestamp: null
+  name: whoami-test
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: whoami
+status:
+  loadBalancer: {}

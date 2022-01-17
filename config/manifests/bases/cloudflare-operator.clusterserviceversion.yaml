@@ -1,0 +1,55 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: cloudflare-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: Tunnel is the Schema for the tunnels API
+      displayName: Tunnel
+      kind: Tunnel
+      name: tunnels.networking.cfargotunnel.com
+      version: v1alpha1
+  description: This operator provides a Tunnel Custom Resource to create and use existing
+    Cloudflare Tunnels. Further, it provides a Service Controller to add services
+    to be accessible via the internet using the Tunnel resource.
+  displayName: Cloudflare Tunnel Service Operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - operator
+  - cloudflare
+  - cloudflare-tunnel
+  - cloudflared
+  - kubernetes
+  - kubernetes-operator
+  links:
+  - name: Cloudflare Operator
+    url: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/run-tunnel
+  maintainers:
+  - email: me@adyanth.dev
+    name: adyanth
+  maturity: alpha
+  provider:
+    name: adyanth.dev
+    url: https://github.com/adyanth/cloudflare-operator
+  version: 0.0.0
