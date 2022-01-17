@@ -14,7 +14,7 @@ import (
 
 const CLOUDFLARE_ENDPOINT = "https://api.cloudflare.com/client/v4/"
 
-type CloudflarAPI struct {
+type CloudflareAPI struct {
 	Log             logr.Logger
 	TunnelName      string
 	TunnelId        string
@@ -68,7 +68,7 @@ type CloudflareAPITunnelCreate struct {
 	TunnelSecret string `json:"tunnel_secret"`
 }
 
-func (c CloudflarAPI) addAuthHeader(req *http.Request, delete bool) error {
+func (c CloudflareAPI) addAuthHeader(req *http.Request, delete bool) error {
 	if !delete && c.APIToken != "" {
 		req.Header.Add("Authorization", "Bearer "+c.APIToken)
 		return nil
@@ -84,7 +84,7 @@ func (c CloudflarAPI) addAuthHeader(req *http.Request, delete bool) error {
 	return nil
 }
 
-func (c *CloudflarAPI) CreateCloudflareTunnel() (string, string, error) {
+func (c *CloudflareAPI) CreateCloudflareTunnel() (string, string, error) {
 	if _, err := c.GetAccountId(); err != nil {
 		c.Log.Error(err, "error code in getting account ID")
 		return "", "", err
@@ -139,7 +139,7 @@ func (c *CloudflarAPI) CreateCloudflareTunnel() (string, string, error) {
 	return tunnelResponse.Result.Id, string(creds), nil
 }
 
-func (c *CloudflarAPI) DeleteCloudflareTunnel() error {
+func (c *CloudflareAPI) DeleteCloudflareTunnel() error {
 	if err := c.ValidateAll(); err != nil {
 		c.Log.Error(err, "Error in validation")
 		return err
@@ -180,7 +180,7 @@ func (c *CloudflarAPI) DeleteCloudflareTunnel() error {
 	return nil
 }
 
-func (c *CloudflarAPI) ValidateAll() error {
+func (c *CloudflareAPI) ValidateAll() error {
 	c.Log.Info("In validation")
 	if _, err := c.GetAccountId(); err != nil {
 		return err
@@ -198,7 +198,7 @@ func (c *CloudflarAPI) ValidateAll() error {
 	return nil
 }
 
-func (c *CloudflarAPI) GetAccountId() (string, error) {
+func (c *CloudflareAPI) GetAccountId() (string, error) {
 	if c.ValidAccountId != "" {
 		return c.ValidAccountId, nil
 	}
@@ -222,7 +222,7 @@ func (c *CloudflarAPI) GetAccountId() (string, error) {
 	return c.ValidAccountId, nil
 }
 
-func (c CloudflarAPI) validateAccountId() bool {
+func (c CloudflareAPI) validateAccountId() bool {
 	if c.AccountId == "" {
 		c.Log.Info("Account ID not provided")
 		return false
@@ -249,7 +249,7 @@ func (c CloudflarAPI) validateAccountId() bool {
 	return accountResponse.Success && accountResponse.Result.Id == c.AccountId
 }
 
-func (c *CloudflarAPI) getAccountIdByName() (string, error) {
+func (c *CloudflareAPI) getAccountIdByName() (string, error) {
 	req, _ := http.NewRequest("GET", CLOUDFLARE_ENDPOINT+"accounts?name="+url.QueryEscape(c.AccountName), nil)
 	if err := c.addAuthHeader(req, false); err != nil {
 		return "", err
@@ -283,7 +283,7 @@ func (c *CloudflarAPI) getAccountIdByName() (string, error) {
 	}
 }
 
-func (c *CloudflarAPI) GetTunnelId() (string, error) {
+func (c *CloudflareAPI) GetTunnelId() (string, error) {
 	if c.ValidTunnelId != "" {
 		return c.ValidTunnelId, nil
 	}
@@ -309,7 +309,7 @@ func (c *CloudflarAPI) GetTunnelId() (string, error) {
 	return c.ValidTunnelId, nil
 }
 
-func (c *CloudflarAPI) validateTunnelId() bool {
+func (c *CloudflareAPI) validateTunnelId() bool {
 	if c.TunnelId == "" {
 		c.Log.Info("Tunnel ID not provided")
 		return false
@@ -344,7 +344,7 @@ func (c *CloudflarAPI) validateTunnelId() bool {
 	return tunnelResponse.Success && tunnelResponse.Result.Id == c.TunnelId
 }
 
-func (c *CloudflarAPI) getTunnelIdByName() (string, error) {
+func (c *CloudflareAPI) getTunnelIdByName() (string, error) {
 	if _, err := c.GetAccountId(); err != nil {
 		c.Log.Error(err, "error in getting account ID")
 		return "", err
@@ -384,7 +384,7 @@ func (c *CloudflarAPI) getTunnelIdByName() (string, error) {
 	}
 }
 
-func (c *CloudflarAPI) GetTunnelCreds(tunnelSecret string) (string, error) {
+func (c *CloudflareAPI) GetTunnelCreds(tunnelSecret string) (string, error) {
 	if _, err := c.GetAccountId(); err != nil {
 		c.Log.Error(err, "error in getting account ID")
 		return "", err
@@ -405,7 +405,7 @@ func (c *CloudflarAPI) GetTunnelCreds(tunnelSecret string) (string, error) {
 	return string(creds), err
 }
 
-func (c *CloudflarAPI) GetZoneId() (string, error) {
+func (c *CloudflareAPI) GetZoneId() (string, error) {
 	if c.ValidZoneId != "" {
 		return c.ValidZoneId, nil
 	}
@@ -424,7 +424,7 @@ func (c *CloudflarAPI) GetZoneId() (string, error) {
 	return c.ValidZoneId, nil
 }
 
-func (c *CloudflarAPI) getZoneIdByName() (string, error) {
+func (c *CloudflareAPI) getZoneIdByName() (string, error) {
 	req, _ := http.NewRequest("GET", CLOUDFLARE_ENDPOINT+"zones/?name="+url.QueryEscape(c.Domain), nil)
 	if err := c.addAuthHeader(req, false); err != nil {
 		return "", err
@@ -458,7 +458,7 @@ func (c *CloudflarAPI) getZoneIdByName() (string, error) {
 	}
 }
 
-func (c *CloudflarAPI) InsertOrUpdateCName(fqdn string) error {
+func (c *CloudflareAPI) InsertOrUpdateCName(fqdn string) error {
 	method := "POST"
 	subPath := ""
 	if dnsId, err := c.getDNSCNameId(fqdn); err == nil {
@@ -508,7 +508,7 @@ func (c *CloudflarAPI) InsertOrUpdateCName(fqdn string) error {
 	return nil
 }
 
-func (c *CloudflarAPI) DeleteDNSCName(fqdn string) error {
+func (c *CloudflareAPI) DeleteDNSCName(fqdn string) error {
 	dnsId, err := c.getDNSCNameId(fqdn)
 	if err != nil {
 		c.Log.Info("Cannot find DNS record, already deleted", "fqdn", fqdn)
@@ -540,7 +540,7 @@ func (c *CloudflarAPI) DeleteDNSCName(fqdn string) error {
 	return nil
 }
 
-func (c *CloudflarAPI) getDNSCNameId(fqdn string) (string, error) {
+func (c *CloudflareAPI) getDNSCNameId(fqdn string) (string, error) {
 	if _, err := c.GetZoneId(); err != nil {
 		c.Log.Error(err, "error in getting Zone ID")
 		return "", err
