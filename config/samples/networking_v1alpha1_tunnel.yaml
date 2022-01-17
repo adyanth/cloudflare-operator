@@ -2,5 +2,15 @@ apiVersion: networking.cfargotunnel.com/v1alpha1
 kind: Tunnel
 metadata:
   name: tunnel-sample
+  namespace: testing-crd
 spec:
-  # Add fields here
+  newTunnel:
+    name: new-k8s-tunnel
+  size: 2
+  cloudflare:
+    domain: example.com
+    secret: cloudflare-secrets
+    # accountId and accountName cannot be both empty. If both are provided, Account ID is used if valid, else falls back to Account Name.
+    email: email@domain.com
+    accountName: <Cloudflare account name>
+    accountId: <Cloudflare account ID>

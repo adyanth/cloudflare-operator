@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: whoami-test
+  namespace: testing-crd
+  annotations:
+    tunnels.networking.cfargotunnel.com/cr: tunnel-sample
+    tunnels.networking.cfargotunnel.com/ns: default
+spec:
+  selector:
+    app: whoami
+  ports:
+    - port: 80
+      targetPort: 80
