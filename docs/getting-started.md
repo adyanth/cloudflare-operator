@@ -12,9 +12,11 @@ For the `CLOUDFLARE_API_TOKEN`, create a new "custom" token with the following:
 1. Permissions
     * Account > Argo Tunnel > Edit : To create new tunnels
     * Account > Account Settings > Read : To get the accountId from Name and the domainId for the selected domain
-    * Zone > DNS > Edit : To get the existing domain and create new entries in DNS for the domain. See #5 for potential unintended consequences if not careful when creating Resources.
+    * Zone > DNS > Edit : To get the existing domain and create new entries in DNS for the domain. See [#5](/adyanth/cloudflare-operator/issues/5) for potential unintended consequences if not careful when creating Resources.
 2. Account Resources: Include > All accounts
 3. Zone Resources: Include > All zones
+
+![Sample API Token Configuration](api-token-config.png)
 
 Usage of these tokens can be validated from the source code of [cloudflare_api.go](../controllers/cloudflare_api.go).
 
@@ -54,18 +56,18 @@ To create a Tunnel, we need to store Cloudflare credentials in a Secret. Follow 
     apiVersion: networking.cfargotunnel.com/v1alpha1
     kind: Tunnel
     metadata:
-        name: new-tunnel                # The Tunnel Custom Resource Name
+      name: new-tunnel                # The Tunnel Custom Resource Name
     spec:
-        newTunnel:
-            name: my-k8s-tunnel         # Name of your new tunnel
-        size: 2                         # This is the number of replicas for cloudflared
-        cloudflare:
-            email: email@domain.com     # Your email used to login to the Cloudflare Dashboard
-            domain: example.com         # Domain under which the tunnel runs and adds DNS entries to
-            secret: cloudflare-secrets  # The secret created before
-            # accountId and accountName cannot be both empty. If both are provided, Account ID is used if valid, else falls back to Account Name.
-            accountName: <Cloudflare account name>
-            accountId: <Cloudflare account ID>
+      newTunnel:
+        name: my-k8s-tunnel         # Name of your new tunnel
+      size: 2                         # This is the number of replicas for cloudflared
+      cloudflare:
+        email: email@domain.com     # Your email used to login to the Cloudflare Dashboard
+        domain: example.com         # Domain under which the tunnel runs and adds DNS entries to
+        secret: cloudflare-secrets  # The secret created before
+        # accountId and accountName cannot be both empty. If both are provided, Account ID is used if valid, else falls back to Account Name.
+        accountName: <Cloudflare account name>
+        accountId: <Cloudflare account ID>
     ```
 
 3. Verify that the tunnel resource was successful and generated a configmap and a deployment.
@@ -87,40 +89,40 @@ The name of the service and the domain of the Tunnel is used to add the DNS reco
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-    name: whoami
-    namespace: testing-crd
+  name: whoami
+  namespace: testing-crd
 spec:
-    selector:
-        matchLabels:
-            app: whoami
-    template:
-        metadata:
-            labels:
-                app: whoami
-        spec:
-            containers:
-                - name: whoami
-                  image: traefik/whoami
-                  resources:
-                      limits:
-                          memory: "128Mi"
-                          cpu: "500m"
-                  ports:
-                      - containerPort: 80
+  selector:
+    matchLabels:
+      app: whoami
+  template:
+    metadata:
+      labels:
+          app: whoami
+    spec:
+      containers:
+        - name: whoami
+          image: traefik/whoami
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
+          ports:
+            - containerPort: 80
 ---
 apiVersion: v1
 kind: Service
 metadata:
-    name: whoami
-    annotations:
-        # Specifies the name of the Tunnel resource created before
-        tunnels.networking.cfargotunnel.com/cr: new-tunnel
+  name: whoami
+  annotations:
+    # Specifies the name of the Tunnel resource created before
+    tunnels.networking.cfargotunnel.com/cr: new-tunnel
 spec:
-    selector:
-        app: whoami
-    ports:
-        - port: 80
-          targetPort: 80
+  selector:
+    app: whoami
+  ports:
+    - port: 80
+      targetPort: 80
 ```
 
 And that's it. Head over to `whoami.example.com` to see your deployment exposed securely through Cloudflare Tunnels!
