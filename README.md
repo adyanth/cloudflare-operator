@@ -1,8 +1,33 @@
-# Cloudflare Operator
+<h1 align=center>Cloudflare Operator</h1>
 
+<div align="center">
+  <a href="https://github.com/adyanth/cloudflare-operator">
+    <img src="images/CloudflareOperatorLogo.png" alt="Logo" height="250">
+  </a>
+  <br />
+
+  <p align="center">
+    A Kubernetes Operator to create and manage Cloudflare Tunnels and DNS records <br /> for (HTTP/TCP/UDP*) Service Resources
+    <br />
+    <br />
+    <a href="docs/getting-started.md"><strong>Getting Started Guide »</strong></a>
+    <br />
+    <br />
+    <a href="https://github.com/adyanth/cloudflare-operator/issues">Report Bug</a>
+    ·
+    <a href="https://github.com/adyanth/cloudflare-operator/issues">Request Feature</a>
+    <br />
+  </p>
+</div>
+
+
+[![GitHub license](https://img.shields.io/github/license/adyanth/cloudflare-operator?color=brightgreen)](https://github.com/adyanth/cloudflare-operator/blob/main/LICENSE)
+[![GitHub forks](https://img.shields.io/github/forks/adyanth/cloudflare-operator)](https://github.com/adyanth/cloudflare-operator/network)
+[![GitHub stars](https://img.shields.io/github/stars/adyanth/cloudflare-operator)](https://github.com/adyanth/cloudflare-operator/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/adyanth/cloudflare-operator)](https://github.com/adyanth/cloudflare-operator/issues)
 [![Go Report Card](https://goreportcard.com/badge/github.com/adyanth/cloudflare-operator)](https://goreportcard.com/report/github.com/adyanth/cloudflare-operator)
 
-> **This is not an official operator provided/backed by Cloudflare Inc.**
+> This is **NOT** an official operator provided/backed by Cloudflare Inc.
 
 > **_NOTE_**: This project is currently in Alpha
 
