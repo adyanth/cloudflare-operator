@@ -16,7 +16,7 @@ For the `CLOUDFLARE_API_TOKEN`, create a new "custom" token with the following:
 2. Account Resources: Include > All accounts
 3. Zone Resources: Include > All zones
 
-![Sample API Token Configuration](api-token-config.png)
+![Sample API Token Configuration](../images/api-token-config.png)
 
 Usage of these tokens can be validated from the source code of [cloudflare_api.go](../controllers/cloudflare_api.go).
 
