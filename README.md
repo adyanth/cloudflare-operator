@@ -31,6 +31,8 @@
 
 > **_NOTE_**: This project is currently in Alpha
 
+> UDP*: UDP support for Cloudflare Tunnels is in [Early Access](https://blog.cloudflare.com/extending-cloudflares-zero-trust-platform-to-support-udp-and-internal-dns/)
+
 ## Motivation
 
 The [Cloudflare Tunnels guide](https://developers.cloudflare.com/cloudflare-one/tutorials/many-cfd-one-tunnel) for deployment on Kubernetes provides a [manifest](https://github.com/cloudflare/argo-tunnel-examples/tree/master/named-tunnel-k8s) which is very bare bones and does not hook into Kubernetes in any meaningful way. The operator started out as a hobby project of mine to deploy applications in my home lab and expose them to the internet via Cloudflare Tunnels without doing a lot of manual work every time a new application is deployed.
