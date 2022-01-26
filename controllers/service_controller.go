@@ -118,7 +118,7 @@ func encodeCfService(cfService string) string {
 	return fmt.Sprintf("%s%s%s", protoSplit[0], configServiceLabelSplit, domainSplit[1])
 }
 
-func (r ServiceReconciler) getListOpts() ([]client.ListOption, error) {
+func (r ServiceReconciler) getListOpts() []client.ListOption {
 	// Read Service annotations. If both annotations are not set, return without doing anything
 	tunnelName, okName := r.service.Annotations[tunnelNameAnnotation]
 	tunnelId, okId := r.service.Annotations[tunnelIdAnnotation]
@@ -147,19 +147,14 @@ func (r ServiceReconciler) getListOpts() ([]client.ListOption, error) {
 	} // else set to "false", thus no filter on namespace, pick the 1st one
 
 	listOpts = append(listOpts, client.MatchingLabels(labels))
-	return listOpts, nil
+	return listOpts
 }
 
 func (r *ServiceReconciler) initStruct(ctx context.Context, req ctrl.Request, service *corev1.Service) error {
 	r.ctx = ctx
 	r.service = service
 
-	listOpts, err := r.getListOpts()
-	if err != nil {
-		r.log.Error(err, "unable to get list options")
-		return err
-	}
-	r.listOpts = listOpts
+	r.listOpts = r.getListOpts()
 	r.log.Info("setting listOpts", "listOpts", r.listOpts)
 
 	if tunnel, err := r.getTunnel(); err != nil {
