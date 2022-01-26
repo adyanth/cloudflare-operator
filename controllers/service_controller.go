@@ -36,6 +36,7 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/client-go/tools/record"
 )
 
 const (
@@ -83,7 +84,8 @@ var tunnelValidProtoMap map[string]bool = map[string]bool{
 // ServiceReconciler reconciles a Service object
 type ServiceReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 
 	// Custom data for ease of (re)use
 
@@ -159,6 +161,7 @@ func (r *ServiceReconciler) initStruct(ctx context.Context, req ctrl.Request, se
 
 	if tunnel, err := r.getTunnel(); err != nil {
 		r.log.Error(err, "unable to get tunnel for configuration")
+		r.Recorder.Event(service, corev1.EventTypeWarning, "ErrTunnel", "Error finding Tunnel referenced by Service")
 		return err
 	} else {
 		r.tunnel = tunnel
@@ -166,6 +169,7 @@ func (r *ServiceReconciler) initStruct(ctx context.Context, req ctrl.Request, se
 
 	if configmap, err := r.getConfigMap(); err != nil {
 		r.log.Error(err, "unable to get configmap for configuration")
+		r.Recorder.Event(service, corev1.EventTypeWarning, "ErrConfigMap", "Error finding ConfigMap for Tunnel referenced by Service")
 		return err
 	} else {
 		r.configmap = configmap
@@ -173,6 +177,7 @@ func (r *ServiceReconciler) initStruct(ctx context.Context, req ctrl.Request, se
 
 	if config, err := r.getConfigForService("", nil); err != nil {
 		r.log.Error(err, "error getting config for service")
+		r.Recorder.Event(service, corev1.EventTypeWarning, "ErrBuildConfig", "Error building Tunnel configuration")
 		return err
 	} else {
 		r.config = &config
@@ -185,6 +190,7 @@ func (r *ServiceReconciler) initStruct(ctx context.Context, req ctrl.Request, se
 //+kubebuilder:rbac:groups=core,resources=services/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;update;patch
+//+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.log = ctrllog.FromContext(ctx)
@@ -218,8 +224,10 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			err := r.Update(ctx, service)
 			if err != nil {
 				r.log.Error(err, "unable to remove finalizer from unmanaged Service")
+				r.Recorder.Event(service, corev1.EventTypeWarning, "FailedFinalizerUnset", "Failed to remove Service Finalizer from unmanaged Service")
 				return ctrl.Result{}, err
 			}
+			r.Recorder.Event(service, corev1.EventTypeNormal, "FinalizerUnset", "Service Finalizer removed, unmanaged Service")
 		}
 		return ctrl.Result{}, nil
 	}
@@ -233,8 +241,10 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// don't remove the finalizer so that we can retry during the next reconciliation.
 
 			if err := r.deleteRecord(); err != nil {
+				r.Recorder.Event(service, corev1.EventTypeWarning, "FailedDeletingDns", "Failed to delete DNS entry")
 				return ctrl.Result{}, err
 			}
+			r.Recorder.Event(service, corev1.EventTypeNormal, "DeletedDns", "Deleted DNS entry")
 
 			// Remove tunnelFinalizer. Once all finalizers have been
 			// removed, the object will be deleted.
@@ -242,8 +252,10 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			err := r.Update(ctx, service)
 			if err != nil {
 				r.log.Error(err, "unable to continue with Service deletion")
+				r.Recorder.Event(service, corev1.EventTypeWarning, "FailedFinalizerUnset", "Failed to remove Service Finalizer")
 				return ctrl.Result{}, err
 			}
+			r.Recorder.Event(service, corev1.EventTypeNormal, "FinalizerUnset", "Service Finalizer removed")
 		}
 	} else {
 		// Add finalizer for Service
@@ -256,22 +268,28 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 		// Update Service resource
 		if err := r.Update(ctx, service); err != nil {
+			r.Recorder.Event(service, corev1.EventTypeWarning, "FailedMetaSet", "Failed to set Service Finalizer and Labels")
 			return ctrl.Result{}, err
 		}
+		r.Recorder.Event(service, corev1.EventTypeNormal, "MetaSet", "Service Finalizer and Labels added")
 
 		// Create DNS entry
 		if err := r.createRecord(); err != nil {
+			r.Recorder.Event(service, corev1.EventTypeWarning, "FailedCreatingDns", "Failed to insert/update DNS entry")
 			return ctrl.Result{}, err
 		}
 		r.log.Info("Inserted/Updated DNS entry")
+		r.Recorder.Event(service, corev1.EventTypeNormal, "CreatedDns", "Inserted/Updated DNS entry")
 	}
 
 	// Configure ConfigMap
+	r.Recorder.Event(service, corev1.EventTypeNormal, "Configuring", "Configuring ConfigMap")
 	if err := r.configureCloudflare(); err != nil {
 		r.log.Error(err, "unable to configure ConfigMap", "key", configmapKey)
+		r.Recorder.Event(service, corev1.EventTypeWarning, "FailedConfigure", "Failed to configure ConfigMap")
 		return ctrl.Result{}, err
 	}
-
+	r.Recorder.Event(service, corev1.EventTypeNormal, "Configured", "Configured Cloudflare Tunnel")
 	return ctrl.Result{}, nil
 }
 
@@ -430,19 +448,26 @@ func (r *ServiceReconciler) setConfigMapConfiguration(config *Configuration) err
 	cfDeployment := &appsv1.Deployment{}
 	if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.configmap.Name, Namespace: r.configmap.Namespace}, cfDeployment); err != nil {
 		r.log.Error(err, "Error in getting deployment, failed to restart")
+		r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedConfigure", "Failed to get Deployment")
 		return err
 	}
 	hash := md5.Sum([]byte(configStr))
 	// Restart pods
+	r.Recorder.Event(r.service, corev1.EventTypeNormal, "ApplyingConfig", "Applying ConfigMap to Deployment")
+	r.Recorder.Event(cfDeployment, corev1.EventTypeNormal, "ApplyingConfig", "Applying ConfigMap to Deployment")
 	if cfDeployment.Spec.Template.Annotations == nil {
 		cfDeployment.Spec.Template.Annotations = map[string]string{}
 	}
 	cfDeployment.Spec.Template.Annotations[tunnelConfigChecksum] = hex.EncodeToString(hash[:])
 	if err := r.Update(r.ctx, cfDeployment); err != nil {
 		r.log.Error(err, "Failed to update Deployment for restart")
+		r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedApplyingConfig", "Failed to apply ConfigMap to Deployment")
+		r.Recorder.Event(cfDeployment, corev1.EventTypeWarning, "FailedApplyingConfig", "Failed to apply ConfigMap to Deployment")
 		return err
 	}
 	r.log.Info("Restarted deployment")
+	r.Recorder.Event(r.service, corev1.EventTypeNormal, "AppliedConfig", "ConfigMap applied to Deployment")
+	r.Recorder.Event(cfDeployment, corev1.EventTypeNormal, "AppliedConfig", "ConfigMap applied to Deployment")
 	return nil
 }
 
@@ -508,6 +533,7 @@ func (r ServiceReconciler) deleteRecord() error {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.Recorder = mgr.GetEventRecorderFor("cloudflare-operator")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Service{}).
 		Complete(r)
