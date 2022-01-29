@@ -196,23 +196,7 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	// Check if ConfigMap already exists
-	cfConfigMap := &corev1.ConfigMap{}
-	if err := r.Get(ctx, apitypes.NamespacedName{Name: tunnel.Name, Namespace: tunnel.Namespace}, cfConfigMap); err != nil && apierrors.IsNotFound(err) {
-		// Define a new ConfigMap
-		cm := r.configMapForTunnel(tunnel)
-		r.log.Info("Creating a new ConfigMap", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Configuring", "Creating Tunnel ConfigMap")
-		err = r.Create(ctx, cm)
-		if err != nil {
-			r.log.Error(err, "Failed to create new ConfigMap", "Deployment.Namespace", cm.Namespace, "Deployment.Name", cm.Name)
-			r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedConfiguring", "Creating Tunnel ConfigMap failed")
-			return ctrl.Result{}, err
-		}
-		r.log.Info("ConfigMap created", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Configured", "Created Tunnel ConfigMap")
-	} else if err != nil {
-		r.log.Error(err, "Failed to get ConfigMap")
-		r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedConfigured", "Reading Tunnel ConfigMap failed")
+	if err := r.createManagedConfigMap(); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -411,6 +395,29 @@ func (r *TunnelReconciler) createManagedSecret() error {
 	} else if err != nil {
 		r.log.Error(err, "Failed to get Secret")
 		r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedCreatedSecret", "Reading Tunnel Secret failed")
+		return err
+	}
+	return nil
+}
+
+func (r *TunnelReconciler) createManagedConfigMap() error {
+	cfConfigMap := &corev1.ConfigMap{}
+	if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.tunnel.Namespace}, cfConfigMap); err != nil && apierrors.IsNotFound(err) {
+		// Define a new ConfigMap
+		cm := r.configMapForTunnel(r.tunnel)
+		r.log.Info("Creating a new ConfigMap", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Configuring", "Creating Tunnel ConfigMap")
+		err = r.Create(r.ctx, cm)
+		if err != nil {
+			r.log.Error(err, "Failed to create new ConfigMap", "Deployment.Namespace", cm.Namespace, "Deployment.Name", cm.Name)
+			r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedConfiguring", "Creating Tunnel ConfigMap failed")
+			return err
+		}
+		r.log.Info("ConfigMap created", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Configured", "Created Tunnel ConfigMap")
+	} else if err != nil {
+		r.log.Error(err, "Failed to get ConfigMap")
+		r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedConfigured", "Reading Tunnel ConfigMap failed")
 		return err
 	}
 	return nil
