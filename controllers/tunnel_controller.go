@@ -173,80 +173,10 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			return ctrl.Result{}, err
 		}
 		} else {
-			creds, err := cfAPI.GetTunnelCreds(string(cfSecretB64))
-			if err != nil {
-				log.Error(err, "error getting tunnel credentials from secret")
-				r.Recorder.Event(tunnel, corev1.EventTypeWarning, "ErrSpecApi", "Error in getting Tunnel Credentials from Secret")
-				return ctrl.Result{}, err
-			}
-			tunnelCreds = creds
-		}
-	}
-
-	// New tunnel, create on Cloudflare
-	if okNewTunnel && tunnel.Status.TunnelId == "" {
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Creating", "Tunnel is being created")
-		cfAPI.TunnelName = tunnel.Spec.NewTunnel.Name
-		_, creds, err := cfAPI.CreateCloudflareTunnel()
-		if err != nil {
-			log.Error(err, "unable to create Tunnel")
-			r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedCreate", "Unable to create Tunnel on Cloudflare")
-			return ctrl.Result{}, err
-		}
-		log.Info("Tunnel created on Cloudflare")
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Created", "Tunnel created successfully on Cloudflare")
-		tunnelCreds = creds
-	}
-
-	// Check if Tunnel is marked for deletion if new tunnel
-	if okNewTunnel {
-		if tunnel.GetDeletionTimestamp() != nil {
-			if controllerutil.ContainsFinalizer(tunnel, tunnelFinalizerAnnotation) {
-				// Run finalization logic. If the finalization logic fails,
-				// don't remove the finalizer so that we can retry during the next reconciliation.
-
-				log.Info("starting deletion cycle", "size", tunnel.Spec.Size)
-				r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Deleting", "Starting Tunnel Deletion")
-				cfDeployment := &appsv1.Deployment{}
-				var bypass bool
-				if err := r.Get(ctx, apitypes.NamespacedName{Name: tunnel.Name, Namespace: tunnel.Namespace}, cfDeployment); err != nil {
-					log.Error(err, "Error in getting deployments, might already be deleted?")
-					bypass = true
-				}
-				if *cfDeployment.Spec.Replicas != 0 {
-					log.Info("Scaling down cloudflared")
-					r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Scaling", "Scaling down cloudflared")
-					var size int32 = 0
-					cfDeployment.Spec.Replicas = &size
-					if err := r.Update(ctx, cfDeployment); err != nil {
-						log.Error(err, "Failed to update Deployment", "Deployment.Namespace", cfDeployment.Namespace, "Deployment.Name", cfDeployment.Name)
-						r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedScaling", "Failed to scale down cloudflared")
-						return ctrl.Result{}, err
-					}
-					log.Info("Scaling down successful", "size", tunnel.Spec.Size)
-					r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Scaled", "Scaling down cloudflared successful")
-					return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-				}
-				if bypass || *cfDeployment.Spec.Replicas == 0 {
-					if err := cfAPI.DeleteCloudflareTunnel(); err != nil {
-						r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedDeleting", "Tunnel deletion failed")
-						return ctrl.Result{}, err
-					}
-					log.Info("Tunnel deleted", "tunnelID", tunnel.Status.TunnelId)
-					r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Deleted", "Tunnel deletion successful")
-
-					// Remove tunnelFinalizer. Once all finalizers have been
-					// removed, the object will be deleted.
-					controllerutil.RemoveFinalizer(tunnel, tunnelFinalizerAnnotation)
-					err := r.Update(ctx, tunnel)
-					if err != nil {
-						log.Error(err, "unable to continue with tunnel deletion")
-						r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedFinalizerUnset", "Unable to remove Tunnel Finalizer")
-						return ctrl.Result{}, err
-					}
-					r.Recorder.Event(tunnel, corev1.EventTypeNormal, "FinalizerUnset", "Tunnel Finalizer removed")
-					return ctrl.Result{}, nil
-				}
+		// New tunnel, finalizer/cleanup logic + creation
+		if r.tunnel.GetDeletionTimestamp() != nil {
+			if res, err := r.cleanupTunnel(); err != nil || (res != ctrl.Result{}) {
+				return res, err
 			}
 		} else {
 			if err := r.setupNewTunnel(); err != nil {
@@ -419,6 +349,57 @@ func (r *TunnelReconciler) setupNewTunnel() error {
 		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "FinalizerSet", "Tunnel Finalizer added")
 	}
 	return nil
+}
+
+func (r *TunnelReconciler) cleanupTunnel() (ctrl.Result, error) {
+	if controllerutil.ContainsFinalizer(r.tunnel, tunnelFinalizerAnnotation) {
+		// Run finalization logic. If the finalization logic fails,
+		// don't remove the finalizer so that we can retry during the next reconciliation.
+
+		r.log.Info("starting deletion cycle", "size", r.tunnel.Spec.Size)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Deleting", "Starting Tunnel Deletion")
+		cfDeployment := &appsv1.Deployment{}
+		var bypass bool
+		if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.tunnel.Namespace}, cfDeployment); err != nil {
+			r.log.Error(err, "Error in getting deployments, might already be deleted?")
+			bypass = true
+		}
+		if *cfDeployment.Spec.Replicas != 0 {
+			r.log.Info("Scaling down cloudflared")
+			r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Scaling", "Scaling down cloudflared")
+			var size int32 = 0
+			cfDeployment.Spec.Replicas = &size
+			if err := r.Update(r.ctx, cfDeployment); err != nil {
+				r.log.Error(err, "Failed to update Deployment", "Deployment.Namespace", cfDeployment.Namespace, "Deployment.Name", cfDeployment.Name)
+				r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedScaling", "Failed to scale down cloudflared")
+				return ctrl.Result{}, err
+			}
+			r.log.Info("Scaling down successful", "size", r.tunnel.Spec.Size)
+			r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Scaled", "Scaling down cloudflared successful")
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+		if bypass || *cfDeployment.Spec.Replicas == 0 {
+			if err := r.cfAPI.DeleteCloudflareTunnel(); err != nil {
+				r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedDeleting", "Tunnel deletion failed")
+				return ctrl.Result{}, err
+			}
+			r.log.Info("Tunnel deleted", "tunnelID", r.tunnel.Status.TunnelId)
+			r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Deleted", "Tunnel deletion successful")
+
+			// Remove tunnelFinalizer. Once all finalizers have been
+			// removed, the object will be deleted.
+			controllerutil.RemoveFinalizer(r.tunnel, tunnelFinalizerAnnotation)
+			err := r.Update(r.ctx, r.tunnel)
+			if err != nil {
+				r.log.Error(err, "unable to continue with tunnel deletion")
+				r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedFinalizerUnset", "Unable to remove Tunnel Finalizer")
+				return ctrl.Result{}, err
+			}
+			r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "FinalizerUnset", "Tunnel Finalizer removed")
+			return ctrl.Result{}, nil
+		}
+	}
+	return ctrl.Result{}, nil
 }
 
 // configMapForTunnel returns a tunnel ConfigMap object
