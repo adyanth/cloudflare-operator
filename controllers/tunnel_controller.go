@@ -249,14 +249,8 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				}
 			}
 		} else {
-			// Add finalizer for tunnel
-			if !controllerutil.ContainsFinalizer(tunnel, tunnelFinalizerAnnotation) {
-				controllerutil.AddFinalizer(tunnel, tunnelFinalizerAnnotation)
-				if err := r.Update(ctx, tunnel); err != nil {
-					r.Recorder.Event(tunnel, corev1.EventTypeNormal, "FailedFinalizerSet", "Failed to add Tunnel Finalizer")
+			if err := r.setupNewTunnel(); err != nil {
 					return ctrl.Result{}, err
-				}
-				r.Recorder.Event(tunnel, corev1.EventTypeNormal, "FinalizerSet", "Tunnel Finalizer added")
 			}
 		}
 	}
@@ -396,6 +390,34 @@ func (r *TunnelReconciler) setupExistingTunnel() error {
 		r.tunnelCreds = creds
 	}
 
+	return nil
+}
+
+func (r *TunnelReconciler) setupNewTunnel() error {
+	// New tunnel, not yet setup, create on Cloudflare
+	if r.tunnel.Status.TunnelId == "" {
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Creating", "Tunnel is being created")
+		r.cfAPI.TunnelName = r.tunnel.Spec.NewTunnel.Name
+		_, creds, err := r.cfAPI.CreateCloudflareTunnel()
+		if err != nil {
+			r.log.Error(err, "unable to create Tunnel")
+			r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedCreate", "Unable to create Tunnel on Cloudflare")
+			return err
+		}
+		r.log.Info("Tunnel created on Cloudflare")
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Created", "Tunnel created successfully on Cloudflare")
+		r.tunnelCreds = creds
+	}
+
+	// Add finalizer for tunnel
+	if !controllerutil.ContainsFinalizer(r.tunnel, tunnelFinalizerAnnotation) {
+		controllerutil.AddFinalizer(r.tunnel, tunnelFinalizerAnnotation)
+		if err := r.Update(r.ctx, r.tunnel); err != nil {
+			r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "FailedFinalizerSet", "Failed to add Tunnel Finalizer")
+			return err
+		}
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "FinalizerSet", "Tunnel Finalizer added")
+	}
 	return nil
 }
 
