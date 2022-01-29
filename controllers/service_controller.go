@@ -96,6 +96,7 @@ type ServiceReconciler struct {
 	service   *corev1.Service
 	configmap *corev1.ConfigMap
 	listOpts  []client.ListOption
+	cfAPI     *CloudflareAPI
 }
 
 // labelsForService returns the labels for selecting the resources served by a Tunnel.
@@ -152,7 +153,7 @@ func (r ServiceReconciler) getListOpts() []client.ListOption {
 	return listOpts
 }
 
-func (r *ServiceReconciler) initStruct(ctx context.Context, req ctrl.Request, service *corev1.Service) error {
+func (r *ServiceReconciler) initStruct(ctx context.Context, service *corev1.Service) error {
 	r.ctx = ctx
 	r.service = service
 
@@ -181,6 +182,14 @@ func (r *ServiceReconciler) initStruct(ctx context.Context, req ctrl.Request, se
 		return err
 	} else {
 		r.config = &config
+	}
+
+	if cfAPI, _, err := getAPIDetails(r.Client, r.ctx, r.log, *r.tunnel); err != nil {
+		r.log.Error(err, "unable to get API details")
+		r.Recorder.Event(service, corev1.EventTypeWarning, "ErrApiConfig", "Error getting API details")
+		return err
+	} else {
+		r.cfAPI = cfAPI
 	}
 
 	return nil
@@ -219,7 +228,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, r.unManagedService(ctx, service)
 	}
 
-	if err := r.initStruct(ctx, req, service); err != nil {
+	if err := r.initStruct(ctx, service); err != nil {
 		r.log.Error(err, "initialization failed")
 		return ctrl.Result{}, err
 	}
@@ -267,10 +276,11 @@ func (r *ServiceReconciler) deletionLogic() error {
 		// Run finalization logic. If the finalization logic fails,
 		// don't remove the finalizer so that we can retry during the next reconciliation.
 
-		if err := r.deleteRecord(); err != nil {
+		if err := r.cfAPI.DeleteDNSCName(r.config.Hostname); err != nil {
 			r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingDns", "Failed to delete DNS entry")
 			return err
 		}
+		r.log.Info("Deleted DNS entry", "Hostname", r.config.Hostname)
 		r.Recorder.Event(r.service, corev1.EventTypeNormal, "DeletedDns", "Deleted DNS entry")
 
 		// Remove tunnelFinalizer. Once all finalizers have been
@@ -305,7 +315,7 @@ func (r *ServiceReconciler) creationLogic() error {
 	r.Recorder.Event(r.service, corev1.EventTypeNormal, "MetaSet", "Service Finalizer and Labels added")
 
 	// Create DNS entry
-	if err := r.createRecord(); err != nil {
+	if err := r.cfAPI.InsertOrUpdateCName(r.config.Hostname); err != nil {
 		r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedCreatingDns", "Failed to insert/update DNS entry")
 		return err
 	}
@@ -524,32 +534,6 @@ func (r *ServiceReconciler) configureCloudflare() error {
 	config.Ingress = finalIngresses
 
 	return r.setConfigMapConfiguration(config)
-}
-
-func (r ServiceReconciler) createRecord() error {
-	cfAPI, _, err := getAPIDetails(r.Client, r.ctx, r.log, *r.tunnel)
-	if err != nil {
-		r.log.Error(err, "unable to get API details")
-		return err
-	}
-	if err := cfAPI.InsertOrUpdateCName(r.config.Hostname); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (r ServiceReconciler) deleteRecord() error {
-	cfAPI, _, err := getAPIDetails(r.Client, r.ctx, r.log, *r.tunnel)
-	if err != nil {
-		r.log.Error(err, "unable to get API details")
-		return err
-	}
-
-	if err := cfAPI.DeleteDNSCName(r.config.Hostname); err != nil {
-		return err
-	}
-	r.log.Info("Deleted DNS entry", "Hostname", r.config.Hostname)
-	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
