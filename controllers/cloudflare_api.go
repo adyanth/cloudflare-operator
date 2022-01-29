@@ -12,7 +12,7 @@ import (
 	"github.com/go-logr/logr"
 )
 
-// Cloudflare API base URL from https://api.cloudflare.com/#getting-started-endpoints.
+// CLOUDFLARE_ENDPOINT is the Cloudflare API base URL from https://api.cloudflare.com/#getting-started-endpoints.
 const CLOUDFLARE_ENDPOINT = "https://api.cloudflare.com/client/v4/"
 
 // CloudflareAPI config object holding all relevant fields to use the API
@@ -32,7 +32,7 @@ type CloudflareAPI struct {
 	ValidZoneId     string
 }
 
-// Cloudflare API Response object containing a slice of Results with a Name and Id field
+// CloudflareAPIResponse object containing Result with a Name and Id field (includes an optional CredentialsFile for Tunnel responses)
 type CloudflareAPIResponse struct {
 	Result struct {
 		Id              string
@@ -45,6 +45,7 @@ type CloudflareAPIResponse struct {
 	}
 }
 
+// CloudflareAPIMultiResponse object containing a slice of Results with a Name and Id field
 type CloudflareAPIMultiResponse struct {
 	Result []struct {
 		Id   string
@@ -56,7 +57,7 @@ type CloudflareAPIMultiResponse struct {
 	Success bool
 }
 
-// Cloudflare API Input for creating a Tunnel
+// CloudflareAPITunnelCreate object containing Cloudflare API Input for creating a Tunnel
 type CloudflareAPITunnelCreate struct {
 	Name         string
 	TunnelSecret string `json:"tunnel_secret"`
@@ -78,7 +79,7 @@ func (c CloudflareAPI) addAuthHeader(req *http.Request, delete bool) error {
 	return nil
 }
 
-// Create a Cloudflare Tunnel and return the tunnel Id and credentials file
+// CreateCloudflareTunnel creates a Cloudflare Tunnel and returns the tunnel Id and credentials file
 func (c *CloudflareAPI) CreateCloudflareTunnel() (string, string, error) {
 	if _, err := c.GetAccountId(); err != nil {
 		c.Log.Error(err, "error code in getting account ID")
@@ -134,7 +135,7 @@ func (c *CloudflareAPI) CreateCloudflareTunnel() (string, string, error) {
 	return tunnelResponse.Result.Id, string(creds), nil
 }
 
-// Delete a Cloudflare Tunnel
+// DeleteCloudflareTunnel deletes a Cloudflare Tunnel
 func (c *CloudflareAPI) DeleteCloudflareTunnel() error {
 	if err := c.ValidateAll(); err != nil {
 		c.Log.Error(err, "Error in validation")
@@ -168,7 +169,7 @@ func (c *CloudflareAPI) DeleteCloudflareTunnel() error {
 	return nil
 }
 
-// Validate the contents of the CloudflareAPI struct
+// ValidateAll validates the contents of the CloudflareAPI struct
 func (c *CloudflareAPI) ValidateAll() error {
 	c.Log.Info("In validation")
 	if _, err := c.GetAccountId(); err != nil {
@@ -187,7 +188,7 @@ func (c *CloudflareAPI) ValidateAll() error {
 	return nil
 }
 
-// Get the AccountId from Account Name
+// GetAccountId gets AccountId from Account Name
 func (c *CloudflareAPI) GetAccountId() (string, error) {
 	if c.ValidAccountId != "" {
 		return c.ValidAccountId, nil
@@ -273,7 +274,7 @@ func (c *CloudflareAPI) getAccountIdByName() (string, error) {
 	}
 }
 
-// Get Tunnel Id from available information
+// GetTunnelId gets Tunnel Id from available information
 func (c *CloudflareAPI) GetTunnelId() (string, error) {
 	if c.ValidTunnelId != "" {
 		return c.ValidTunnelId, nil
@@ -376,7 +377,7 @@ func (c *CloudflareAPI) getTunnelIdByName() (string, error) {
 	}
 }
 
-// Get Tunnel Credentials from Tunnel secret
+// GetTunnelCreds gets Tunnel Credentials from Tunnel secret
 func (c *CloudflareAPI) GetTunnelCreds(tunnelSecret string) (string, error) {
 	if _, err := c.GetAccountId(); err != nil {
 		c.Log.Error(err, "error in getting account ID")
@@ -398,7 +399,7 @@ func (c *CloudflareAPI) GetTunnelCreds(tunnelSecret string) (string, error) {
 	return string(creds), err
 }
 
-// Get Zone Id from DNS domain
+// GetZoneId gets Zone Id from DNS domain
 func (c *CloudflareAPI) GetZoneId() (string, error) {
 	if c.ValidZoneId != "" {
 		return c.ValidZoneId, nil
@@ -452,7 +453,7 @@ func (c *CloudflareAPI) getZoneIdByName() (string, error) {
 	}
 }
 
-// Upsert DNS CNAME record for the given FQDN to point to the tunnel
+// InsertOrUpdateCName upsert DNS CNAME record for the given FQDN to point to the tunnel
 func (c *CloudflareAPI) InsertOrUpdateCName(fqdn string) error {
 	method := "POST"
 	subPath := ""
@@ -503,7 +504,7 @@ func (c *CloudflareAPI) InsertOrUpdateCName(fqdn string) error {
 	return nil
 }
 
-// Delete DNS CNAME entry for the given FQDN
+// DeleteDNSCName deletes DNS CNAME entry for the given FQDN
 func (c *CloudflareAPI) DeleteDNSCName(fqdn string) error {
 	dnsId, err := c.getDNSCNameId(fqdn)
 	if err != nil {
