@@ -23,7 +23,7 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// Existing Tunnel spec. Needs either a Tunnel Id or a Name to find it on Cloudflare.
+// ExistingTunnel spec needs either a Tunnel Id or a Name to find it on Cloudflare.
 type ExistingTunnel struct {
 	//+kubebuilder:validation:Optional
 	// Existing Tunnel ID to run on. Tunnel ID and Tunnel Name cannot be both empty. If both are provided, ID is used if valid, else falls back to Name.
@@ -34,14 +34,14 @@ type ExistingTunnel struct {
 	Name string `json:"name,omitempty"`
 }
 
-// New Tunnel spec. Needs a name to create a Tunnel on Cloudflare.
+// NewTunnel spec needs a name to create a Tunnel on Cloudflare.
 type NewTunnel struct {
 	//+kubebuilder:validation:Required
 	// Tunnel name to create on Cloudflare.
 	Name string `json:"name,omitempty"`
 }
 
-// Cloudflare Details spec. All the necessary parameters needed to connect to the Cloudflare API.
+// CloudflareDetails spec contains all the necessary parameters needed to connect to the Cloudflare API.
 type CloudflareDetails struct {
 	//+kubebuilder:validation:Required
 	// Cloudflare Domain to which this tunnel belongs to
