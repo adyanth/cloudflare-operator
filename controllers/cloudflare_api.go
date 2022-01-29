@@ -565,10 +565,17 @@ func (c *CloudflareAPI) getDNSCNameId(fqdn string) (string, error) {
 		return "", err
 	}
 
-	if len(dnsResponse.Result) != 1 {
-		err := fmt.Errorf("multiple/no records returned")
-		c.Log.Error(err, "multiple/no records returned, check fqdn", "fqdn", fqdn)
+	if len(dnsResponse.Result) == 0 {
+		err := fmt.Errorf("no records returned")
+		c.Log.Info("no records returned for fqdn", "fqdn", fqdn)
 		return "", err
 	}
+
+	if len(dnsResponse.Result) > 1 {
+		err := fmt.Errorf("multiple records returned")
+		c.Log.Error(err, "multiple records returned for fqdn", "fqdn", fqdn)
+		return "", err
+	}
+
 	return dnsResponse.Result[0].Id, nil
 }
