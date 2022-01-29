@@ -45,6 +45,15 @@ type TunnelReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
+
+	// Custom data for ease of (re)use
+
+	ctx         context.Context
+	log         logr.Logger
+	tunnel      *networkingv1alpha1.Tunnel
+	cfAPI       *CloudflareAPI
+	cfSecret    *corev1.Secret
+	tunnelCreds string
 }
 
 // labelsForTunnel returns the labels for selecting the resources
@@ -63,20 +72,20 @@ func labelsForTunnel(cf networkingv1alpha1.Tunnel) map[string]string {
 func getAPIDetails(c client.Client, ctx context.Context, log logr.Logger, tunnel networkingv1alpha1.Tunnel) (*CloudflareAPI, *corev1.Secret, error) {
 
 	// Get secret containing API token
-	cfCloudflareSecret := &corev1.Secret{}
-	if err := c.Get(ctx, apitypes.NamespacedName{Name: tunnel.Spec.Cloudflare.Secret, Namespace: tunnel.Namespace}, cfCloudflareSecret); err != nil {
+	cfSecret := &corev1.Secret{}
+	if err := c.Get(ctx, apitypes.NamespacedName{Name: tunnel.Spec.Cloudflare.Secret, Namespace: tunnel.Namespace}, cfSecret); err != nil {
 		log.Error(err, "secret not found", "secret", tunnel.Spec.Cloudflare.Secret)
 		return &CloudflareAPI{}, &corev1.Secret{}, err
 	}
 
 	// Read secret for API Token
-	cfAPITokenB64, ok := cfCloudflareSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_API_TOKEN]
+	cfAPITokenB64, ok := cfSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_API_TOKEN]
 	if !ok {
 		log.Info("key not found in secret", "secret", tunnel.Spec.Cloudflare.Secret, "key", tunnel.Spec.Cloudflare.CLOUDFLARE_API_TOKEN)
 	}
 
 	// Read secret for API Key
-	cfAPIKeyB64, ok := cfCloudflareSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_API_KEY]
+	cfAPIKeyB64, ok := cfSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_API_KEY]
 	if !ok {
 		log.Info("key not found in secret", "secret", tunnel.Spec.Cloudflare.Secret, "key", tunnel.Spec.Cloudflare.CLOUDFLARE_API_KEY)
 	}
@@ -94,7 +103,23 @@ func getAPIDetails(c client.Client, ctx context.Context, log logr.Logger, tunnel
 		ValidTunnelName: tunnel.Status.TunnelName,
 		ValidZoneId:     tunnel.Status.ZoneId,
 	}
-	return cfAPI, cfCloudflareSecret, nil
+	return cfAPI, cfSecret, nil
+}
+
+func (r *TunnelReconciler) initStruct(ctx context.Context, tunnel *networkingv1alpha1.Tunnel) error {
+	r.ctx = ctx
+	r.tunnel = tunnel
+
+	if cfAPI, cfSecret, err := getAPIDetails(r.Client, r.ctx, r.log, *r.tunnel); err != nil {
+		r.log.Error(err, "unable to get API details")
+		r.Recorder.Event(tunnel, corev1.EventTypeWarning, "ErrSpecSecret", "Error reading Secret to configure API")
+		return err
+	} else {
+		r.cfAPI = cfAPI
+		r.cfSecret = cfSecret
+	}
+
+	return nil
 }
 
 //+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnels,verbs=get;list;watch;create;update;patch;delete
@@ -110,8 +135,9 @@ func getAPIDetails(c client.Client, ctx context.Context, log logr.Logger, tunnel
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
+
 func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
+	r.log = ctrllog.FromContext(ctx)
 
 	// Lookup the Tunnel resource
 	tunnel := &networkingv1alpha1.Tunnel{}
@@ -120,20 +146,14 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			// Tunnel object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			log.Info("Tunnel deleted, nothing to do")
+			r.log.Info("Tunnel deleted, nothing to do")
 			return ctrl.Result{}, nil
 		}
-		log.Error(err, "unable to fetch Tunnel")
+		r.log.Error(err, "unable to fetch Tunnel")
 		return ctrl.Result{}, err
 	}
 
-	// Creds is the tunnel credential JSON
-	var tunnelCreds string
-
-	cfAPI, cfCloudflareSecret, err := getAPIDetails(r.Client, ctx, log, *tunnel)
-	if err != nil {
-		log.Error(err, "error while getting API details")
-		r.Recorder.Event(tunnel, corev1.EventTypeWarning, "ErrSpecSecret", "Error reading Secret to configure API")
+	if err := r.initStruct(ctx, tunnel); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -142,223 +162,287 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	if okNewTunnel == okExistingTunnel {
 		err := fmt.Errorf("spec ExistingTunnel and NewTunnel cannot be both empty and are mutually exclusive")
-		log.Error(err, "spec ExistingTunnel and NewTunnel cannot be both empty and are mutually exclusive")
+		r.log.Error(err, "spec ExistingTunnel and NewTunnel cannot be both empty and are mutually exclusive")
 		r.Recorder.Event(tunnel, corev1.EventTypeWarning, "ErrSpecTunnel", "ExistingTunnel and NewTunnel cannot be both empty and are mutually exclusive")
 		return ctrl.Result{}, err
 	}
 
-	// Set tunnelId in status and get creds file
 	if okExistingTunnel {
-		cfAPI.TunnelName = tunnel.Spec.ExistingTunnel.Name
-		cfAPI.TunnelId = tunnel.Spec.ExistingTunnel.Id
-
-		// Read secret for credentials file
-		cfCredFileB64, okCredFile := cfCloudflareSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_FILE]
-		cfSecretB64, okSecret := cfCloudflareSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET]
-
-		if !okCredFile && !okSecret {
-			err := fmt.Errorf("neither key not found in secret")
-			log.Error(err, "neither key not found in secret", "secret", tunnel.Spec.Cloudflare.Secret, "key1", tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_FILE, "key2", tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET)
-			r.Recorder.Event(tunnel, corev1.EventTypeWarning, "ErrSpecSecret", "Neither Key found in Secret")
+		// Existing Tunnel, Set tunnelId in status and get creds file
+		if err := r.setupExistingTunnel(); err != nil {
 			return ctrl.Result{}, err
 		}
-
-		if okCredFile {
-			tunnelCreds = string(cfCredFileB64)
+	} else {
+		// New tunnel, finalizer/cleanup logic + creation
+		if r.tunnel.GetDeletionTimestamp() != nil {
+			if res, err := r.cleanupTunnel(); err != nil || (res != ctrl.Result{}) {
+				return res, err
+			}
 		} else {
-			creds, err := cfAPI.GetTunnelCreds(string(cfSecretB64))
-			if err != nil {
-				log.Error(err, "error getting tunnel credentials from secret")
-				r.Recorder.Event(tunnel, corev1.EventTypeWarning, "ErrSpecApi", "Error in getting Tunnel Credentials from Secret")
+			if err := r.setupNewTunnel(); err != nil {
 				return ctrl.Result{}, err
 			}
-			tunnelCreds = creds
 		}
-	}
-
-	// New tunnel, create on Cloudflare
-	if okNewTunnel && tunnel.Status.TunnelId == "" {
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Creating", "Tunnel is being created")
-		cfAPI.TunnelName = tunnel.Spec.NewTunnel.Name
-		_, creds, err := cfAPI.CreateCloudflareTunnel()
-		if err != nil {
-			log.Error(err, "unable to create Tunnel")
-			r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedCreate", "Unable to create Tunnel on Cloudflare")
-			return ctrl.Result{}, err
-		}
-		log.Info("Tunnel created on Cloudflare")
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Created", "Tunnel created successfully on Cloudflare")
-		tunnelCreds = creds
-	}
-
-	// Check if Tunnel is marked for deletion if new tunnel
-	if okNewTunnel {
-		if tunnel.GetDeletionTimestamp() != nil {
-			if controllerutil.ContainsFinalizer(tunnel, tunnelFinalizerAnnotation) {
-				// Run finalization logic. If the finalization logic fails,
-				// don't remove the finalizer so that we can retry during the next reconciliation.
-
-				log.Info("starting deletion cycle", "size", tunnel.Spec.Size)
-				r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Deleting", "Starting Tunnel Deletion")
-				cfDeployment := &appsv1.Deployment{}
-				var bypass bool
-				if err := r.Get(ctx, apitypes.NamespacedName{Name: tunnel.Name, Namespace: tunnel.Namespace}, cfDeployment); err != nil {
-					log.Error(err, "Error in getting deployments, might already be deleted?")
-					bypass = true
-				}
-				if *cfDeployment.Spec.Replicas != 0 {
-					log.Info("Scaling down cloudflared")
-					r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Scaling", "Scaling down cloudflared")
-					var size int32 = 0
-					cfDeployment.Spec.Replicas = &size
-					if err := r.Update(ctx, cfDeployment); err != nil {
-						log.Error(err, "Failed to update Deployment", "Deployment.Namespace", cfDeployment.Namespace, "Deployment.Name", cfDeployment.Name)
-						r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedScaling", "Failed to scale down cloudflared")
-						return ctrl.Result{}, err
-					}
-					log.Info("Scaling down successful", "size", tunnel.Spec.Size)
-					r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Scaled", "Scaling down cloudflared successful")
-					return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-				}
-				if bypass || *cfDeployment.Spec.Replicas == 0 {
-					if err := cfAPI.DeleteCloudflareTunnel(); err != nil {
-						r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedDeleting", "Tunnel deletion failed")
-						return ctrl.Result{}, err
-					}
-					log.Info("Tunnel deleted", "tunnelID", tunnel.Status.TunnelId)
-					r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Deleted", "Tunnel deletion successful")
-
-					// Remove tunnelFinalizer. Once all finalizers have been
-					// removed, the object will be deleted.
-					controllerutil.RemoveFinalizer(tunnel, tunnelFinalizerAnnotation)
-					err := r.Update(ctx, tunnel)
-					if err != nil {
-						log.Error(err, "unable to continue with tunnel deletion")
-						r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedFinalizerUnset", "Unable to remove Tunnel Finalizer")
-						return ctrl.Result{}, err
-					}
-					r.Recorder.Event(tunnel, corev1.EventTypeNormal, "FinalizerUnset", "Tunnel Finalizer removed")
-					return ctrl.Result{}, nil
-				}
-			}
-		} else {
-			// Add finalizer for tunnel
-			if !controllerutil.ContainsFinalizer(tunnel, tunnelFinalizerAnnotation) {
-				controllerutil.AddFinalizer(tunnel, tunnelFinalizerAnnotation)
-				if err := r.Update(ctx, tunnel); err != nil {
-					r.Recorder.Event(tunnel, corev1.EventTypeNormal, "FailedFinalizerSet", "Failed to add Tunnel Finalizer")
-					return ctrl.Result{}, err
-				}
-				r.Recorder.Event(tunnel, corev1.EventTypeNormal, "FinalizerSet", "Tunnel Finalizer added")
-			}
-		}
-	}
-
-	tunnel.Labels = labelsForTunnel(*tunnel)
-	if err := r.Update(ctx, tunnel); err != nil {
-		return ctrl.Result{}, err
 	}
 
 	// Update status
-	if err := cfAPI.ValidateAll(); err != nil {
-		log.Error(err, "Failed to validate API credentials")
-		r.Recorder.Event(tunnel, corev1.EventTypeWarning, "ErrSpecApi", "Error validating Cloudflare API credentials")
+	if err := r.updateTunnelStatus(); err != nil {
 		return ctrl.Result{}, err
 	}
-	tunnel.Status.AccountId = cfAPI.ValidAccountId
-	tunnel.Status.TunnelId = cfAPI.ValidTunnelId
-	tunnel.Status.TunnelName = cfAPI.ValidTunnelName
-	tunnel.Status.ZoneId = cfAPI.ValidZoneId
-	if err := r.Status().Update(ctx, tunnel); err != nil {
-		log.Error(err, "Failed to update Tunnel status", "Tunnel.Namespace", tunnel.Namespace, "Tunnel.Name", tunnel.Name)
-		r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedStatusSet", "Failed to set Tunnel status required for operation")
-		return ctrl.Result{}, err
-	}
-	log.Info("Tunnel status is set", "status", tunnel.Status)
 
-	// Check if Secret already exists
-	cfSecret := &corev1.Secret{}
-	if err := r.Get(ctx, apitypes.NamespacedName{Name: tunnel.Name, Namespace: tunnel.Namespace}, cfSecret); err != nil && apierrors.IsNotFound(err) {
+	// Check if Secret already exists, else create it
+	if err := r.createManagedSecret(); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Check if ConfigMap already exists, else create it
+	if err := r.createManagedConfigMap(); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Create Deployment if does not exist and scale it
+	if res, err := r.createOrScaleManagedDeployment(); err != nil || (res != ctrl.Result{}) {
+		return res, err
+	}
+
+	return ctrl.Result{}, nil
+}
+
+func (r *TunnelReconciler) setupExistingTunnel() error {
+	r.cfAPI.TunnelName = r.tunnel.Spec.ExistingTunnel.Name
+	r.cfAPI.TunnelId = r.tunnel.Spec.ExistingTunnel.Id
+
+	// Read secret for credentials file
+	cfCredFileB64, okCredFile := r.cfSecret.Data[r.tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_FILE]
+	cfSecretB64, okSecret := r.cfSecret.Data[r.tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET]
+
+	if !okCredFile && !okSecret {
+		err := fmt.Errorf("neither key not found in secret")
+		r.log.Error(err, "neither key not found in secret", "secret", r.tunnel.Spec.Cloudflare.Secret, "key1", r.tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_FILE, "key2", r.tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "ErrSpecSecret", "Neither Key found in Secret")
+		return err
+	}
+
+	if okCredFile {
+		r.tunnelCreds = string(cfCredFileB64)
+	} else {
+		creds, err := r.cfAPI.GetTunnelCreds(string(cfSecretB64))
+		if err != nil {
+			r.log.Error(err, "error getting tunnel credentials from secret")
+			r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "ErrSpecApi", "Error in getting Tunnel Credentials from Secret")
+			return err
+		}
+		r.tunnelCreds = creds
+	}
+
+	return nil
+}
+
+func (r *TunnelReconciler) setupNewTunnel() error {
+	// New tunnel, not yet setup, create on Cloudflare
+	if r.tunnel.Status.TunnelId == "" {
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Creating", "Tunnel is being created")
+		r.cfAPI.TunnelName = r.tunnel.Spec.NewTunnel.Name
+		_, creds, err := r.cfAPI.CreateCloudflareTunnel()
+		if err != nil {
+			r.log.Error(err, "unable to create Tunnel")
+			r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedCreate", "Unable to create Tunnel on Cloudflare")
+			return err
+		}
+		r.log.Info("Tunnel created on Cloudflare")
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Created", "Tunnel created successfully on Cloudflare")
+		r.tunnelCreds = creds
+	}
+
+	// Add finalizer for tunnel
+	if !controllerutil.ContainsFinalizer(r.tunnel, tunnelFinalizerAnnotation) {
+		controllerutil.AddFinalizer(r.tunnel, tunnelFinalizerAnnotation)
+		if err := r.Update(r.ctx, r.tunnel); err != nil {
+			r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "FailedFinalizerSet", "Failed to add Tunnel Finalizer")
+			return err
+		}
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "FinalizerSet", "Tunnel Finalizer added")
+	}
+	return nil
+}
+
+func (r *TunnelReconciler) cleanupTunnel() (ctrl.Result, error) {
+	if controllerutil.ContainsFinalizer(r.tunnel, tunnelFinalizerAnnotation) {
+		// Run finalization logic. If the finalization logic fails,
+		// don't remove the finalizer so that we can retry during the next reconciliation.
+
+		r.log.Info("starting deletion cycle", "size", r.tunnel.Spec.Size)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Deleting", "Starting Tunnel Deletion")
+		cfDeployment := &appsv1.Deployment{}
+		var bypass bool
+		if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.tunnel.Namespace}, cfDeployment); err != nil {
+			r.log.Error(err, "Error in getting deployments, might already be deleted?")
+			bypass = true
+		}
+		if *cfDeployment.Spec.Replicas != 0 {
+			r.log.Info("Scaling down cloudflared")
+			r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Scaling", "Scaling down cloudflared")
+			var size int32 = 0
+			cfDeployment.Spec.Replicas = &size
+			if err := r.Update(r.ctx, cfDeployment); err != nil {
+				r.log.Error(err, "Failed to update Deployment", "Deployment.Namespace", cfDeployment.Namespace, "Deployment.Name", cfDeployment.Name)
+				r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedScaling", "Failed to scale down cloudflared")
+				return ctrl.Result{}, err
+			}
+			r.log.Info("Scaling down successful", "size", r.tunnel.Spec.Size)
+			r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Scaled", "Scaling down cloudflared successful")
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+		if bypass || *cfDeployment.Spec.Replicas == 0 {
+			if err := r.cfAPI.DeleteCloudflareTunnel(); err != nil {
+				r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedDeleting", "Tunnel deletion failed")
+				return ctrl.Result{}, err
+			}
+			r.log.Info("Tunnel deleted", "tunnelID", r.tunnel.Status.TunnelId)
+			r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Deleted", "Tunnel deletion successful")
+
+			// Remove tunnelFinalizer. Once all finalizers have been
+			// removed, the object will be deleted.
+			controllerutil.RemoveFinalizer(r.tunnel, tunnelFinalizerAnnotation)
+			err := r.Update(r.ctx, r.tunnel)
+			if err != nil {
+				r.log.Error(err, "unable to continue with tunnel deletion")
+				r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedFinalizerUnset", "Unable to remove Tunnel Finalizer")
+				return ctrl.Result{}, err
+			}
+			r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "FinalizerUnset", "Tunnel Finalizer removed")
+			return ctrl.Result{}, nil
+		}
+	}
+	return ctrl.Result{}, nil
+}
+
+func (r *TunnelReconciler) updateTunnelStatus() error {
+	r.tunnel.Labels = labelsForTunnel(*r.tunnel)
+	if err := r.Update(r.ctx, r.tunnel); err != nil {
+		return err
+	}
+
+	if err := r.cfAPI.ValidateAll(); err != nil {
+		r.log.Error(err, "Failed to validate API credentials")
+		r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "ErrSpecApi", "Error validating Cloudflare API credentials")
+		return err
+	}
+	r.tunnel.Status.AccountId = r.cfAPI.ValidAccountId
+	r.tunnel.Status.TunnelId = r.cfAPI.ValidTunnelId
+	r.tunnel.Status.TunnelName = r.cfAPI.ValidTunnelName
+	r.tunnel.Status.ZoneId = r.cfAPI.ValidZoneId
+	if err := r.Status().Update(r.ctx, r.tunnel); err != nil {
+		r.log.Error(err, "Failed to update Tunnel status", "Tunnel.Namespace", r.tunnel.Namespace, "Tunnel.Name", r.tunnel.Name)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedStatusSet", "Failed to set Tunnel status required for operation")
+		return err
+	}
+	r.log.Info("Tunnel status is set", "status", r.tunnel.Status)
+	return nil
+}
+
+func (r *TunnelReconciler) createManagedSecret() error {
+	managedSecret := &corev1.Secret{}
+	if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.tunnel.Namespace}, managedSecret); err != nil && apierrors.IsNotFound(err) {
 		// Define a new Secret
-		sec := r.secretForTunnel(tunnel, tunnelCreds)
-		log.Info("Creating a new Secret", "Secret.Namespace", sec.Namespace, "Secret.Name", sec.Name)
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "CreatingSecret", "Creating Tunnel Secret")
-		err = r.Create(ctx, sec)
+		sec := r.secretForTunnel(r.tunnel, r.tunnelCreds)
+		r.log.Info("Creating a new Secret", "Secret.Namespace", sec.Namespace, "Secret.Name", sec.Name)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "CreatingSecret", "Creating Tunnel Secret")
+		err = r.Create(r.ctx, sec)
 		if err != nil {
-			log.Error(err, "Failed to create new Secret", "Deployment.Namespace", sec.Namespace, "Deployment.Name", sec.Name)
-			r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedCreateingSecret", "Creating Tunnel Secret failed")
-			return ctrl.Result{}, err
+			r.log.Error(err, "Failed to create new Secret", "Deployment.Namespace", sec.Namespace, "Deployment.Name", sec.Name)
+			r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedCreateingSecret", "Creating Tunnel Secret failed")
+			return err
 		}
-		log.Info("Secret created", "Secret.Namespace", sec.Namespace, "Secret.Name", sec.Name)
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "CreatedSecret", "Created Tunnel Secret")
+		r.log.Info("Secret created", "Secret.Namespace", sec.Namespace, "Secret.Name", sec.Name)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "CreatedSecret", "Created Tunnel Secret")
 	} else if err != nil {
-		log.Error(err, "Failed to get Secret")
-		r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedCreatedSecret", "Reading Tunnel Secret failed")
-		return ctrl.Result{}, err
+		r.log.Error(err, "Failed to get Secret")
+		r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedCreatedSecret", "Reading Tunnel Secret failed")
+		return err
 	}
+	return nil
+}
 
-	// Check if ConfigMap already exists
+func (r *TunnelReconciler) createManagedConfigMap() error {
 	cfConfigMap := &corev1.ConfigMap{}
-	if err := r.Get(ctx, apitypes.NamespacedName{Name: tunnel.Name, Namespace: tunnel.Namespace}, cfConfigMap); err != nil && apierrors.IsNotFound(err) {
+	if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.tunnel.Namespace}, cfConfigMap); err != nil && apierrors.IsNotFound(err) {
 		// Define a new ConfigMap
-		cm := r.configMapForTunnel(tunnel)
-		log.Info("Creating a new ConfigMap", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Configuring", "Creating Tunnel ConfigMap")
-		err = r.Create(ctx, cm)
+		cm := r.configMapForTunnel(r.tunnel)
+		r.log.Info("Creating a new ConfigMap", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Configuring", "Creating Tunnel ConfigMap")
+		err = r.Create(r.ctx, cm)
 		if err != nil {
-			log.Error(err, "Failed to create new ConfigMap", "Deployment.Namespace", cm.Namespace, "Deployment.Name", cm.Name)
-			r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedConfiguring", "Creating Tunnel ConfigMap failed")
-			return ctrl.Result{}, err
+			r.log.Error(err, "Failed to create new ConfigMap", "Deployment.Namespace", cm.Namespace, "Deployment.Name", cm.Name)
+			r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedConfiguring", "Creating Tunnel ConfigMap failed")
+			return err
 		}
-		log.Info("ConfigMap created", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Configured", "Created Tunnel ConfigMap")
+		r.log.Info("ConfigMap created", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Configured", "Created Tunnel ConfigMap")
 	} else if err != nil {
-		log.Error(err, "Failed to get ConfigMap")
-		r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedConfigured", "Reading Tunnel ConfigMap failed")
-		return ctrl.Result{}, err
+		r.log.Error(err, "Failed to get ConfigMap")
+		r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedConfigured", "Reading Tunnel ConfigMap failed")
+		return err
 	}
+	return nil
+}
 
-	// Check if Deployment already exists
+func (r *TunnelReconciler) createOrScaleManagedDeployment() (ctrl.Result, error) {
+	// Check if Deployment already exists, else create it
 	cfDeployment := &appsv1.Deployment{}
-	if err := r.Get(ctx, apitypes.NamespacedName{Name: tunnel.Name, Namespace: tunnel.Namespace}, cfDeployment); err != nil && apierrors.IsNotFound(err) {
-		// Define a new deployment
-		dep := r.deploymentForTunnel(tunnel)
-		log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Deploying", "Creating Tunnel Deployment")
-		err = r.Create(ctx, dep)
-		if err != nil {
-			log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-			r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedDeploying", "Creating Tunnel Deployment failed")
-			return ctrl.Result{}, err
-		}
-		log.Info("Deployment created", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Deployed", "Created Tunnel Deployment")
-		return ctrl.Result{Requeue: true}, nil
-	} else if err != nil {
-		log.Error(err, "Failed to get Deployment")
-		r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedDeployed", "Reading Tunnel Deployment failed")
-		return ctrl.Result{}, err
+	if res, err := r.createManagedDeployment(cfDeployment); err != nil || (res != ctrl.Result{}) {
+		return res, err
 	}
 
 	// Ensure the Deployment size is the same as the spec
-	size := tunnel.Spec.Size
-	if *cfDeployment.Spec.Replicas != size {
-		log.Info("Updating deployment", "currentReplica", *cfDeployment.Spec.Replicas, "desiredSize", size)
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Scaling", "Scaling Tunnel Deployment")
-		cfDeployment.Spec.Replicas = &size
-		if err := r.Update(ctx, cfDeployment); err != nil {
-			log.Error(err, "Failed to update Deployment", "Deployment.Namespace", cfDeployment.Namespace, "Deployment.Name", cfDeployment.Name)
-			r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedScaling", "Failed to scale Tunnel Deployment")
+	if res, err := r.scaleManagedDeployment(cfDeployment); err != nil || (res != ctrl.Result{}) {
+		return res, err
+	}
+
+	return ctrl.Result{}, nil
+}
+
+func (r *TunnelReconciler) createManagedDeployment(cfDeployment *appsv1.Deployment) (ctrl.Result, error) {
+	if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.tunnel.Namespace}, cfDeployment); err != nil && apierrors.IsNotFound(err) {
+		// Define a new deployment
+		dep := r.deploymentForTunnel(r.tunnel)
+		r.log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Deploying", "Creating Tunnel Deployment")
+		err = r.Create(r.ctx, dep)
+		if err != nil {
+			r.log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+			r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedDeploying", "Creating Tunnel Deployment failed")
 			return ctrl.Result{}, err
 		}
-		log.Info("Deployment updated")
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Scaled", "Scaled Tunnel Deployment")
+		r.log.Info("Deployment created", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Deployed", "Created Tunnel Deployment")
+		return ctrl.Result{Requeue: true}, nil
+	} else if err != nil {
+		r.log.Error(err, "Failed to get Deployment")
+		r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedDeployed", "Reading Tunnel Deployment failed")
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{}, nil
+}
+
+func (r *TunnelReconciler) scaleManagedDeployment(cfDeployment *appsv1.Deployment) (ctrl.Result, error) {
+	size := r.tunnel.Spec.Size
+	if *cfDeployment.Spec.Replicas != size {
+		r.log.Info("Updating deployment", "currentReplica", *cfDeployment.Spec.Replicas, "desiredSize", size)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Scaling", "Scaling Tunnel Deployment")
+		cfDeployment.Spec.Replicas = &size
+		if err := r.Update(r.ctx, cfDeployment); err != nil {
+			r.log.Error(err, "Failed to update Deployment", "Deployment.Namespace", cfDeployment.Namespace, "Deployment.Name", cfDeployment.Name)
+			r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedScaling", "Failed to scale Tunnel Deployment")
+			return ctrl.Result{}, err
+		}
+		r.log.Info("Deployment updated")
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Scaled", "Scaled Tunnel Deployment")
 		// Ask to requeue after 1 minute in order to give enough time for the
 		// pods be created on the cluster side and the operand be able
 		// to do the next update step accurately.
 		return ctrl.Result{RequeueAfter: time.Minute}, nil
 	}
-
 	return ctrl.Result{}, nil
 }
 
