@@ -232,7 +232,10 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
-	r.initStruct(ctx, req, service)
+	if err := r.initStruct(ctx, req, service); err != nil {
+		r.log.Error(err, "initialization failed")
+		return ctrl.Result{}, err
+	}
 
 	// Check if Service is marked for deletion
 	if service.GetDeletionTimestamp() != nil {
