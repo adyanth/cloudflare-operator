@@ -201,44 +201,14 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	// Check if Deployment already exists
-	cfDeployment := &appsv1.Deployment{}
-	if err := r.Get(ctx, apitypes.NamespacedName{Name: tunnel.Name, Namespace: tunnel.Namespace}, cfDeployment); err != nil && apierrors.IsNotFound(err) {
-		// Define a new deployment
-		dep := r.deploymentForTunnel(tunnel)
-		r.log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Deploying", "Creating Tunnel Deployment")
-		err = r.Create(ctx, dep)
-		if err != nil {
-			r.log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-			r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedDeploying", "Creating Tunnel Deployment failed")
-			return ctrl.Result{}, err
-		}
-		r.log.Info("Deployment created", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Deployed", "Created Tunnel Deployment")
-		return ctrl.Result{Requeue: true}, nil
-	} else if err != nil {
-		r.log.Error(err, "Failed to get Deployment")
-		r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedDeployed", "Reading Tunnel Deployment failed")
-		return ctrl.Result{}, err
+	var cfDeployment *appsv1.Deployment
+	if res, err := r.createManagedDeployment(cfDeployment); err != nil || (res != ctrl.Result{}) {
+		return res, err
 	}
 
 	// Ensure the Deployment size is the same as the spec
-	size := tunnel.Spec.Size
-	if *cfDeployment.Spec.Replicas != size {
-		r.log.Info("Updating deployment", "currentReplica", *cfDeployment.Spec.Replicas, "desiredSize", size)
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Scaling", "Scaling Tunnel Deployment")
-		cfDeployment.Spec.Replicas = &size
-		if err := r.Update(ctx, cfDeployment); err != nil {
-			r.log.Error(err, "Failed to update Deployment", "Deployment.Namespace", cfDeployment.Namespace, "Deployment.Name", cfDeployment.Name)
-			r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedScaling", "Failed to scale Tunnel Deployment")
-			return ctrl.Result{}, err
-		}
-		r.log.Info("Deployment updated")
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "Scaled", "Scaled Tunnel Deployment")
-		// Ask to requeue after 1 minute in order to give enough time for the
-		// pods be created on the cluster side and the operand be able
-		// to do the next update step accurately.
-		return ctrl.Result{RequeueAfter: time.Minute}, nil
+	if res, err := r.scaleManagedDeployment(cfDeployment); err != nil || (res != ctrl.Result{}) {
+		return res, err
 	}
 
 	return ctrl.Result{}, nil
@@ -421,6 +391,50 @@ func (r *TunnelReconciler) createManagedConfigMap() error {
 		return err
 	}
 	return nil
+}
+
+func (r *TunnelReconciler) createManagedDeployment(cfDeployment *appsv1.Deployment) (ctrl.Result, error) {
+	if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.tunnel.Namespace}, cfDeployment); err != nil && apierrors.IsNotFound(err) {
+		// Define a new deployment
+		dep := r.deploymentForTunnel(r.tunnel)
+		r.log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Deploying", "Creating Tunnel Deployment")
+		err = r.Create(r.ctx, dep)
+		if err != nil {
+			r.log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+			r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedDeploying", "Creating Tunnel Deployment failed")
+			return ctrl.Result{}, err
+		}
+		r.log.Info("Deployment created", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Deployed", "Created Tunnel Deployment")
+		return ctrl.Result{Requeue: true}, nil
+	} else if err != nil {
+		r.log.Error(err, "Failed to get Deployment")
+		r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedDeployed", "Reading Tunnel Deployment failed")
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{}, nil
+}
+
+func (r *TunnelReconciler) scaleManagedDeployment(cfDeployment *appsv1.Deployment) (ctrl.Result, error) {
+	size := r.tunnel.Spec.Size
+	if *cfDeployment.Spec.Replicas != size {
+		r.log.Info("Updating deployment", "currentReplica", *cfDeployment.Spec.Replicas, "desiredSize", size)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Scaling", "Scaling Tunnel Deployment")
+		cfDeployment.Spec.Replicas = &size
+		if err := r.Update(r.ctx, cfDeployment); err != nil {
+			r.log.Error(err, "Failed to update Deployment", "Deployment.Namespace", cfDeployment.Namespace, "Deployment.Name", cfDeployment.Name)
+			r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedScaling", "Failed to scale Tunnel Deployment")
+			return ctrl.Result{}, err
+		}
+		r.log.Info("Deployment updated")
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Scaled", "Scaled Tunnel Deployment")
+		// Ask to requeue after 1 minute in order to give enough time for the
+		// pods be created on the cluster side and the operand be able
+		// to do the next update step accurately.
+		return ctrl.Result{RequeueAfter: time.Minute}, nil
+	}
+	return ctrl.Result{}, nil
 }
 
 // configMapForTunnel returns a tunnel ConfigMap object
