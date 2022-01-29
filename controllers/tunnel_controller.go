@@ -190,24 +190,18 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	// Check if Secret already exists, else create
+	// Check if Secret already exists, else create it
 	if err := r.createManagedSecret(); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Check if ConfigMap already exists
+	// Check if ConfigMap already exists, else create it
 	if err := r.createManagedConfigMap(); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Check if Deployment already exists
-	var cfDeployment *appsv1.Deployment
-	if res, err := r.createManagedDeployment(cfDeployment); err != nil || (res != ctrl.Result{}) {
-		return res, err
-	}
-
-	// Ensure the Deployment size is the same as the spec
-	if res, err := r.scaleManagedDeployment(cfDeployment); err != nil || (res != ctrl.Result{}) {
+	// Create Deployment if does not exist and scale it
+	if res, err := r.createOrScaleManagedDeployment(); err != nil || (res != ctrl.Result{}) {
 		return res, err
 	}
 
@@ -391,6 +385,21 @@ func (r *TunnelReconciler) createManagedConfigMap() error {
 		return err
 	}
 	return nil
+}
+
+func (r *TunnelReconciler) createOrScaleManagedDeployment() (ctrl.Result, error) {
+	// Check if Deployment already exists, else create it
+	cfDeployment := &appsv1.Deployment{}
+	if res, err := r.createManagedDeployment(cfDeployment); err != nil || (res != ctrl.Result{}) {
+		return res, err
+	}
+
+	// Ensure the Deployment size is the same as the spec
+	if res, err := r.scaleManagedDeployment(cfDeployment); err != nil || (res != ctrl.Result{}) {
+		return res, err
+	}
+
+	return ctrl.Result{}, nil
 }
 
 func (r *TunnelReconciler) createManagedDeployment(cfDeployment *appsv1.Deployment) (ctrl.Result, error) {
