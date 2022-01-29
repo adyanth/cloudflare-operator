@@ -160,32 +160,8 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	okNewTunnel := tunnel.Spec.NewTunnel != networkingv1alpha1.NewTunnel{}
-	okExistingTunnel := tunnel.Spec.ExistingTunnel != networkingv1alpha1.ExistingTunnel{}
-
-	if okNewTunnel == okExistingTunnel {
-		err := fmt.Errorf("spec ExistingTunnel and NewTunnel cannot be both empty and are mutually exclusive")
-		r.log.Error(err, "spec ExistingTunnel and NewTunnel cannot be both empty and are mutually exclusive")
-		r.Recorder.Event(tunnel, corev1.EventTypeWarning, "ErrSpecTunnel", "ExistingTunnel and NewTunnel cannot be both empty and are mutually exclusive")
-		return ctrl.Result{}, err
-	}
-
-	if okExistingTunnel {
-		// Existing Tunnel, Set tunnelId in status and get creds file
-		if err := r.setupExistingTunnel(); err != nil {
-			return ctrl.Result{}, err
-		}
-	} else {
-		// New tunnel, finalizer/cleanup logic + creation
-		if r.tunnel.GetDeletionTimestamp() != nil {
-			if res, err := r.cleanupTunnel(); err != nil || (res != ctrl.Result{}) {
-				return res, err
-			}
-		} else {
-			if err := r.setupNewTunnel(); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
+	if res, ok, err := r.setupTunnel(); !ok {
+		return res, err
 	}
 
 	// Update status
@@ -193,22 +169,45 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	// Check if Secret already exists, else create it
-	if err := r.createManagedSecret(); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Check if ConfigMap already exists, else create it
-	if err := r.createManagedConfigMap(); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Create Deployment if does not exist and scale it
-	if res, err := r.createOrScaleManagedDeployment(); err != nil || (res != ctrl.Result{}) {
+	// Create necessary resources
+	if res, ok, err := r.createManagedResources(); !ok {
 		return res, err
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *TunnelReconciler) setupTunnel() (ctrl.Result, bool, error) {
+	okNewTunnel := r.tunnel.Spec.NewTunnel != networkingv1alpha1.NewTunnel{}
+	okExistingTunnel := r.tunnel.Spec.ExistingTunnel != networkingv1alpha1.ExistingTunnel{}
+
+	// If both are set (or neither are), we have a problem
+	if okNewTunnel == okExistingTunnel {
+		err := fmt.Errorf("spec ExistingTunnel and NewTunnel cannot be both empty and are mutually exclusive")
+		r.log.Error(err, "spec ExistingTunnel and NewTunnel cannot be both empty and are mutually exclusive")
+		r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "ErrSpecTunnel", "ExistingTunnel and NewTunnel cannot be both empty and are mutually exclusive")
+		return ctrl.Result{}, false, err
+	}
+
+	if okExistingTunnel {
+		// Existing Tunnel, Set tunnelId in status and get creds file
+		if err := r.setupExistingTunnel(); err != nil {
+			return ctrl.Result{}, false, err
+		}
+	} else {
+		// New tunnel, finalizer/cleanup logic + creation
+		if r.tunnel.GetDeletionTimestamp() != nil {
+			if res, ok, err := r.cleanupTunnel(); !ok {
+				return res, false, err
+			}
+		} else {
+			if err := r.setupNewTunnel(); err != nil {
+				return ctrl.Result{}, false, err
+			}
+		}
+	}
+
+	return ctrl.Result{}, true, nil
 }
 
 func (r *TunnelReconciler) setupExistingTunnel() error {
@@ -269,7 +268,7 @@ func (r *TunnelReconciler) setupNewTunnel() error {
 	return nil
 }
 
-func (r *TunnelReconciler) cleanupTunnel() (ctrl.Result, error) {
+func (r *TunnelReconciler) cleanupTunnel() (ctrl.Result, bool, error) {
 	if controllerutil.ContainsFinalizer(r.tunnel, tunnelFinalizerAnnotation) {
 		// Run finalization logic. If the finalization logic fails,
 		// don't remove the finalizer so that we can retry during the next reconciliation.
@@ -290,16 +289,16 @@ func (r *TunnelReconciler) cleanupTunnel() (ctrl.Result, error) {
 			if err := r.Update(r.ctx, cfDeployment); err != nil {
 				r.log.Error(err, "Failed to update Deployment", "Deployment.Namespace", cfDeployment.Namespace, "Deployment.Name", cfDeployment.Name)
 				r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedScaling", "Failed to scale down cloudflared")
-				return ctrl.Result{}, err
+				return ctrl.Result{}, false, err
 			}
 			r.log.Info("Scaling down successful", "size", r.tunnel.Spec.Size)
 			r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Scaled", "Scaling down cloudflared successful")
-			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, false, nil
 		}
 		if bypass || *cfDeployment.Spec.Replicas == 0 {
 			if err := r.cfAPI.DeleteCloudflareTunnel(); err != nil {
 				r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedDeleting", "Tunnel deletion failed")
-				return ctrl.Result{}, err
+				return ctrl.Result{}, false, err
 			}
 			r.log.Info("Tunnel deleted", "tunnelID", r.tunnel.Status.TunnelId)
 			r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Deleted", "Tunnel deletion successful")
@@ -311,13 +310,13 @@ func (r *TunnelReconciler) cleanupTunnel() (ctrl.Result, error) {
 			if err != nil {
 				r.log.Error(err, "unable to continue with tunnel deletion")
 				r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedFinalizerUnset", "Unable to remove Tunnel Finalizer")
-				return ctrl.Result{}, err
+				return ctrl.Result{}, false, err
 			}
 			r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "FinalizerUnset", "Tunnel Finalizer removed")
-			return ctrl.Result{}, nil
+			return ctrl.Result{}, true, nil
 		}
 	}
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, true, nil
 }
 
 func (r *TunnelReconciler) updateTunnelStatus() error {
@@ -390,19 +389,19 @@ func (r *TunnelReconciler) createManagedConfigMap() error {
 	return nil
 }
 
-func (r *TunnelReconciler) createOrScaleManagedDeployment() (ctrl.Result, error) {
+func (r *TunnelReconciler) createOrScaleManagedDeployment() (ctrl.Result, bool, error) {
 	// Check if Deployment already exists, else create it
 	cfDeployment := &appsv1.Deployment{}
 	if res, err := r.createManagedDeployment(cfDeployment); err != nil || (res != ctrl.Result{}) {
-		return res, err
+		return res, false, err
 	}
 
 	// Ensure the Deployment size is the same as the spec
 	if res, err := r.scaleManagedDeployment(cfDeployment); err != nil || (res != ctrl.Result{}) {
-		return res, err
+		return res, false, err
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, true, nil
 }
 
 func (r *TunnelReconciler) createManagedDeployment(cfDeployment *appsv1.Deployment) (ctrl.Result, error) {
@@ -447,6 +446,25 @@ func (r *TunnelReconciler) scaleManagedDeployment(cfDeployment *appsv1.Deploymen
 		return ctrl.Result{RequeueAfter: time.Minute}, nil
 	}
 	return ctrl.Result{}, nil
+}
+
+func (r *TunnelReconciler) createManagedResources() (ctrl.Result, bool, error) {
+	// Check if Secret already exists, else create it
+	if err := r.createManagedSecret(); err != nil {
+		return ctrl.Result{}, false, err
+	}
+
+	// Check if ConfigMap already exists, else create it
+	if err := r.createManagedConfigMap(); err != nil {
+		return ctrl.Result{}, false, err
+	}
+
+	// Create Deployment if does not exist and scale it
+	if res, ok, err := r.createOrScaleManagedDeployment(); !ok {
+		return res, false, err
+	}
+
+	return ctrl.Result{}, true, nil
 }
 
 // configMapForTunnel returns a tunnel ConfigMap object
