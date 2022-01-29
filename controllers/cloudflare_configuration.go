@@ -4,6 +4,7 @@ import (
 	"time"
 )
 
+// cloudflared configuration yaml model
 type Configuration struct {
 	TunnelId      string                   `yaml:"tunnel"`
 	Ingress       []UnvalidatedIngressRule `yaml:"ingress,omitempty"`
@@ -14,6 +15,7 @@ type Configuration struct {
 	NoAutoUpdate  bool                     `yaml:"no-autoupdate,omitempty"`
 }
 
+// cloudflared ingress entry model
 type UnvalidatedIngressRule struct {
 	Hostname      string `yaml:"hostname,omitempty"`
 	Path          string `yaml:"path,omitempty"`
@@ -21,10 +23,12 @@ type UnvalidatedIngressRule struct {
 	OriginRequest OriginRequestConfig `yaml:"originRequest,omitempty"`
 }
 
+// cloudflared warp routing model
 type WarpRoutingConfig struct {
 	Enabled bool `yaml:"enabled,omitempty"`
 }
 
+// cloudflared origin request configuration model
 type OriginRequestConfig struct {
 	// HTTP proxy timeout for establishing a new connection
 	ConnectTimeout *time.Duration `yaml:"connectTimeout,omitempty"`
@@ -64,6 +68,7 @@ type OriginRequestConfig struct {
 	IPRules []IngressIPRule `yaml:"ipRules,omitempty"`
 }
 
+// cloudflared origin ingress IP rule config model
 type IngressIPRule struct {
 	Prefix *string `yaml:"prefix,omitempty"`
 	Ports  []int   `yaml:"ports,omitempty"`

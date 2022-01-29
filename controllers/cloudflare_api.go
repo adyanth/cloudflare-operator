@@ -12,8 +12,10 @@ import (
 	"github.com/go-logr/logr"
 )
 
+// Cloudflare API base URL from https://api.cloudflare.com/#getting-started-endpoints.
 const CLOUDFLARE_ENDPOINT = "https://api.cloudflare.com/client/v4/"
 
+// CloudflareAPI config object holding all relevant fields to use the API
 type CloudflareAPI struct {
 	Log             logr.Logger
 	TunnelName      string
@@ -30,28 +32,8 @@ type CloudflareAPI struct {
 	ValidZoneId     string
 }
 
-type CloudflareAPINameResponse struct {
-	Result []struct {
-		Id   string
-		Name string
-	}
-	Errors []struct {
-		Message string
-	}
-	Success bool
-}
-type CloudflareAPIIdResponse struct {
-	Result struct {
-		Id   string
-		Name string
-	}
-	Errors []struct {
-		Message string
-	}
-	Success bool
-}
-
-type CloudflareAPITunnelResponse struct {
+// Cloudflare API Response object containing a slice of Results with a Name and Id field
+type CloudflareAPIResponse struct {
 	Result struct {
 		Id              string
 		Name            string
@@ -63,6 +45,18 @@ type CloudflareAPITunnelResponse struct {
 	}
 }
 
+type CloudflareAPIMultiResponse struct {
+	Result []struct {
+		Id   string
+		Name string
+	}
+	Errors []struct {
+		Message string
+	}
+	Success bool
+}
+
+// Cloudflare API Input for creating a Tunnel
 type CloudflareAPITunnelCreate struct {
 	Name         string
 	TunnelSecret string `json:"tunnel_secret"`
@@ -84,6 +78,7 @@ func (c CloudflareAPI) addAuthHeader(req *http.Request, delete bool) error {
 	return nil
 }
 
+// Create a Cloudflare Tunnel and return the tunnel Id and credentials file
 func (c *CloudflareAPI) CreateCloudflareTunnel() (string, string, error) {
 	if _, err := c.GetAccountId(); err != nil {
 		c.Log.Error(err, "error code in getting account ID")
@@ -119,7 +114,7 @@ func (c *CloudflareAPI) CreateCloudflareTunnel() (string, string, error) {
 
 	defer resp.Body.Close()
 
-	var tunnelResponse CloudflareAPITunnelResponse
+	var tunnelResponse CloudflareAPIResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tunnelResponse); err != nil {
 		c.Log.Error(err, "could not read body in creating tunnel")
 		return "", "", err
@@ -139,6 +134,7 @@ func (c *CloudflareAPI) CreateCloudflareTunnel() (string, string, error) {
 	return tunnelResponse.Result.Id, string(creds), nil
 }
 
+// Delete a Cloudflare Tunnel
 func (c *CloudflareAPI) DeleteCloudflareTunnel() error {
 	if err := c.ValidateAll(); err != nil {
 		c.Log.Error(err, "Error in validation")
@@ -157,16 +153,8 @@ func (c *CloudflareAPI) DeleteCloudflareTunnel() error {
 		return err
 	}
 
-	// body, err := ioutil.ReadAll(resp.Body)
-	// if err != nil {
-	// 	log.Fatalln(err)
-	// }
-	// //Convert the body to type string
-	// sb := string(body)
-	// c.Log.Info("BODYYYYYYYYYYYYYYY!!!!!!!!!!!!!!!!!", "body", sb)
-
 	defer resp.Body.Close()
-	var tunnelResponse CloudflareAPIIdResponse
+	var tunnelResponse CloudflareAPIResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tunnelResponse); err != nil {
 		c.Log.Error(err, "could not read body in deleting tunnel", "tunnelId", c.TunnelId)
 		return err
@@ -180,6 +168,7 @@ func (c *CloudflareAPI) DeleteCloudflareTunnel() error {
 	return nil
 }
 
+// Validate the contents of the CloudflareAPI struct
 func (c *CloudflareAPI) ValidateAll() error {
 	c.Log.Info("In validation")
 	if _, err := c.GetAccountId(); err != nil {
@@ -198,6 +187,7 @@ func (c *CloudflareAPI) ValidateAll() error {
 	return nil
 }
 
+// Get the AccountId from Account Name
 func (c *CloudflareAPI) GetAccountId() (string, error) {
 	if c.ValidAccountId != "" {
 		return c.ValidAccountId, nil
@@ -240,7 +230,7 @@ func (c CloudflareAPI) validateAccountId() bool {
 	}
 
 	defer resp.Body.Close()
-	var accountResponse CloudflareAPIIdResponse
+	var accountResponse CloudflareAPIResponse
 	if err := json.NewDecoder(resp.Body).Decode(&accountResponse); err != nil {
 		c.Log.Error(err, "could not read body in getting account by Account ID", "accountId", c.AccountId)
 		return false
@@ -263,7 +253,7 @@ func (c *CloudflareAPI) getAccountIdByName() (string, error) {
 	}
 
 	defer resp.Body.Close()
-	var accountResponse CloudflareAPINameResponse
+	var accountResponse CloudflareAPIMultiResponse
 	if err := json.NewDecoder(resp.Body).Decode(&accountResponse); err != nil || !accountResponse.Success {
 		c.Log.Error(err, "could not read body in getting account, check accountName", "accountName", c.AccountName)
 		return "", err
@@ -283,6 +273,7 @@ func (c *CloudflareAPI) getAccountIdByName() (string, error) {
 	}
 }
 
+// Get Tunnel Id from available information
 func (c *CloudflareAPI) GetTunnelId() (string, error) {
 	if c.ValidTunnelId != "" {
 		return c.ValidTunnelId, nil
@@ -297,15 +288,16 @@ func (c *CloudflareAPI) GetTunnelId() (string, error) {
 	if c.validateTunnelId() {
 		c.ValidTunnelId = c.TunnelId
 		return c.TunnelId, nil
-	} else {
-		c.Log.Info("Tunnel ID failed, falling back to Tunnel Name")
-		tunnelIdFromName, err := c.getTunnelIdByName()
-		if err != nil {
-			return "", fmt.Errorf("error fetching Tunnel ID by Tunnel Name")
-		}
-		c.ValidTunnelId = tunnelIdFromName
-		c.ValidTunnelName = c.TunnelName
 	}
+
+	c.Log.Info("Tunnel ID failed, falling back to Tunnel Name")
+	tunnelIdFromName, err := c.getTunnelIdByName()
+	if err != nil {
+		return "", fmt.Errorf("error fetching Tunnel ID by Tunnel Name")
+	}
+	c.ValidTunnelId = tunnelIdFromName
+	c.ValidTunnelName = c.TunnelName
+
 	return c.ValidTunnelId, nil
 }
 
@@ -333,7 +325,7 @@ func (c *CloudflareAPI) validateTunnelId() bool {
 	}
 
 	defer resp.Body.Close()
-	var tunnelResponse CloudflareAPIIdResponse
+	var tunnelResponse CloudflareAPIResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tunnelResponse); err != nil {
 		c.Log.Error(err, "could not read body in getting tunnel by Tunnel ID", "tunnelId", c.TunnelId)
 		return false
@@ -363,7 +355,7 @@ func (c *CloudflareAPI) getTunnelIdByName() (string, error) {
 	}
 
 	defer resp.Body.Close()
-	var tunnelResponse CloudflareAPINameResponse
+	var tunnelResponse CloudflareAPIMultiResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tunnelResponse); err != nil || !tunnelResponse.Success {
 		c.Log.Error(err, "could not read body in getting tunnel, check tunnelName", "tunnelName", c.TunnelName)
 		return "", err
@@ -384,6 +376,7 @@ func (c *CloudflareAPI) getTunnelIdByName() (string, error) {
 	}
 }
 
+// Get Tunnel Credentials from Tunnel secret
 func (c *CloudflareAPI) GetTunnelCreds(tunnelSecret string) (string, error) {
 	if _, err := c.GetAccountId(); err != nil {
 		c.Log.Error(err, "error in getting account ID")
@@ -405,6 +398,7 @@ func (c *CloudflareAPI) GetTunnelCreds(tunnelSecret string) (string, error) {
 	return string(creds), err
 }
 
+// Get Zone Id from DNS domain
 func (c *CloudflareAPI) GetZoneId() (string, error) {
 	if c.ValidZoneId != "" {
 		return c.ValidZoneId, nil
@@ -438,7 +432,7 @@ func (c *CloudflareAPI) getZoneIdByName() (string, error) {
 	}
 
 	defer resp.Body.Close()
-	var zoneResponse CloudflareAPINameResponse
+	var zoneResponse CloudflareAPIMultiResponse
 	if err := json.NewDecoder(resp.Body).Decode(&zoneResponse); err != nil || !zoneResponse.Success {
 		c.Log.Error(err, "could not read body in getting zoneId, check domain", "domain", c.Domain)
 		return "", err
@@ -458,6 +452,7 @@ func (c *CloudflareAPI) getZoneIdByName() (string, error) {
 	}
 }
 
+// Upsert DNS CNAME record for the given FQDN to point to the tunnel
 func (c *CloudflareAPI) InsertOrUpdateCName(fqdn string) error {
 	method := "POST"
 	subPath := ""
@@ -499,7 +494,7 @@ func (c *CloudflareAPI) InsertOrUpdateCName(fqdn string) error {
 	}
 
 	defer resp.Body.Close()
-	var dnsResponse CloudflareAPIIdResponse
+	var dnsResponse CloudflareAPIResponse
 	if err := json.NewDecoder(resp.Body).Decode(&dnsResponse); err != nil || !dnsResponse.Success {
 		c.Log.Error(err, "could not read body in setting DNS record", "response", dnsResponse)
 		return err
@@ -508,6 +503,7 @@ func (c *CloudflareAPI) InsertOrUpdateCName(fqdn string) error {
 	return nil
 }
 
+// Delete DNS CNAME entry for the given FQDN
 func (c *CloudflareAPI) DeleteDNSCName(fqdn string) error {
 	dnsId, err := c.getDNSCNameId(fqdn)
 	if err != nil {
@@ -559,7 +555,7 @@ func (c *CloudflareAPI) getDNSCNameId(fqdn string) (string, error) {
 	}
 
 	defer resp.Body.Close()
-	var dnsResponse CloudflareAPINameResponse
+	var dnsResponse CloudflareAPIMultiResponse
 	if err := json.NewDecoder(resp.Body).Decode(&dnsResponse); err != nil || !dnsResponse.Success {
 		c.Log.Error(err, "could not read body in getting zoneId, check domain", "domain", c.Domain)
 		return "", err
