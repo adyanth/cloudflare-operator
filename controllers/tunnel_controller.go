@@ -167,12 +167,12 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	// Set tunnelId in status and get creds file
 	if okExistingTunnel {
+		// Existing Tunnel, Set tunnelId in status and get creds file
 		if err := r.setupExistingTunnel(); err != nil {
 			return ctrl.Result{}, err
 		}
-		} else {
+	} else {
 		// New tunnel, finalizer/cleanup logic + creation
 		if r.tunnel.GetDeletionTimestamp() != nil {
 			if res, err := r.cleanupTunnel(); err != nil || (res != ctrl.Result{}) {
@@ -180,32 +180,15 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			}
 		} else {
 			if err := r.setupNewTunnel(); err != nil {
-					return ctrl.Result{}, err
+				return ctrl.Result{}, err
 			}
 		}
 	}
 
-	tunnel.Labels = labelsForTunnel(*tunnel)
-	if err := r.Update(ctx, tunnel); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	// Update status
-	if err := cfAPI.ValidateAll(); err != nil {
-		log.Error(err, "Failed to validate API credentials")
-		r.Recorder.Event(tunnel, corev1.EventTypeWarning, "ErrSpecApi", "Error validating Cloudflare API credentials")
+	if err := r.updateTunnelStatus(); err != nil {
 		return ctrl.Result{}, err
 	}
-	tunnel.Status.AccountId = cfAPI.ValidAccountId
-	tunnel.Status.TunnelId = cfAPI.ValidTunnelId
-	tunnel.Status.TunnelName = cfAPI.ValidTunnelName
-	tunnel.Status.ZoneId = cfAPI.ValidZoneId
-	if err := r.Status().Update(ctx, tunnel); err != nil {
-		log.Error(err, "Failed to update Tunnel status", "Tunnel.Namespace", tunnel.Namespace, "Tunnel.Name", tunnel.Name)
-		r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedStatusSet", "Failed to set Tunnel status required for operation")
-		return ctrl.Result{}, err
-	}
-	log.Info("Tunnel status is set", "status", tunnel.Status)
 
 	// Check if Secret already exists
 	cfSecret := &corev1.Secret{}
@@ -400,6 +383,30 @@ func (r *TunnelReconciler) cleanupTunnel() (ctrl.Result, error) {
 		}
 	}
 	return ctrl.Result{}, nil
+}
+
+func (r *TunnelReconciler) updateTunnelStatus() error {
+	r.tunnel.Labels = labelsForTunnel(*r.tunnel)
+	if err := r.Update(r.ctx, r.tunnel); err != nil {
+		return err
+	}
+
+	if err := r.cfAPI.ValidateAll(); err != nil {
+		r.log.Error(err, "Failed to validate API credentials")
+		r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "ErrSpecApi", "Error validating Cloudflare API credentials")
+		return err
+	}
+	r.tunnel.Status.AccountId = r.cfAPI.ValidAccountId
+	r.tunnel.Status.TunnelId = r.cfAPI.ValidTunnelId
+	r.tunnel.Status.TunnelName = r.cfAPI.ValidTunnelName
+	r.tunnel.Status.ZoneId = r.cfAPI.ValidZoneId
+	if err := r.Status().Update(r.ctx, r.tunnel); err != nil {
+		r.log.Error(err, "Failed to update Tunnel status", "Tunnel.Namespace", r.tunnel.Namespace, "Tunnel.Name", r.tunnel.Name)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedStatusSet", "Failed to set Tunnel status required for operation")
+		return err
+	}
+	r.log.Info("Tunnel status is set", "status", r.tunnel.Status)
+	return nil
 }
 
 // configMapForTunnel returns a tunnel ConfigMap object
