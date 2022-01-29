@@ -531,7 +531,7 @@ func (r *TunnelReconciler) deploymentForTunnel(cfTunnel *networkingv1alpha1.Tunn
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Image: "cloudflare/cloudflared:2021.4.0",
+						Image: r.tunnel.Spec.Image,
 						Name:  "cloudflared",
 						Args:  []string{"tunnel", "--config", "/etc/cloudflared/config/config.yaml", "run"},
 						LivenessProbe: &corev1.Probe{
