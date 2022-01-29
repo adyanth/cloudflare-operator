@@ -169,22 +169,9 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	// Set tunnelId in status and get creds file
 	if okExistingTunnel {
-		cfAPI.TunnelName = tunnel.Spec.ExistingTunnel.Name
-		cfAPI.TunnelId = tunnel.Spec.ExistingTunnel.Id
-
-		// Read secret for credentials file
-		cfCredFileB64, okCredFile := cfCloudflareSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_FILE]
-		cfSecretB64, okSecret := cfCloudflareSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET]
-
-		if !okCredFile && !okSecret {
-			err := fmt.Errorf("neither key not found in secret")
-			log.Error(err, "neither key not found in secret", "secret", tunnel.Spec.Cloudflare.Secret, "key1", tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_FILE, "key2", tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET)
-			r.Recorder.Event(tunnel, corev1.EventTypeWarning, "ErrSpecSecret", "Neither Key found in Secret")
+		if err := r.setupExistingTunnel(); err != nil {
 			return ctrl.Result{}, err
 		}
-
-		if okCredFile {
-			tunnelCreds = string(cfCredFileB64)
 		} else {
 			creds, err := cfAPI.GetTunnelCreds(string(cfSecretB64))
 			if err != nil {
@@ -380,6 +367,36 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *TunnelReconciler) setupExistingTunnel() error {
+	r.cfAPI.TunnelName = r.tunnel.Spec.ExistingTunnel.Name
+	r.cfAPI.TunnelId = r.tunnel.Spec.ExistingTunnel.Id
+
+	// Read secret for credentials file
+	cfCredFileB64, okCredFile := r.cfSecret.Data[r.tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_FILE]
+	cfSecretB64, okSecret := r.cfSecret.Data[r.tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET]
+
+	if !okCredFile && !okSecret {
+		err := fmt.Errorf("neither key not found in secret")
+		r.log.Error(err, "neither key not found in secret", "secret", r.tunnel.Spec.Cloudflare.Secret, "key1", r.tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_FILE, "key2", r.tunnel.Spec.Cloudflare.CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "ErrSpecSecret", "Neither Key found in Secret")
+		return err
+	}
+
+	if okCredFile {
+		r.tunnelCreds = string(cfCredFileB64)
+	} else {
+		creds, err := r.cfAPI.GetTunnelCreds(string(cfSecretB64))
+		if err != nil {
+			r.log.Error(err, "error getting tunnel credentials from secret")
+			r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "ErrSpecApi", "Error in getting Tunnel Credentials from Secret")
+			return err
+		}
+		r.tunnelCreds = creds
+	}
+
+	return nil
 }
 
 // configMapForTunnel returns a tunnel ConfigMap object
