@@ -69,7 +69,7 @@ func labelsForTunnel(cf networkingv1alpha1.Tunnel) map[string]string {
 	}
 }
 
-func getAPIDetails(c client.Client, ctx context.Context, log logr.Logger, tunnel networkingv1alpha1.Tunnel) (*CloudflareAPI, *corev1.Secret, error) {
+func getAPIDetails(ctx context.Context, c client.Client, log logr.Logger, tunnel networkingv1alpha1.Tunnel) (*CloudflareAPI, *corev1.Secret, error) {
 
 	// Get secret containing API token
 	cfSecret := &corev1.Secret{}
@@ -110,14 +110,17 @@ func (r *TunnelReconciler) initStruct(ctx context.Context, tunnel *networkingv1a
 	r.ctx = ctx
 	r.tunnel = tunnel
 
-	if cfAPI, cfSecret, err := getAPIDetails(r.Client, r.ctx, r.log, *r.tunnel); err != nil {
+	var err error
+
+	var cfAPI *CloudflareAPI
+	var cfSecret *corev1.Secret
+	if cfAPI, cfSecret, err = getAPIDetails(r.ctx, r.Client, r.log, *r.tunnel); err != nil {
 		r.log.Error(err, "unable to get API details")
 		r.Recorder.Event(tunnel, corev1.EventTypeWarning, "ErrSpecSecret", "Error reading Secret to configure API")
 		return err
-	} else {
-		r.cfAPI = cfAPI
-		r.cfSecret = cfSecret
 	}
+	r.cfAPI = cfAPI
+	r.cfSecret = cfSecret
 
 	return nil
 }

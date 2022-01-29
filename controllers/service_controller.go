@@ -160,37 +160,39 @@ func (r *ServiceReconciler) initStruct(ctx context.Context, service *corev1.Serv
 	r.listOpts = r.getListOpts()
 	r.log.Info("setting listOpts", "listOpts", r.listOpts)
 
-	if tunnel, err := r.getTunnel(); err != nil {
+	var err error
+
+	var tunnel *networkingv1alpha1.Tunnel
+	if tunnel, err = r.getTunnel(); err != nil {
 		r.log.Error(err, "unable to get tunnel for configuration")
 		r.Recorder.Event(service, corev1.EventTypeWarning, "ErrTunnel", "Error finding Tunnel referenced by Service")
 		return err
-	} else {
-		r.tunnel = tunnel
 	}
+	r.tunnel = tunnel
 
-	if configmap, err := r.getConfigMap(); err != nil {
+	var configmap *corev1.ConfigMap
+	if configmap, err = r.getConfigMap(); err != nil {
 		r.log.Error(err, "unable to get configmap for configuration")
 		r.Recorder.Event(service, corev1.EventTypeWarning, "ErrConfigMap", "Error finding ConfigMap for Tunnel referenced by Service")
 		return err
-	} else {
-		r.configmap = configmap
 	}
+	r.configmap = configmap
 
-	if config, err := r.getConfigForService("", nil); err != nil {
+	var config UnvalidatedIngressRule
+	if config, err = r.getConfigForService("", nil); err != nil {
 		r.log.Error(err, "error getting config for service")
 		r.Recorder.Event(service, corev1.EventTypeWarning, "ErrBuildConfig", "Error building Tunnel configuration")
 		return err
-	} else {
-		r.config = &config
 	}
+	r.config = &config
 
-	if cfAPI, _, err := getAPIDetails(r.Client, r.ctx, r.log, *r.tunnel); err != nil {
+	var cfAPI *CloudflareAPI
+	if cfAPI, _, err = getAPIDetails(r.ctx, r.Client, r.log, *r.tunnel); err != nil {
 		r.log.Error(err, "unable to get API details")
 		r.Recorder.Event(service, corev1.EventTypeWarning, "ErrApiConfig", "Error getting API details")
 		return err
-	} else {
-		r.cfAPI = cfAPI
 	}
+	r.cfAPI = cfAPI
 
 	return nil
 }
