@@ -97,6 +97,11 @@ spec:
                       valid, else falls back to Name.
                     type: string
                 type: object
+              image:
+                default: cloudflare/cloudflared:2022.1.3
+                description: Image sets the Cloudflared Image to use. Defaults to
+                  the image set during the release of the operator.
+                type: string
               newTunnel:
                 description: New tunnel object. NewTunnel and ExistingTunnel cannot
                   be both empty and are mutually exclusive.
@@ -107,7 +112,8 @@ spec:
                 type: object
               size:
                 default: 1
-                description: Number of Daemon pods to run for this tunnel
+                description: Size defines the number of Daemon pods to run for this
+                  tunnel
                 format: int32
                 minimum: 0
                 type: integer

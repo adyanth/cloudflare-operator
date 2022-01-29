@@ -92,8 +92,13 @@ type TunnelSpec struct {
 	//+kubebuilder:validation:Minimum=0
 	//+kubebuilder:default:=1
 	//+kubebuilder:validation:Optional
-	// Number of Daemon pods to run for this tunnel
+	// Size defines the number of Daemon pods to run for this tunnel
 	Size int32 `json:"size,omitempty"`
+
+	//+kubebuilder:default:="cloudflare/cloudflared:2022.1.3"
+	//+kubebuilder:validation:Optional
+	// Image sets the Cloudflared Image to use. Defaults to the image set during the release of the operator.
+	Image string `json:"image,omitempty"`
 
 	//+kubebuilder:validation:Required
 	// Cloudflare Credentials
