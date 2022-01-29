@@ -96,6 +96,7 @@ type ServiceReconciler struct {
 	service   *corev1.Service
 	configmap *corev1.ConfigMap
 	listOpts  []client.ListOption
+	cfAPI     *CloudflareAPI
 }
 
 // labelsForService returns the labels for selecting the resources served by a Tunnel.
@@ -152,7 +153,7 @@ func (r ServiceReconciler) getListOpts() []client.ListOption {
 	return listOpts
 }
 
-func (r *ServiceReconciler) initStruct(ctx context.Context, req ctrl.Request, service *corev1.Service) error {
+func (r *ServiceReconciler) initStruct(ctx context.Context, service *corev1.Service) error {
 	r.ctx = ctx
 	r.service = service
 
@@ -183,6 +184,14 @@ func (r *ServiceReconciler) initStruct(ctx context.Context, req ctrl.Request, se
 		r.config = &config
 	}
 
+	if cfAPI, _, err := getAPIDetails(r.Client, r.ctx, r.log, *r.tunnel); err != nil {
+		r.log.Error(err, "unable to get API details")
+		r.Recorder.Event(service, corev1.EventTypeWarning, "ErrApiConfig", "Error getting API details")
+		return err
+	} else {
+		r.cfAPI = cfAPI
+	}
+
 	return nil
 }
 
@@ -194,9 +203,9 @@ func (r *ServiceReconciler) initStruct(ctx context.Context, req ctrl.Request, se
 
 func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.log = ctrllog.FromContext(ctx)
+
 	// Fetch Service from API
 	service := &corev1.Service{}
-
 	if err := r.Get(ctx, req.NamespacedName, service); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Service object not found, could have been deleted after reconcile request.
@@ -216,73 +225,21 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if !(okCRD || okName || okId) {
 		// If a service with annotation is edited to remove just annotations, cleanup wont happen.
 		// Not an issue as such, since it will be overwritten the next time it is used.
-		r.log.Info("No related annotations not found, skipping Service")
-		// Check if our finalizer is present on a non managed resource and remove it. This can happen if annotations were removed from the Service.
-		if controllerutil.ContainsFinalizer(service, tunnelFinalizerAnnotation) {
-			r.log.Info("Finalizer found on unmanaged Service, removing it")
-			controllerutil.RemoveFinalizer(service, tunnelFinalizerAnnotation)
-			err := r.Update(ctx, service)
-			if err != nil {
-				r.log.Error(err, "unable to remove finalizer from unmanaged Service")
-				r.Recorder.Event(service, corev1.EventTypeWarning, "FailedFinalizerUnset", "Failed to remove Service Finalizer from unmanaged Service")
-				return ctrl.Result{}, err
-			}
-			r.Recorder.Event(service, corev1.EventTypeNormal, "FinalizerUnset", "Service Finalizer removed, unmanaged Service")
-		}
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, r.unManagedService(ctx, service)
 	}
 
-	if err := r.initStruct(ctx, req, service); err != nil {
+	if err := r.initStruct(ctx, service); err != nil {
 		r.log.Error(err, "initialization failed")
 		return ctrl.Result{}, err
 	}
 
 	// Check if Service is marked for deletion
-	if service.GetDeletionTimestamp() != nil {
-		if controllerutil.ContainsFinalizer(service, tunnelFinalizerAnnotation) {
-			// Run finalization logic. If the finalization logic fails,
-			// don't remove the finalizer so that we can retry during the next reconciliation.
-
-			if err := r.deleteRecord(); err != nil {
-				r.Recorder.Event(service, corev1.EventTypeWarning, "FailedDeletingDns", "Failed to delete DNS entry")
-				return ctrl.Result{}, err
-			}
-			r.Recorder.Event(service, corev1.EventTypeNormal, "DeletedDns", "Deleted DNS entry")
-
-			// Remove tunnelFinalizer. Once all finalizers have been
-			// removed, the object will be deleted.
-			controllerutil.RemoveFinalizer(service, tunnelFinalizerAnnotation)
-			err := r.Update(ctx, service)
-			if err != nil {
-				r.log.Error(err, "unable to continue with Service deletion")
-				r.Recorder.Event(service, corev1.EventTypeWarning, "FailedFinalizerUnset", "Failed to remove Service Finalizer")
-				return ctrl.Result{}, err
-			}
-			r.Recorder.Event(service, corev1.EventTypeNormal, "FinalizerUnset", "Service Finalizer removed")
-		}
+	if r.service.GetDeletionTimestamp() != nil {
+		return ctrl.Result{}, r.deletionLogic()
 	} else {
-		// Add finalizer for Service
-		if !controllerutil.ContainsFinalizer(service, tunnelFinalizerAnnotation) {
-			controllerutil.AddFinalizer(service, tunnelFinalizerAnnotation)
-		}
-
-		// Add labels for Service
-		service.Labels = r.labelsForService()
-
-		// Update Service resource
-		if err := r.Update(ctx, service); err != nil {
-			r.Recorder.Event(service, corev1.EventTypeWarning, "FailedMetaSet", "Failed to set Service Finalizer and Labels")
+		if err := r.creationLogic(); err != nil {
 			return ctrl.Result{}, err
 		}
-		r.Recorder.Event(service, corev1.EventTypeNormal, "MetaSet", "Service Finalizer and Labels added")
-
-		// Create DNS entry
-		if err := r.createRecord(); err != nil {
-			r.Recorder.Event(service, corev1.EventTypeWarning, "FailedCreatingDns", "Failed to insert/update DNS entry")
-			return ctrl.Result{}, err
-		}
-		r.log.Info("Inserted/Updated DNS entry")
-		r.Recorder.Event(service, corev1.EventTypeNormal, "CreatedDns", "Inserted/Updated DNS entry")
 	}
 
 	// Configure ConfigMap
@@ -294,6 +251,77 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	r.Recorder.Event(service, corev1.EventTypeNormal, "Configured", "Configured Cloudflare Tunnel")
 	return ctrl.Result{}, nil
+}
+
+func (r *ServiceReconciler) unManagedService(ctx context.Context, service *corev1.Service) error {
+	r.log.Info("No related annotations not found, skipping Service")
+	// Check if our finalizer is present on a non managed resource and remove it. This can happen if annotations were removed from the Service.
+	if controllerutil.ContainsFinalizer(service, tunnelFinalizerAnnotation) {
+		r.log.Info("Finalizer found on unmanaged Service, removing it")
+		controllerutil.RemoveFinalizer(service, tunnelFinalizerAnnotation)
+		err := r.Update(ctx, service)
+		if err != nil {
+			r.log.Error(err, "unable to remove finalizer from unmanaged Service")
+			r.Recorder.Event(service, corev1.EventTypeWarning, "FailedFinalizerUnset", "Failed to remove Service Finalizer from unmanaged Service")
+			return err
+		}
+		r.Recorder.Event(service, corev1.EventTypeNormal, "FinalizerUnset", "Service Finalizer removed, unmanaged Service")
+	}
+	// Our finalizer not present, nothing to do.
+	return nil
+}
+
+func (r *ServiceReconciler) deletionLogic() error {
+	if controllerutil.ContainsFinalizer(r.service, tunnelFinalizerAnnotation) {
+		// Run finalization logic. If the finalization logic fails,
+		// don't remove the finalizer so that we can retry during the next reconciliation.
+
+		if err := r.cfAPI.DeleteDNSCName(r.config.Hostname); err != nil {
+			r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingDns", "Failed to delete DNS entry")
+			return err
+		}
+		r.log.Info("Deleted DNS entry", "Hostname", r.config.Hostname)
+		r.Recorder.Event(r.service, corev1.EventTypeNormal, "DeletedDns", "Deleted DNS entry")
+
+		// Remove tunnelFinalizer. Once all finalizers have been
+		// removed, the object will be deleted.
+		controllerutil.RemoveFinalizer(r.service, tunnelFinalizerAnnotation)
+		err := r.Update(r.ctx, r.service)
+		if err != nil {
+			r.log.Error(err, "unable to continue with Service deletion")
+			r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedFinalizerUnset", "Failed to remove Service Finalizer")
+			return err
+		}
+		r.Recorder.Event(r.service, corev1.EventTypeNormal, "FinalizerUnset", "Service Finalizer removed")
+	}
+	// Already removed our finalizer, all good.
+	return nil
+}
+
+func (r *ServiceReconciler) creationLogic() error {
+	// Add finalizer for Service
+	if !controllerutil.ContainsFinalizer(r.service, tunnelFinalizerAnnotation) {
+		controllerutil.AddFinalizer(r.service, tunnelFinalizerAnnotation)
+	}
+
+	// Add labels for Service
+	r.service.Labels = r.labelsForService()
+
+	// Update Service resource
+	if err := r.Update(r.ctx, r.service); err != nil {
+		r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedMetaSet", "Failed to set Service Finalizer and Labels")
+		return err
+	}
+	r.Recorder.Event(r.service, corev1.EventTypeNormal, "MetaSet", "Service Finalizer and Labels added")
+
+	// Create DNS entry
+	if err := r.cfAPI.InsertOrUpdateCName(r.config.Hostname); err != nil {
+		r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedCreatingDns", "Failed to insert/update DNS entry")
+		return err
+	}
+	r.log.Info("Inserted/Updated DNS entry")
+	r.Recorder.Event(r.service, corev1.EventTypeNormal, "CreatedDns", "Inserted/Updated DNS entry")
+	return nil
 }
 
 func (r *ServiceReconciler) getTunnel() (*networkingv1alpha1.Tunnel, error) {
@@ -506,32 +534,6 @@ func (r *ServiceReconciler) configureCloudflare() error {
 	config.Ingress = finalIngresses
 
 	return r.setConfigMapConfiguration(config)
-}
-
-func (r ServiceReconciler) createRecord() error {
-	cfAPI, _, err := getAPIDetails(r.Client, r.ctx, r.log, *r.tunnel)
-	if err != nil {
-		r.log.Error(err, "unable to get API details")
-		return err
-	}
-	if err := cfAPI.InsertOrUpdateCName(r.config.Hostname); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (r ServiceReconciler) deleteRecord() error {
-	cfAPI, _, err := getAPIDetails(r.Client, r.ctx, r.log, *r.tunnel)
-	if err != nil {
-		r.log.Error(err, "unable to get API details")
-		return err
-	}
-
-	if err := cfAPI.DeleteDNSCName(r.config.Hostname); err != nil {
-		return err
-	}
-	r.log.Info("Deleted DNS entry", "Hostname", r.config.Hostname)
-	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
