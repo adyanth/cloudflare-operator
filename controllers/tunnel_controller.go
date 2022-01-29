@@ -190,24 +190,8 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	// Check if Secret already exists
-	cfSecret := &corev1.Secret{}
-	if err := r.Get(ctx, apitypes.NamespacedName{Name: tunnel.Name, Namespace: tunnel.Namespace}, cfSecret); err != nil && apierrors.IsNotFound(err) {
-		// Define a new Secret
-		sec := r.secretForTunnel(tunnel, r.tunnelCreds)
-		r.log.Info("Creating a new Secret", "Secret.Namespace", sec.Namespace, "Secret.Name", sec.Name)
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "CreatingSecret", "Creating Tunnel Secret")
-		err = r.Create(ctx, sec)
-		if err != nil {
-			r.log.Error(err, "Failed to create new Secret", "Deployment.Namespace", sec.Namespace, "Deployment.Name", sec.Name)
-			r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedCreateingSecret", "Creating Tunnel Secret failed")
-			return ctrl.Result{}, err
-		}
-		r.log.Info("Secret created", "Secret.Namespace", sec.Namespace, "Secret.Name", sec.Name)
-		r.Recorder.Event(tunnel, corev1.EventTypeNormal, "CreatedSecret", "Created Tunnel Secret")
-	} else if err != nil {
-		r.log.Error(err, "Failed to get Secret")
-		r.Recorder.Event(tunnel, corev1.EventTypeWarning, "FailedCreatedSecret", "Reading Tunnel Secret failed")
+	// Check if Secret already exists, else create
+	if err := r.createManagedSecret(); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -406,6 +390,29 @@ func (r *TunnelReconciler) updateTunnelStatus() error {
 		return err
 	}
 	r.log.Info("Tunnel status is set", "status", r.tunnel.Status)
+	return nil
+}
+
+func (r *TunnelReconciler) createManagedSecret() error {
+	managedSecret := &corev1.Secret{}
+	if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.tunnel.Namespace}, managedSecret); err != nil && apierrors.IsNotFound(err) {
+		// Define a new Secret
+		sec := r.secretForTunnel(r.tunnel, r.tunnelCreds)
+		r.log.Info("Creating a new Secret", "Secret.Namespace", sec.Namespace, "Secret.Name", sec.Name)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "CreatingSecret", "Creating Tunnel Secret")
+		err = r.Create(r.ctx, sec)
+		if err != nil {
+			r.log.Error(err, "Failed to create new Secret", "Deployment.Namespace", sec.Namespace, "Deployment.Name", sec.Name)
+			r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedCreateingSecret", "Creating Tunnel Secret failed")
+			return err
+		}
+		r.log.Info("Secret created", "Secret.Namespace", sec.Namespace, "Secret.Name", sec.Name)
+		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "CreatedSecret", "Created Tunnel Secret")
+	} else if err != nil {
+		r.log.Error(err, "Failed to get Secret")
+		r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedCreatedSecret", "Reading Tunnel Secret failed")
+		return err
+	}
 	return nil
 }
 
