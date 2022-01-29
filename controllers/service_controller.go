@@ -203,6 +203,11 @@ func (r *ServiceReconciler) initStruct(ctx context.Context, service *corev1.Serv
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;update;patch
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
+// Reconcile is part of the main kubernetes reconciliation loop which aims to
+// move the current state of the cluster closer to the desired state.
+//
+// For more details, check Reconcile and its Result here:
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.log = ctrllog.FromContext(ctx)
 
@@ -238,10 +243,10 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Check if Service is marked for deletion
 	if r.service.GetDeletionTimestamp() != nil {
 		return ctrl.Result{}, r.deletionLogic()
-	} else {
-		if err := r.creationLogic(); err != nil {
-			return ctrl.Result{}, err
-		}
+	}
+
+	if err := r.creationLogic(); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	// Configure ConfigMap
