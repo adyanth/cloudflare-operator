@@ -42,14 +42,22 @@ The [Cloudflare Tunnels guide](https://developers.cloudflare.com/cloudflare-one/
 The Cloudflare Operator aims to provide a new way of dynamically deploying the [cloudflared](https://github.com/cloudflare/cloudflared) daemon on Kubernetes. Scaffolded and built using `operator-sdk`. Once deployed, this operator provides the following:
 
 * Ability to create new and use existing Tunnels for [Cloudflare for Teams](https://developers.cloudflare.com/cloudflare-one/) using Custom Resources (CR/CRD) which will:
-    * Accept a Secret for Cloudflare API Tokens and Keys
-    * Run a scaled (configurable) Deployment of `cloudflared`
-    * Manage a ConfigMap for the above Deployment
+  * Accept a Secret for Cloudflare API Tokens and Keys
+  * Run a scaled (configurable) Deployment of `cloudflared`
+  * Manage a ConfigMap for the above Deployment
 * A Service controller which monitors Service Resources for Annotations and do the following:
-    * Update the `cloudflared` ConfigMap to include the new Service to be served
-    * Restart the `cloudflared` Deployment to make the configuration change take effect
-    * Add a DNS entry in Cloudflare for the specified domain to be a [proxied CNAME to the referenced tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/routing-to-tunnel/dns)
-    * Reverse the above when the Service is deleted using Finalizers
+  * Update the `cloudflared` ConfigMap to include the new Service to be served
+  * Restart the `cloudflared` Deployment to make the configuration change take effect
+  * Add a DNS entry in Cloudflare for the specified domain to be a [proxied CNAME to the referenced tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/routing-to-tunnel/dns)
+  * Reverse the above when the Service is deleted using Finalizers
+
+## Bird's eye view
+
+Here is how the operator and the Tunnel Resource fit into your deployment.
+
+![Operator Architecture](images/OperatorArchitecture.png#center)
+
+There is more detailed information on this architecture and thought process behind it in my [blog post](https://adyanth.site/posts/migration-compose-k8s/cloudflare-tunnel-operator-architecture/).
 
 ## Getting Started
 
