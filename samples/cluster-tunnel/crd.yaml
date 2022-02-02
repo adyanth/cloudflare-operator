@@ -1,0 +1,39 @@
+# New tunnel
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: ClusterTunnel
+metadata:
+  name: new-tunnel
+spec:
+  newTunnel:
+    name: new-k8s-cluster-tunnel
+  size: 2
+  cloudflare:
+    domain: example.com
+    secret: cloudflare-secrets
+    # accountId and accountName cannot be both empty. If both are provided, Account ID is used if valid, else falls back to Account Name.
+    email: email@domain.com
+    accountName: <Cloudflare account name>
+    accountId: <Cloudflare account ID>
+    # CLOUDFLARE_API_TOKEN: <override key to be used reading from secret>
+    # CLOUDFLARE_API_KEY: <override key to be used reading from secret>
+# ---
+# # Existing tunnel
+# apiVersion: networking.cfargotunnel.com/v1alpha1
+# kind: ClusterTunnel
+# metadata:
+#   name: existing-tunnel
+# spec:
+#   existingTunnel:
+#     # id and name cannot be both empty. If both are provided, Tunnel ID is used if valid, else falls back to Tunnel Name.
+#     id: <tunnel ID>
+#     name: <tunnel Name>
+#   size: 2
+#   cloudflare:
+#     domain: example.com
+#     secret: cloudflare-secrets
+#     # accountId and accountName cannot be both empty. If both are provided, Account ID is used if valid, else falls back to Account Name.
+#     accountName: <Cloudflare account name>
+#     accountId: <Cloudflare account ID>
+#     # CLOUDFLARE_API_KEY: <override key to be used reading from secret>
+#     # CLOUDFLARE_TUNNEL_CREDENTIAL_FILE: <override key to be used reading from secret>
+#     # CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET: <override key to be used reading from secret>
