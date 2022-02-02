@@ -116,7 +116,7 @@ metadata:
   name: whoami
   annotations:
     # Specifies the name of the Tunnel resource created before
-    tunnels.networking.cfargotunnel.com/cr: new-tunnel
+    cfargotunnel.com/tunnel: new-tunnel
 spec:
   selector:
     app: whoami

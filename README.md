@@ -27,8 +27,6 @@
 [![GitHub issues](https://img.shields.io/github/issues/adyanth/cloudflare-operator)](https://github.com/adyanth/cloudflare-operator/issues)
 [![Go Report Card](https://goreportcard.com/badge/github.com/adyanth/cloudflare-operator)](https://goreportcard.com/report/github.com/adyanth/cloudflare-operator)
 
-> This is **NOT** an official operator provided/backed by Cloudflare Inc.
-
 > **_NOTE_**: This project is currently in Alpha
 
 > UDP*: UDP support for Cloudflare Tunnels is in [Early Access](https://blog.cloudflare.com/extending-cloudflares-zero-trust-platform-to-support-udp-and-internal-dns/)
@@ -45,6 +43,7 @@ The Cloudflare Operator aims to provide a new way of dynamically deploying the [
   * Accept a Secret for Cloudflare API Tokens and Keys
   * Run a scaled (configurable) Deployment of `cloudflared`
   * Manage a ConfigMap for the above Deployment
+  * Have Cluster and Namespace scoped Tunnels
 * A Service controller which monitors Service Resources for Annotations and do the following:
   * Update the `cloudflared` ConfigMap to include the new Service to be served
   * Restart the `cloudflared` Deployment to make the configuration change take effect
@@ -64,3 +63,5 @@ There is more detailed information on this architecture and thought process behi
 Go through the dedicated documentation on [Getting Started](docs/getting-started.md) to learn how to deploy this operator and a sample tunnel along with a service to expose.
 
 Look into the [Configuration](docs/configuration.md) documentation to understand various configurable parameters of this operator.
+
+> **_NOTE_**: This is **NOT** an official operator provided/backed by Cloudflare Inc. It utilizes their [v4 API](https://api.cloudflare.com/) and their [`cloudflared`](https://github.com/cloudflare/cloudflared) to automate setting up of tunnels on Kubernetes. 
