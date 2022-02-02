@@ -1,0 +1,15 @@
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: ClusterTunnel
+metadata:
+  name: clustertunnel-sample
+spec:
+  newTunnel:
+    name: new-k8s-cluster-tunnel
+  size: 2
+  cloudflare:
+    domain: example.com
+    secret: cloudflare-secrets # present in the cluster-resource-namespace (defaults to cloudflare-operator-system)
+    # accountId and accountName cannot be both empty. If both are provided, Account ID is used if valid, else falls back to Account Name.
+    email: email@domain.com
+    accountName: <Cloudflare account name>
+    accountId: <Cloudflare account ID>

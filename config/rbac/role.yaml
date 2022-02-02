@@ -67,6 +67,32 @@ rules:
 - apiGroups:
   - networking.cfargotunnel.com
   resources:
+  - clustertunnels
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - networking.cfargotunnel.com
+  resources:
+  - clustertunnels/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - networking.cfargotunnel.com
+  resources:
+  - clustertunnels/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - networking.cfargotunnel.com
+  resources:
   - tunnels
   verbs:
   - create
