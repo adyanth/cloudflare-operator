@@ -187,7 +187,7 @@ func (r *ServiceReconciler) initStruct(ctx context.Context, service *corev1.Serv
 	r.config = &config
 
 	var cfAPI *CloudflareAPI
-	if cfAPI, _, err = getAPIDetails(r.ctx, r.Client, r.log, *r.tunnel); err != nil {
+	if cfAPI, _, err = getAPIDetails(r.ctx, r.Client, r.log, r.tunnel.Spec, r.tunnel.Status, r.tunnel.Namespace); err != nil {
 		r.log.Error(err, "unable to get API details")
 		r.Recorder.Event(service, corev1.EventTypeWarning, "ErrApiConfig", "Error getting API details")
 		return err
