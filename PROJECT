@@ -1,25 +1,33 @@
 domain: cfargotunnel.com
 layout:
-  - go.kubebuilder.io/v3
+- go.kubebuilder.io/v3
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: cloudflare-operator
 repo: github.com/adyanth/cloudflare-operator
 resources:
-  - controller: true
-    domain: k8s.io
-    group: networking
-    kind: Service
-    path: k8s.io/api/core/v1
-    version: v1
-  - api:
-      crdVersion: v1
-      namespaced: true
-    controller: true
-    domain: cfargotunnel.com
-    group: networking
-    kind: Tunnel
-    path: github.com/adyanth/cloudflare-operator/api/v1alpha1
-    version: v1alpha1
+- controller: true
+  domain: k8s.io
+  group: networking
+  kind: Service
+  path: k8s.io/api/core/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: cfargotunnel.com
+  group: networking
+  kind: Tunnel
+  path: github.com/adyanth/cloudflare-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: cfargotunnel.com
+  group: networking
+  kind: ClusterTunnel
+  path: github.com/adyanth/cloudflare-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"

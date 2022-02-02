@@ -22,6 +22,7 @@ import (
 	"time"
 
 	yaml "gopkg.in/yaml.v3"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -36,46 +37,46 @@ import (
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
 	"github.com/go-logr/logr"
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/client-go/tools/record"
 )
 
-// TunnelReconciler reconciles a Tunnel object
-type TunnelReconciler struct {
+// ClusterTunnelReconciler reconciles a ClusterTunnel object
+type ClusterTunnelReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme    *runtime.Scheme
+	Namespace string
+	Recorder  record.EventRecorder
 
 	// Custom data for ease of (re)use
 
 	ctx         context.Context
 	log         logr.Logger
-	tunnel      *networkingv1alpha1.Tunnel
+	tunnel      *networkingv1alpha1.ClusterTunnel
 	cfAPI       *CloudflareAPI
 	cfSecret    *corev1.Secret
 	tunnelCreds string
 }
 
-// labelsForTunnel returns the labels for selecting the resources
-// belonging to the given Tunnel CR name.
-func labelsForTunnel(cf networkingv1alpha1.Tunnel) map[string]string {
+// labelsForClusterTunnel returns the labels for selecting the resources
+// belonging to the given Tunnel.
+func labelsForClusterTunnel(cf networkingv1alpha1.ClusterTunnel) map[string]string {
 	return map[string]string{
-		tunnelAnnotation:          cf.Name,
+		clusterTunnelAnnotation:   cf.Name,
 		tunnelAppAnnotation:       "cloudflared",
 		tunnelIdAnnotation:        cf.Status.TunnelId,
 		tunnelNameAnnotation:      cf.Status.TunnelName,
 		tunnelDomainAnnotation:    cf.Spec.Cloudflare.Domain,
-		isClusterTunnelAnnotation: "false",
+		isClusterTunnelAnnotation: "true",
 	}
 }
 
-func (r *TunnelReconciler) initStruct(ctx context.Context, tunnel *networkingv1alpha1.Tunnel) error {
+func (r *ClusterTunnelReconciler) initStruct(ctx context.Context, tunnel *networkingv1alpha1.ClusterTunnel) error {
 	r.ctx = ctx
 	r.tunnel = tunnel
 
 	var err error
 
-	if r.cfAPI, r.cfSecret, err = getAPIDetails(r.ctx, r.Client, r.log, r.tunnel.Spec, r.tunnel.Status, r.tunnel.Namespace); err != nil {
+	if r.cfAPI, r.cfSecret, err = getAPIDetails(r.ctx, r.Client, r.log, r.tunnel.Spec, r.tunnel.Status, r.Namespace); err != nil {
 		r.log.Error(err, "unable to get API details")
 		r.Recorder.Event(tunnel, corev1.EventTypeWarning, "ErrSpecSecret", "Error reading Secret to configure API")
 		return err
@@ -84,9 +85,9 @@ func (r *TunnelReconciler) initStruct(ctx context.Context, tunnel *networkingv1a
 	return nil
 }
 
-//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnels,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnels/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnels/finalizers,verbs=update
+//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
@@ -94,23 +95,27 @@ func (r *TunnelReconciler) initStruct(ctx context.Context, tunnel *networkingv1a
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
+// TODO(user): Modify the Reconcile function to compare the state specified by
+// the ClusterTunnel object against the actual cluster state, and then
+// perform operations to make the cluster state reflect the state specified by
+// the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
-func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ClusterTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.log = ctrllog.FromContext(ctx)
 
 	// Lookup the Tunnel resource
-	tunnel := &networkingv1alpha1.Tunnel{}
+	tunnel := &networkingv1alpha1.ClusterTunnel{}
 	if err := r.Get(ctx, req.NamespacedName, tunnel); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Tunnel object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			r.log.Info("Tunnel deleted, nothing to do")
+			r.log.Info("ClusterTunnel deleted, nothing to do")
 			return ctrl.Result{}, nil
 		}
-		r.log.Error(err, "unable to fetch Tunnel")
+		r.log.Error(err, "unable to fetch ClusterTunnel")
 		return ctrl.Result{}, err
 	}
 
@@ -135,7 +140,7 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return ctrl.Result{}, nil
 }
 
-func (r *TunnelReconciler) setupTunnel() (ctrl.Result, bool, error) {
+func (r *ClusterTunnelReconciler) setupTunnel() (ctrl.Result, bool, error) {
 	okNewTunnel := r.tunnel.Spec.NewTunnel != networkingv1alpha1.NewTunnel{}
 	okExistingTunnel := r.tunnel.Spec.ExistingTunnel != networkingv1alpha1.ExistingTunnel{}
 
@@ -168,7 +173,7 @@ func (r *TunnelReconciler) setupTunnel() (ctrl.Result, bool, error) {
 	return ctrl.Result{}, true, nil
 }
 
-func (r *TunnelReconciler) setupExistingTunnel() error {
+func (r *ClusterTunnelReconciler) setupExistingTunnel() error {
 	r.cfAPI.TunnelName = r.tunnel.Spec.ExistingTunnel.Name
 	r.cfAPI.TunnelId = r.tunnel.Spec.ExistingTunnel.Id
 
@@ -198,7 +203,7 @@ func (r *TunnelReconciler) setupExistingTunnel() error {
 	return nil
 }
 
-func (r *TunnelReconciler) setupNewTunnel() error {
+func (r *ClusterTunnelReconciler) setupNewTunnel() error {
 	// New tunnel, not yet setup, create on Cloudflare
 	if r.tunnel.Status.TunnelId == "" {
 		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Creating", "Tunnel is being created")
@@ -226,7 +231,7 @@ func (r *TunnelReconciler) setupNewTunnel() error {
 	return nil
 }
 
-func (r *TunnelReconciler) cleanupTunnel() (ctrl.Result, bool, error) {
+func (r *ClusterTunnelReconciler) cleanupTunnel() (ctrl.Result, bool, error) {
 	if controllerutil.ContainsFinalizer(r.tunnel, tunnelFinalizerAnnotation) {
 		// Run finalization logic. If the finalization logic fails,
 		// don't remove the finalizer so that we can retry during the next reconciliation.
@@ -235,7 +240,7 @@ func (r *TunnelReconciler) cleanupTunnel() (ctrl.Result, bool, error) {
 		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Deleting", "Starting Tunnel Deletion")
 		cfDeployment := &appsv1.Deployment{}
 		var bypass bool
-		if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.tunnel.Namespace}, cfDeployment); err != nil {
+		if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.Namespace}, cfDeployment); err != nil {
 			r.log.Error(err, "Error in getting deployments, might already be deleted?")
 			bypass = true
 		}
@@ -277,8 +282,8 @@ func (r *TunnelReconciler) cleanupTunnel() (ctrl.Result, bool, error) {
 	return ctrl.Result{}, true, nil
 }
 
-func (r *TunnelReconciler) updateTunnelStatus() error {
-	r.tunnel.Labels = labelsForTunnel(*r.tunnel)
+func (r *ClusterTunnelReconciler) updateTunnelStatus() error {
+	r.tunnel.Labels = labelsForClusterTunnel(*r.tunnel)
 	if err := r.Update(r.ctx, r.tunnel); err != nil {
 		return err
 	}
@@ -293,7 +298,7 @@ func (r *TunnelReconciler) updateTunnelStatus() error {
 	r.tunnel.Status.TunnelName = r.cfAPI.ValidTunnelName
 	r.tunnel.Status.ZoneId = r.cfAPI.ValidZoneId
 	if err := r.Status().Update(r.ctx, r.tunnel); err != nil {
-		r.log.Error(err, "Failed to update Tunnel status", "Tunnel.Namespace", r.tunnel.Namespace, "Tunnel.Name", r.tunnel.Name)
+		r.log.Error(err, "Failed to update Tunnel status", "Tunnel.Namespace", r.Namespace, "Tunnel.Name", r.tunnel.Name)
 		r.Recorder.Event(r.tunnel, corev1.EventTypeWarning, "FailedStatusSet", "Failed to set Tunnel status required for operation")
 		return err
 	}
@@ -301,9 +306,9 @@ func (r *TunnelReconciler) updateTunnelStatus() error {
 	return nil
 }
 
-func (r *TunnelReconciler) createManagedSecret() error {
+func (r *ClusterTunnelReconciler) createManagedSecret() error {
 	managedSecret := &corev1.Secret{}
-	if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.tunnel.Namespace}, managedSecret); err != nil && apierrors.IsNotFound(err) {
+	if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.Namespace}, managedSecret); err != nil && apierrors.IsNotFound(err) {
 		// Define a new Secret
 		sec := r.secretForTunnel(r.tunnel, r.tunnelCreds)
 		r.log.Info("Creating a new Secret", "Secret.Namespace", sec.Namespace, "Secret.Name", sec.Name)
@@ -324,9 +329,9 @@ func (r *TunnelReconciler) createManagedSecret() error {
 	return nil
 }
 
-func (r *TunnelReconciler) createManagedConfigMap() error {
+func (r *ClusterTunnelReconciler) createManagedConfigMap() error {
 	cfConfigMap := &corev1.ConfigMap{}
-	if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.tunnel.Namespace}, cfConfigMap); err != nil && apierrors.IsNotFound(err) {
+	if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.Namespace}, cfConfigMap); err != nil && apierrors.IsNotFound(err) {
 		// Define a new ConfigMap
 		cm := r.configMapForTunnel(r.tunnel)
 		r.log.Info("Creating a new ConfigMap", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
@@ -347,7 +352,7 @@ func (r *TunnelReconciler) createManagedConfigMap() error {
 	return nil
 }
 
-func (r *TunnelReconciler) createOrScaleManagedDeployment() (ctrl.Result, bool, error) {
+func (r *ClusterTunnelReconciler) createOrScaleManagedDeployment() (ctrl.Result, bool, error) {
 	// Check if Deployment already exists, else create it
 	cfDeployment := &appsv1.Deployment{}
 	if res, err := r.createManagedDeployment(cfDeployment); err != nil || (res != ctrl.Result{}) {
@@ -362,8 +367,8 @@ func (r *TunnelReconciler) createOrScaleManagedDeployment() (ctrl.Result, bool, 
 	return ctrl.Result{}, true, nil
 }
 
-func (r *TunnelReconciler) createManagedDeployment(cfDeployment *appsv1.Deployment) (ctrl.Result, error) {
-	if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.tunnel.Namespace}, cfDeployment); err != nil && apierrors.IsNotFound(err) {
+func (r *ClusterTunnelReconciler) createManagedDeployment(cfDeployment *appsv1.Deployment) (ctrl.Result, error) {
+	if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.Namespace}, cfDeployment); err != nil && apierrors.IsNotFound(err) {
 		// Define a new deployment
 		dep := r.deploymentForTunnel(r.tunnel)
 		r.log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
@@ -385,7 +390,7 @@ func (r *TunnelReconciler) createManagedDeployment(cfDeployment *appsv1.Deployme
 	return ctrl.Result{}, nil
 }
 
-func (r *TunnelReconciler) scaleManagedDeployment(cfDeployment *appsv1.Deployment) (ctrl.Result, error) {
+func (r *ClusterTunnelReconciler) scaleManagedDeployment(cfDeployment *appsv1.Deployment) (ctrl.Result, error) {
 	size := r.tunnel.Spec.Size
 	if *cfDeployment.Spec.Replicas != size {
 		r.log.Info("Updating deployment", "currentReplica", *cfDeployment.Spec.Replicas, "desiredSize", size)
@@ -406,7 +411,7 @@ func (r *TunnelReconciler) scaleManagedDeployment(cfDeployment *appsv1.Deploymen
 	return ctrl.Result{}, nil
 }
 
-func (r *TunnelReconciler) createManagedResources() (ctrl.Result, bool, error) {
+func (r *ClusterTunnelReconciler) createManagedResources() (ctrl.Result, bool, error) {
 	// Check if Secret already exists, else create it
 	if err := r.createManagedSecret(); err != nil {
 		return ctrl.Result{}, false, err
@@ -426,8 +431,8 @@ func (r *TunnelReconciler) createManagedResources() (ctrl.Result, bool, error) {
 }
 
 // configMapForTunnel returns a tunnel ConfigMap object
-func (r *TunnelReconciler) configMapForTunnel(cfTunnel *networkingv1alpha1.Tunnel) *corev1.ConfigMap {
-	ls := labelsForTunnel(*cfTunnel)
+func (r *ClusterTunnelReconciler) configMapForTunnel(cfTunnel *networkingv1alpha1.ClusterTunnel) *corev1.ConfigMap {
+	ls := labelsForClusterTunnel(*cfTunnel)
 	initialConfigBytes, _ := yaml.Marshal(Configuration{
 		TunnelId:     cfTunnel.Status.TunnelId,
 		SourceFile:   "/etc/cloudflared/creds/credentials.json",
@@ -441,7 +446,7 @@ func (r *TunnelReconciler) configMapForTunnel(cfTunnel *networkingv1alpha1.Tunne
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cfTunnel.Name,
-			Namespace: cfTunnel.Namespace,
+			Namespace: r.Namespace,
 			Labels:    ls,
 		},
 		Data: map[string]string{"config.yaml": string(initialConfigBytes)},
@@ -452,12 +457,12 @@ func (r *TunnelReconciler) configMapForTunnel(cfTunnel *networkingv1alpha1.Tunne
 }
 
 // secretForTunnel returns a tunnel Secret object
-func (r *TunnelReconciler) secretForTunnel(cfTunnel *networkingv1alpha1.Tunnel, tunnelCreds string) *corev1.Secret {
-	ls := labelsForTunnel(*cfTunnel)
+func (r *ClusterTunnelReconciler) secretForTunnel(cfTunnel *networkingv1alpha1.ClusterTunnel, tunnelCreds string) *corev1.Secret {
+	ls := labelsForClusterTunnel(*cfTunnel)
 	sec := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cfTunnel.Name,
-			Namespace: cfTunnel.Namespace,
+			Namespace: r.Namespace,
 			Labels:    ls,
 		},
 		StringData: map[string]string{"credentials.json": tunnelCreds},
@@ -468,14 +473,14 @@ func (r *TunnelReconciler) secretForTunnel(cfTunnel *networkingv1alpha1.Tunnel, 
 }
 
 // deploymentForTunnel returns a tunnel Deployment object
-func (r *TunnelReconciler) deploymentForTunnel(cfTunnel *networkingv1alpha1.Tunnel) *appsv1.Deployment {
-	ls := labelsForTunnel(*cfTunnel)
+func (r *ClusterTunnelReconciler) deploymentForTunnel(cfTunnel *networkingv1alpha1.ClusterTunnel) *appsv1.Deployment {
+	ls := labelsForClusterTunnel(*cfTunnel)
 	replicas := cfTunnel.Spec.Size
 
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cfTunnel.Name,
-			Namespace: cfTunnel.Namespace,
+			Namespace: r.Namespace,
 			Labels:    ls,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -543,10 +548,10 @@ func (r *TunnelReconciler) deploymentForTunnel(cfTunnel *networkingv1alpha1.Tunn
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *TunnelReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ClusterTunnelReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.Recorder = mgr.GetEventRecorderFor("cloudflare-operator")
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&networkingv1alpha1.Tunnel{}).
+		For(&networkingv1alpha1.ClusterTunnel{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.Secret{}).
 		Owns(&appsv1.Deployment{}).
