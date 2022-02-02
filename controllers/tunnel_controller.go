@@ -69,39 +69,39 @@ func labelsForTunnel(cf networkingv1alpha1.Tunnel) map[string]string {
 	}
 }
 
-func getAPIDetails(ctx context.Context, c client.Client, log logr.Logger, tunnel networkingv1alpha1.Tunnel) (*CloudflareAPI, *corev1.Secret, error) {
+func getAPIDetails(ctx context.Context, c client.Client, log logr.Logger, tunnelSpec networkingv1alpha1.TunnelSpec, tunnelStatus networkingv1alpha1.TunnelStatus, namespace string) (*CloudflareAPI, *corev1.Secret, error) {
 
 	// Get secret containing API token
 	cfSecret := &corev1.Secret{}
-	if err := c.Get(ctx, apitypes.NamespacedName{Name: tunnel.Spec.Cloudflare.Secret, Namespace: tunnel.Namespace}, cfSecret); err != nil {
-		log.Error(err, "secret not found", "secret", tunnel.Spec.Cloudflare.Secret)
+	if err := c.Get(ctx, apitypes.NamespacedName{Name: tunnelSpec.Cloudflare.Secret, Namespace: namespace}, cfSecret); err != nil {
+		log.Error(err, "secret not found", "secret", tunnelSpec.Cloudflare.Secret)
 		return &CloudflareAPI{}, &corev1.Secret{}, err
 	}
 
 	// Read secret for API Token
-	cfAPITokenB64, ok := cfSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_API_TOKEN]
+	cfAPITokenB64, ok := cfSecret.Data[tunnelSpec.Cloudflare.CLOUDFLARE_API_TOKEN]
 	if !ok {
-		log.Info("key not found in secret", "secret", tunnel.Spec.Cloudflare.Secret, "key", tunnel.Spec.Cloudflare.CLOUDFLARE_API_TOKEN)
+		log.Info("key not found in secret", "secret", tunnelSpec.Cloudflare.Secret, "key", tunnelSpec.Cloudflare.CLOUDFLARE_API_TOKEN)
 	}
 
 	// Read secret for API Key
-	cfAPIKeyB64, ok := cfSecret.Data[tunnel.Spec.Cloudflare.CLOUDFLARE_API_KEY]
+	cfAPIKeyB64, ok := cfSecret.Data[tunnelSpec.Cloudflare.CLOUDFLARE_API_KEY]
 	if !ok {
-		log.Info("key not found in secret", "secret", tunnel.Spec.Cloudflare.Secret, "key", tunnel.Spec.Cloudflare.CLOUDFLARE_API_KEY)
+		log.Info("key not found in secret", "secret", tunnelSpec.Cloudflare.Secret, "key", tunnelSpec.Cloudflare.CLOUDFLARE_API_KEY)
 	}
 
 	cfAPI := &CloudflareAPI{
 		Log:             log,
-		AccountName:     tunnel.Spec.Cloudflare.AccountName,
-		AccountId:       tunnel.Spec.Cloudflare.AccountId,
-		Domain:          tunnel.Spec.Cloudflare.Domain,
+		AccountName:     tunnelSpec.Cloudflare.AccountName,
+		AccountId:       tunnelSpec.Cloudflare.AccountId,
+		Domain:          tunnelSpec.Cloudflare.Domain,
 		APIToken:        string(cfAPITokenB64),
 		APIKey:          string(cfAPIKeyB64),
-		APIEmail:        tunnel.Spec.Cloudflare.Email,
-		ValidAccountId:  tunnel.Status.AccountId,
-		ValidTunnelId:   tunnel.Status.TunnelId,
-		ValidTunnelName: tunnel.Status.TunnelName,
-		ValidZoneId:     tunnel.Status.ZoneId,
+		APIEmail:        tunnelSpec.Cloudflare.Email,
+		ValidAccountId:  tunnelStatus.AccountId,
+		ValidTunnelId:   tunnelStatus.TunnelId,
+		ValidTunnelName: tunnelStatus.TunnelName,
+		ValidZoneId:     tunnelStatus.ZoneId,
 	}
 	return cfAPI, cfSecret, nil
 }
@@ -114,7 +114,7 @@ func (r *TunnelReconciler) initStruct(ctx context.Context, tunnel *networkingv1a
 
 	var cfAPI *CloudflareAPI
 	var cfSecret *corev1.Secret
-	if cfAPI, cfSecret, err = getAPIDetails(r.ctx, r.Client, r.log, *r.tunnel); err != nil {
+	if cfAPI, cfSecret, err = getAPIDetails(r.ctx, r.Client, r.log, r.tunnel.Spec, r.tunnel.Status, r.tunnel.Namespace); err != nil {
 		r.log.Error(err, "unable to get API details")
 		r.Recorder.Event(tunnel, corev1.EventTypeWarning, "ErrSpecSecret", "Error reading Secret to configure API")
 		return err
