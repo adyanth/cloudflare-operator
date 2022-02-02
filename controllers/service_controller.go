@@ -39,75 +39,43 @@ import (
 	"k8s.io/client-go/tools/record"
 )
 
-const (
-	// One of the Tunne CRD, ID, Name is mandatory
-	// Tunnel CR Name
-	tunnelCRAnnotation = "tunnels.networking.cfargotunnel.com/cr"
-	// Tunnel ID matching Tunnel Resource
-	tunnelIdAnnotation = "tunnels.networking.cfargotunnel.com/id"
-	// Tunnel Name matching Tunnel Resource Spec
-	tunnelNameAnnotation = "tunnels.networking.cfargotunnel.com/name"
-	// FQDN to create a DNS entry for and route traffic from internet on, defaults to Service name + cloudflare domain
-	fqdnAnnotation = "tunnels.networking.cfargotunnel.com/fqdn"
-	// If this annotation is set to false, do not limit searching Tunnel to Service namespace, and pick the 1st one found (Might be random?)
-	// If set to anything other than false, use it as a namspace where Tunnel exists
-	tunnelNSAnnotation = "tunnels.networking.cfargotunnel.com/ns"
-
-	// Protocol to use between cloudflared and the Service.
-	// Defaults to http if protocol is tcp and port is 80, https if protocol is tcp and port is 443
-	// Else, defaults to tcp if Service Proto is tcp and udp if Service Proto is udp.
-	// Allowed values are in tunnelValidProtoMap (http, https, tcp, udp)
-	tunnelProtoAnnotation = "tunnels.networking.cfargotunnel.com/proto"
-	tunnelProtoHTTP       = "http"
-	tunnelProtoHTTPS      = "https"
-	tunnelProtoTCP        = "tcp"
-	tunnelProtoUDP        = "udp"
-
-	// Checksum of the config, used to restart pods in the deployment
-	tunnelConfigChecksum = "tunnels.networking.cfargotunnel.com/checksum"
-
-	tunnelFinalizerAnnotation = "tunnels.networking.cfargotunnel.com/finalizer"
-	tunnelDomainLabel         = "tunnels.networking.cfargotunnel.com/domain"
-	configHostnameLabel       = "tunnels.networking.cfargotunnel.com/hostname"
-	configServiceLabel        = "tunnels.networking.cfargotunnel.com/service"
-	configServiceLabelSplit   = "."
-	configmapKey              = "config.yaml"
-)
-
-var tunnelValidProtoMap map[string]bool = map[string]bool{
-	tunnelProtoHTTP:  true,
-	tunnelProtoHTTPS: true,
-	tunnelProtoTCP:   true,
-	tunnelProtoUDP:   true,
-}
-
 // ServiceReconciler reconciles a Service object
 type ServiceReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme    *runtime.Scheme
+	Recorder  record.EventRecorder
+	Namespace string
 
 	// Custom data for ease of (re)use
 
-	ctx       context.Context
-	log       logr.Logger
-	config    *UnvalidatedIngressRule
-	tunnel    *networkingv1alpha1.Tunnel
-	service   *corev1.Service
-	configmap *corev1.ConfigMap
-	listOpts  []client.ListOption
-	cfAPI     *CloudflareAPI
+	ctx             context.Context
+	log             logr.Logger
+	config          *UnvalidatedIngressRule
+	tunnel          *networkingv1alpha1.Tunnel
+	clusterTunnel   *networkingv1alpha1.ClusterTunnel
+	service         *corev1.Service
+	configmap       *corev1.ConfigMap
+	namespacedName  apitypes.NamespacedName
+	cfAPI           *CloudflareAPI
+	isClusterTunnel bool
 }
 
 // labelsForService returns the labels for selecting the resources served by a Tunnel.
 func (r ServiceReconciler) labelsForService() map[string]string {
-	return map[string]string{
-		tunnelDomainLabel:   r.tunnel.Spec.Cloudflare.Domain,
+	labels := map[string]string{
 		configHostnameLabel: r.config.Hostname,
 		configServiceLabel:  encodeCfService(r.config.Service),
-		tunnelNSAnnotation:  r.tunnel.Namespace,
-		tunnelCRAnnotation:  r.tunnel.Name,
 	}
+
+	if r.isClusterTunnel {
+		labels[clusterTunnelAnnotation] = r.clusterTunnel.Name
+		labels[tunnelDomainLabel] = r.clusterTunnel.Spec.Cloudflare.Domain
+	} else {
+		labels[tunnelAnnotation] = r.tunnel.Name
+		labels[tunnelDomainLabel] = r.tunnel.Spec.Cloudflare.Domain
+	}
+
+	return labels
 }
 
 func decodeLabel(label string, service corev1.Service) string {
@@ -121,62 +89,63 @@ func encodeCfService(cfService string) string {
 	return fmt.Sprintf("%s%s%s", protoSplit[0], configServiceLabelSplit, domainSplit[1])
 }
 
-func (r ServiceReconciler) getListOpts() []client.ListOption {
-	// Read Service annotations. If both annotations are not set, return without doing anything
-	tunnelName, okName := r.service.Annotations[tunnelNameAnnotation]
-	tunnelId, okId := r.service.Annotations[tunnelIdAnnotation]
-	tunnelNS, okNS := r.service.Annotations[tunnelNSAnnotation]
-	tunnelCRD, okCRD := r.service.Annotations[tunnelCRAnnotation]
-
-	// listOpts to search for ConfigMap. Set labels, and namespace restriction if
-	listOpts := []client.ListOption{}
-	labels := map[string]string{}
-	if okId {
-		labels[tunnelIdAnnotation] = tunnelId
-	}
-	if okName {
-		labels[tunnelNameAnnotation] = tunnelName
-	}
-	if okCRD {
-		labels[tunnelCRAnnotation] = tunnelCRD
-	}
-
-	if tunnelNS == "true" || !okNS { // Either set to "true" or not specified
-		labels[tunnelNSAnnotation] = r.service.Namespace
-		listOpts = append(listOpts, client.InNamespace(r.service.Namespace))
-	} else if okNS && tunnelNS != "false" { // Set to something that is not "false"
-		labels[tunnelNSAnnotation] = tunnelNS
-		listOpts = append(listOpts, client.InNamespace(tunnelNS))
-	} // else set to "false", thus no filter on namespace, pick the 1st one
-
-	listOpts = append(listOpts, client.MatchingLabels(labels))
-	return listOpts
-}
-
 func (r *ServiceReconciler) initStruct(ctx context.Context, service *corev1.Service) error {
 	r.ctx = ctx
 	r.service = service
 
-	r.listOpts = r.getListOpts()
-	r.log.Info("setting listOpts", "listOpts", r.listOpts)
+	// Read Service annotations. If both annotations are not set, return without doing anything
+	tunnelName, okTunnel := r.service.Annotations[tunnelAnnotation]
+	clusterTunnelName, okClusterTunnel := r.service.Annotations[clusterTunnelAnnotation]
+
+	if okTunnel == okClusterTunnel {
+		err := fmt.Errorf("cannot have both tunnel and cluster tunnel annotations")
+		r.log.Error(err, "error reading annotations")
+		r.Recorder.Event(service, corev1.EventTypeWarning, "ErrAnno", "Conflicting annotations found")
+		return err
+	}
 
 	var err error
 
-	var tunnel *networkingv1alpha1.Tunnel
-	if tunnel, err = r.getTunnel(); err != nil {
-		r.log.Error(err, "unable to get tunnel for configuration")
-		r.Recorder.Event(service, corev1.EventTypeWarning, "ErrTunnel", "Error finding Tunnel referenced by Service")
-		return err
-	}
-	r.tunnel = tunnel
+	if okClusterTunnel {
+		r.isClusterTunnel = true
 
-	var configmap *corev1.ConfigMap
-	if configmap, err = r.getConfigMap(); err != nil {
+		r.namespacedName = apitypes.NamespacedName{Name: clusterTunnelName, Namespace: r.Namespace}
+		r.clusterTunnel = &networkingv1alpha1.ClusterTunnel{}
+		if err := r.Get(r.ctx, r.namespacedName, r.clusterTunnel); err != nil {
+			r.log.Error(err, "Failed to get ClusterTunnel", "namespacedName", r.namespacedName)
+			r.Recorder.Event(service, corev1.EventTypeWarning, "ErrTunnel", "Error getting ClusterTunnel")
+			return err
+		}
+
+		if r.cfAPI, _, err = getAPIDetails(r.ctx, r.Client, r.log, r.clusterTunnel.Spec, r.clusterTunnel.Status, r.Namespace); err != nil {
+			r.log.Error(err, "unable to get API details")
+			r.Recorder.Event(service, corev1.EventTypeWarning, "ErrApiConfig", "Error getting API details")
+			return err
+		}
+	} else {
+		r.isClusterTunnel = false
+
+		namespacedName := apitypes.NamespacedName{Name: tunnelName, Namespace: r.service.Namespace}
+		r.tunnel = &networkingv1alpha1.Tunnel{}
+		if err := r.Get(r.ctx, namespacedName, r.tunnel); err != nil {
+			r.log.Error(err, "Failed to get Tunnel", "namespacedName", namespacedName)
+			r.Recorder.Event(service, corev1.EventTypeWarning, "ErrTunnel", "Error getting Tunnel")
+			return err
+		}
+
+		if r.cfAPI, _, err = getAPIDetails(r.ctx, r.Client, r.log, r.tunnel.Spec, r.tunnel.Status, r.Namespace); err != nil {
+			r.log.Error(err, "unable to get API details")
+			r.Recorder.Event(service, corev1.EventTypeWarning, "ErrApiConfig", "Error getting API details")
+			return err
+		}
+	}
+
+	r.configmap = &corev1.ConfigMap{}
+	if err := r.Get(r.ctx, r.namespacedName, r.configmap); err != nil {
 		r.log.Error(err, "unable to get configmap for configuration")
 		r.Recorder.Event(service, corev1.EventTypeWarning, "ErrConfigMap", "Error finding ConfigMap for Tunnel referenced by Service")
 		return err
 	}
-	r.configmap = configmap
 
 	var config UnvalidatedIngressRule
 	if config, err = r.getConfigForService("", nil); err != nil {
@@ -186,19 +155,15 @@ func (r *ServiceReconciler) initStruct(ctx context.Context, service *corev1.Serv
 	}
 	r.config = &config
 
-	var cfAPI *CloudflareAPI
-	if cfAPI, _, err = getAPIDetails(r.ctx, r.Client, r.log, r.tunnel.Spec, r.tunnel.Status, r.tunnel.Namespace); err != nil {
-		r.log.Error(err, "unable to get API details")
-		r.Recorder.Event(service, corev1.EventTypeWarning, "ErrApiConfig", "Error getting API details")
-		return err
-	}
-	r.cfAPI = cfAPI
-
 	return nil
 }
 
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;update
 //+kubebuilder:rbac:groups=core,resources=services/finalizers,verbs=update
+//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnels,verbs=get
+//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnels/status,verbs=get
+//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels,verbs=get
+//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels/status,verbs=get
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;update;patch
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
@@ -225,11 +190,10 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	_, okName := service.Annotations[tunnelNameAnnotation]
-	_, okId := service.Annotations[tunnelIdAnnotation]
-	_, okCRD := service.Annotations[tunnelCRAnnotation]
+	_, okTunnel := service.Annotations[tunnelAnnotation]
+	_, okClusterTunnel := service.Annotations[clusterTunnelAnnotation]
 
-	if !(okCRD || okName || okId) {
+	if !(okTunnel || okClusterTunnel) {
 		// If a service with annotation is edited to remove just annotations, cleanup wont happen.
 		// Not an issue as such, since it will be overwritten the next time it is used.
 		return ctrl.Result{}, r.unManagedService(ctx, service)
@@ -331,46 +295,18 @@ func (r *ServiceReconciler) creationLogic() error {
 	return nil
 }
 
-func (r *ServiceReconciler) getTunnel() (*networkingv1alpha1.Tunnel, error) {
-	// Fetch Tunnel from API
-	tunnelList := &networkingv1alpha1.TunnelList{}
-	if err := r.List(r.ctx, tunnelList, r.listOpts...); err != nil {
-		r.log.Error(err, "Failed to list Tunnels", "listOpts", r.listOpts)
-		return &networkingv1alpha1.Tunnel{}, err
-	}
-	if len(tunnelList.Items) == 0 {
-		err := fmt.Errorf("no tunnels found")
-		r.log.Error(err, "Failed to list Tunnels", "listOpts", r.listOpts)
-		return &networkingv1alpha1.Tunnel{}, err
-	}
-	tunnel := tunnelList.Items[0]
-
-	return &tunnel, nil
-}
-
-func (r ServiceReconciler) getConfigMap() (*corev1.ConfigMap, error) {
-	// Fetch ConfigMap from API
-	configMapList := &corev1.ConfigMapList{}
-	if err := r.List(r.ctx, configMapList, r.listOpts...); err != nil {
-		r.log.Error(err, "Failed to list ConfigMaps", "listOpts", r.listOpts)
-		return &corev1.ConfigMap{}, err
-	}
-	if len(configMapList.Items) == 0 {
-		err := fmt.Errorf("no configmaps found")
-		r.log.Error(err, "Failed to list ConfigMaps", "listOpts", r.listOpts)
-		return &corev1.ConfigMap{}, err
-	}
-	configmap := configMapList.Items[0]
-	return &configmap, nil
-}
-
 func (r *ServiceReconciler) getRelevantServices() ([]corev1.Service, error) {
 	// Fetch Services from API
-	labels := map[string]string{
-		tunnelNSAnnotation: r.tunnel.Namespace,
-		tunnelCRAnnotation: r.tunnel.Name,
+	var listOpts []client.ListOption
+	if r.isClusterTunnel {
+		listOpts = []client.ListOption{client.MatchingLabels(map[string]string{
+			clusterTunnelAnnotation: r.clusterTunnel.Name,
+		})}
+	} else {
+		listOpts = []client.ListOption{client.InNamespace(r.service.Namespace), client.MatchingLabels(map[string]string{
+			tunnelAnnotation: r.tunnel.Name,
+		})}
 	}
-	listOpts := []client.ListOption{client.MatchingLabels(labels)}
 	serviceList := &corev1.ServiceList{}
 	if err := r.List(r.ctx, serviceList, listOpts...); err != nil {
 		r.log.Error(err, "failed to list Services", "listOpts", listOpts)
@@ -435,11 +371,11 @@ func (r ServiceReconciler) getConfigForService(tunnelDomain string, service *cor
 
 	cfHostname := service.Annotations[fqdnAnnotation]
 
-	// Generate cfHostname string from Ingress Spec if not provided
+	// Generate cfHostname string from Service Spec if not provided
 	if cfHostname == "" {
 		if tunnelDomain == "" {
 			r.log.Info("Using current tunnel's domain for generating config")
-			tunnelDomain = r.tunnel.Spec.Cloudflare.Domain
+			tunnelDomain = r.cfAPI.Domain
 		}
 		cfHostname = fmt.Sprintf("%s.%s", service.Name, tunnelDomain)
 		r.log.Info("using default domain value", "domain", tunnelDomain)
