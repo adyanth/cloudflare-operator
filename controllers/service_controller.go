@@ -125,15 +125,15 @@ func (r *ServiceReconciler) initStruct(ctx context.Context, service *corev1.Serv
 	} else {
 		r.isClusterTunnel = false
 
-		namespacedName := apitypes.NamespacedName{Name: tunnelName, Namespace: r.service.Namespace}
+		r.namespacedName = apitypes.NamespacedName{Name: tunnelName, Namespace: r.service.Namespace}
 		r.tunnel = &networkingv1alpha1.Tunnel{}
-		if err := r.Get(r.ctx, namespacedName, r.tunnel); err != nil {
-			r.log.Error(err, "Failed to get Tunnel", "namespacedName", namespacedName)
+		if err := r.Get(r.ctx, r.namespacedName, r.tunnel); err != nil {
+			r.log.Error(err, "Failed to get Tunnel", "namespacedName", r.namespacedName)
 			r.Recorder.Event(service, corev1.EventTypeWarning, "ErrTunnel", "Error getting Tunnel")
 			return err
 		}
 
-		if r.cfAPI, _, err = getAPIDetails(r.ctx, r.Client, r.log, r.tunnel.Spec, r.tunnel.Status, r.Namespace); err != nil {
+		if r.cfAPI, _, err = getAPIDetails(r.ctx, r.Client, r.log, r.tunnel.Spec, r.tunnel.Status, r.service.Namespace); err != nil {
 			r.log.Error(err, "unable to get API details")
 			r.Recorder.Event(service, corev1.EventTypeWarning, "ErrApiConfig", "Error getting API details")
 			return err
@@ -165,6 +165,7 @@ func (r *ServiceReconciler) initStruct(ctx context.Context, service *corev1.Serv
 //+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels,verbs=get
 //+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels/status,verbs=get
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;update;patch
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
