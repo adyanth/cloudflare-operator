@@ -90,7 +90,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: whoami
-  namespace: testing-crd
 spec:
   selector:
     matchLabels:
