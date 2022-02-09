@@ -1,0 +1,36 @@
+# New tunnel
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: Tunnel
+metadata:
+  name: new-tunnel
+spec:
+  newTunnel:
+    name: k3s-deployment
+  size: 2
+  cloudflare:
+    domain: adyanth.site
+    secret: cloudflare-secrets
+    # accountId and accountName cannot be both empty. If both are provided, Account ID is used if valid, else falls back to Account Name.
+    accountName: Adyanth LAN
+    email: adyanthh@gmail.com
+# ---
+# # Existing tunnel
+# apiVersion: networking.cfargotunnel.com/v1alpha1
+# kind: Tunnel
+# metadata:
+#   name: existing-tunnel
+# spec:
+#   existingTunnel:
+#     # id and name cannot be both empty. If both are provided, Tunnel ID is used if valid, else falls back to Tunnel Name.
+#     # id: 8a3fe988-89ce-467e-a781-4f620cdcc38a
+#     name: k8s
+#   size: 2
+#   cloudflare:
+#     domain: adyanth.site
+#     secret: cloudflare-secrets
+#     # accountId and accountName cannot be both empty. If both are provided, Account ID is used if valid, else falls back to Account Name.
+#     # accountName: Adyanth LAN
+#     accountId: 99324e29567e6b6e4f18eb440eccf5d7
+#     # CLOUDFLARE_API_KEY: <override key to be used reading from secret>
+#     # CLOUDFLARE_TUNNEL_CREDENTIAL_FILE: <override key to be used reading from secret>
+#     # CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET: <override key to be used reading from secret>

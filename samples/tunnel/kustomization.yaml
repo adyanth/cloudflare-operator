@@ -1,8 +1,0 @@
-namespace: test-cloudflare-operator-tunnel-app
-namePrefix: test-cloudflare-operator-tunnel-
-
-resources:
-  - "./namespace.yaml"
-  - "./secrets.yaml"
-  - "./crd.yaml"
-  - "./service.yaml"
