@@ -34,9 +34,9 @@ Deploy the operator using Kustomize:
 kubectl apply -k https://github.com/adyanth/cloudflare-operator/config/default
 ```
 
-## Create a Custom Tunnel Resource
+## Create a Custom ClusterTunnel Resource
 
-To create a Tunnel, we need to store Cloudflare credentials in a Secret. Follow the steps below.
+To create a ClusterTunnel, we need to store Cloudflare credentials in a Secret. Follow the steps below.
 
 1. Create a Secret containing Cloudflare credentials. More information on what these tokens do are [provided here](#cloudflare-tokens).
     
@@ -44,7 +44,7 @@ To create a Tunnel, we need to store Cloudflare credentials in a Secret. Follow 
     kubectl create secret generic cloudflare-secrets --from-literal CLOUDFLARE_API_TOKEN=<api-token> --from-literal CLOUDFLARE_API_KEY=<api-key>
     ```
 
-2. Create a Tunnel Resource using `kubectl apply -f tunnel.yaml`.
+2. Create a ClusterTunnel Resource using `kubectl apply -f clustertunnel.yaml`.
     * The `newTunnel.name` is the name that shows up under Access > Tunnels on [Cloudflare For Teams Dashboard](https://dash.teams.cloudflare.com/)
     * The `cloudflare.email` is the email used to login to the dashboard. This is needed when using the Cloudflare Global API Key
     * The `cloudflare.domain` is the domain added and managed in Cloudflare under which new records are created
@@ -52,15 +52,15 @@ To create a Tunnel, we need to store Cloudflare credentials in a Secret. Follow 
     * The `accountId` is the one visible in the URL bar after logging into the [Cloudflare Dashboard](https://dash.cloudflare.com/). You can alternatively use `accountName` which is shown on the left panel once logged in.
 
     ```yaml
-    # tunnel.yaml
+    # clustertunnel.yaml
     apiVersion: networking.cfargotunnel.com/v1alpha1
-    kind: Tunnel
+    kind: ClusterTunnel
     metadata:
-      name: new-tunnel                # The Tunnel Custom Resource Name
+      name: k3s-cluster-tunnel      # The ClusterTunnel Custom Resource Name
     spec:
       newTunnel:
-        name: my-k8s-tunnel         # Name of your new tunnel
-      size: 2                         # This is the number of replicas for cloudflared
+        name: my-k8s-tunnel         # Name of your new tunnel on Cloudflare
+      size: 2                       # This is the number of replicas for cloudflared
       cloudflare:
         email: email@domain.com     # Your email used to login to the Cloudflare Dashboard
         domain: example.com         # Domain under which the tunnel runs and adds DNS entries to
@@ -73,16 +73,16 @@ To create a Tunnel, we need to store Cloudflare credentials in a Secret. Follow 
 3. Verify that the tunnel resource was successful and generated a configmap and a deployment.
 
     ```bash
-    kubectl get tunnel new-tunnel
-    kubectl get configmap new-tunnel
-    kubectl get deployment new-tunnel
+    kubectl get clustertunnel k3s-cluster-tunnel
+    kubectl get configmap k3s-cluster-tunnel
+    kubectl get deployment k3s-cluster-tunnel
     ```
 
 ## Sample Deployment and a Service to utilize the Tunnel
 
 Deploy the below file using `kubectl apply -f sample.yaml` to run a [`whoami`](https://github.com/traefik/whoami) app and expose it to the internet using Cloudflare Tunnel.
 
-The name of the service and the domain of the Tunnel is used to add the DNS record. In this case, `whoami.example.com` would be added.
+The name of the service and the domain of the ClusterTunnel is used to add the DNS record. In this case, `whoami.example.com` would be added.
 
 ```yaml
 # sample.yaml
@@ -115,8 +115,8 @@ kind: Service
 metadata:
   name: whoami
   annotations:
-    # Specifies the name of the Tunnel resource created before
-    cfargotunnel.com/tunnel: new-tunnel
+    # Specifies the name of the ClusterTunnel resource created before
+    cfargotunnel.com/cluster-tunnel: k3s-cluster-tunnel
 spec:
   selector:
     app: whoami
