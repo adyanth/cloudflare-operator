@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whoami
+spec:
+  selector:
+    matchLabels:
+      app: whoami
+  template:
+    metadata:
+      labels:
+        app: whoami
+    spec:
+      containers:
+        - name: whoami
+          image: traefik/whoami
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: whoami-test
+  annotations:
+    cfargotunnel.com/cluster-tunnel: new-cluster-tunnel
+    cfargotunnel.com/proto: http
+spec:
+  selector:
+    app: whoami
+  ports:
+    - port: 80
+      targetPort: 80
+---
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: whoami
+#   labels:
+#     name: whoami
+#   annotations:
+#     external-dns.alpha.kubernetes.io/target: cluster.k8s.adyanth.lan
+# spec:
+#   rules:
+#     - host: whoami.k8s.adyanth.lan
+#       http:
+#         paths:
+#           - pathType: Prefix
+#             path: "/"
+#             backend:
+#               service:
+#                 name: whoami-test
+#                 port:
+#                   number: 80
+# ---
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: whoami-local
+#   labels:
+#     name: whoami-local
+#   annotations:
+#     cert-manager.io/cluster-issuer: letsencrypt-issuer
+# spec:
+#   rules:
+#     - host: whoami.adyanth.site
+#       http:
+#         paths:
+#           - pathType: Prefix
+#             path: "/"
+#             backend:
+#               service:
+#                 name: whoami
+#                 port:
+#                   number: 80
+#   tls:
+#     - hosts:
+#         - whoami.adyanth.site
+#       secretName: whoami-ingress-cert
