@@ -9,8 +9,9 @@ These API tokens can be found under [My Profile > API Tokens](https://dash.cloud
 For the `CLOUDFLARE_API_KEY`, copy the Global API Key shown at the bottom of the page. This is used to delete the DNS entries and tunnels when the Service and Tunnel resources are deleted.
 
 For the `CLOUDFLARE_API_TOKEN`, create a new "custom" token with the following:
+
 1. Permissions
-    * Account > Argo Tunnel > Edit : To create new tunnels
+    * Account > Cloudflare Tunnel > Edit : To create new tunnels
     * Account > Account Settings > Read : To get the accountId from Name and the domainId for the selected domain
     * Zone > DNS > Edit : To get the existing domain and create new entries in DNS for the domain. See [#5](/adyanth/cloudflare-operator/issues/5) for potential unintended consequences if not careful when creating Resources.
 2. Account Resources: Include > All accounts
@@ -23,6 +24,7 @@ Usage of these tokens can be validated from the source code of [cloudflare_api.g
 ## Prerequisites
 
 To install this operator, you need the following:
+
 * A kubernetes cluster with a recent enough version to support Custom Resource Definitions. The operator was initially built on `v1.22.5+k3s1`
 * [`kubectl` cli](https://kubernetes.io/docs/tasks/tools/#kubectl) for deploying the operator, custom resources and samples.
 
@@ -39,7 +41,7 @@ kubectl apply -k https://github.com/adyanth/cloudflare-operator/config/default
 To create a ClusterTunnel, we need to store Cloudflare credentials in a Secret. Follow the steps below.
 
 1. Create a Secret containing Cloudflare credentials. More information on what these tokens do are [provided here](#cloudflare-tokens). We create the Secret in the operator namespace for using ClusterTunnels.
-    
+
     ```bash
     kubectl -n cloudflare-operator-system create secret generic cloudflare-secrets --from-literal CLOUDFLARE_API_TOKEN=<api-token> --from-literal CLOUDFLARE_API_KEY=<api-key>
     ```
