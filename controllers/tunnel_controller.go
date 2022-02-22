@@ -278,7 +278,9 @@ func (r *TunnelReconciler) cleanupTunnel() (ctrl.Result, bool, error) {
 }
 
 func (r *TunnelReconciler) updateTunnelStatus() error {
-	r.tunnel.Labels = labelsForTunnel(*r.tunnel)
+	for k, v := range labelsForTunnel(*r.tunnel) {
+		r.tunnel.Labels[k] = v
+	}
 	if err := r.Update(r.ctx, r.tunnel); err != nil {
 		return err
 	}
