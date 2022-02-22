@@ -277,7 +277,9 @@ func (r *ServiceReconciler) creationLogic() error {
 	}
 
 	// Add labels for Service
-	r.service.Labels = r.labelsForService()
+	for k, v := range r.labelsForService() {
+		r.service.Labels[k] = v
+	}
 
 	// Update Service resource
 	if err := r.Update(r.ctx, r.service); err != nil {
