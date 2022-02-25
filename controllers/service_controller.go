@@ -21,6 +21,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"strings"
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
@@ -319,6 +320,10 @@ func (r *ServiceReconciler) getRelevantServices() ([]corev1.Service, error) {
 	if len(serviceList.Items) == 0 {
 		r.log.Info("No services found, tunnel not in use", "listOpts", listOpts)
 	}
+
+	sort.Slice(serviceList.Items, func(i, j int) bool {
+		return serviceList.Items[i].Name < serviceList.Items[j].Name
+	})
 
 	return serviceList.Items, nil
 }
