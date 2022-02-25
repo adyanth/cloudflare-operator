@@ -515,7 +515,8 @@ func (r *TunnelReconciler) deploymentForTunnel(cfTunnel *networkingv1alpha1.Tunn
 							ReadOnly:  true,
 						}},
 						Resources: corev1.ResourceRequirements{
-							Limits: corev1.ResourceList{"memory": resource.MustParse("128Mi"), "cpu": resource.MustParse("500m")},
+							Requests: corev1.ResourceList{"memory": resource.MustParse("30Mi"), "cpu": resource.MustParse("10m")},
+							Limits:   corev1.ResourceList{"memory": resource.MustParse("256Mi"), "cpu": resource.MustParse("500m")},
 						},
 					}},
 					Volumes: []corev1.Volume{{
