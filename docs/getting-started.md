@@ -34,6 +34,11 @@ Deploy the operator using Kustomize:
 
 ```bash
 kubectl apply -k https://github.com/adyanth/cloudflare-operator/config/default
+# If you need more control on the version deployed, look at the below example
+# Correct full format as per https://github.com/kubernetes-sigs/kustomize/blob/master/examples/remoteBuild.md
+kubectl apply -k 'https://github.com/adyanth/cloudflare-operator.git//config/default?ref=main'
+# If you need a specific version, follow the below syntax. Example shown for v0.4.1
+kubectl apply -k 'https://github.com/adyanth/cloudflare-operator.git//config/default?ref=v0.4.1'
 ```
 
 ## Create a Custom ClusterTunnel Resource
