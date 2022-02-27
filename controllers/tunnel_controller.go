@@ -512,7 +512,7 @@ func (r *TunnelReconciler) deploymentForTunnel() *appsv1.Deployment {
 			ReadOnly:  true,
 		})
 		volumes = append(volumes, corev1.Volume{
-			Name: "creds",
+			Name: "certs",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{SecretName: r.tunnel.Spec.OriginCaPool},
 			},
