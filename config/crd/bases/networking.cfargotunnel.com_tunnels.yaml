@@ -116,7 +116,8 @@ spec:
                   the endpoint is HTTPS.
                 type: boolean
               originCaPool:
-                description: OriginCaPool speficies the secret with tls.crt of the
+                description: OriginCaPool speficies the secret with tls.crt (and other
+                  certs as needed to be referred in the service annotation) of the
                   Root CA to be trusted when sending traffic to HTTPS endpoints
                 type: string
               size:

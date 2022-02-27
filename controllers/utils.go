@@ -21,6 +21,10 @@ const (
 	fqdnAnnotation = "cfargotunnel.com/fqdn"
 	// Target can be used to override the target to send traffic to. Ex: Can be used to point to an ingress rather than the service directly
 	targetAnnotation = "cfargotunnel.com/target"
+	// Setting this annotation skips TLS verification for this ingress. Content does not matter. Delete the annotation if not desired. https://github.com/cloudflare/cloudflared/issues/585
+	noTlsVerifyAnnotation = "cfargotunnel.com/noTlsVerify"
+	// Name of the key containing the origin CA certificate in the Secret mentioned under the Tunnel.spec.originCaPool
+	caPoolAnnotation = "cfargotunnel.com/caPool"
 
 	// Tunnel properties
 	isClusterTunnelAnnotation = "cfargotunnel.com/is-cluster-tunnel"

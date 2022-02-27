@@ -106,7 +106,7 @@ type TunnelSpec struct {
 	NoTlsVerify bool `json:"noTlsVerify,omitempty"`
 
 	//+kubebuilder:validation:Optional
-	// OriginCaPool speficies the secret with tls.crt of the Root CA to be trusted when sending traffic to HTTPS endpoints
+	// OriginCaPool speficies the secret with tls.crt (and other certs as needed to be referred in the service annotation) of the Root CA to be trusted when sending traffic to HTTPS endpoints
 	OriginCaPool string `json:"originCaPool,omitempty"`
 
 	//+kubebuilder:validation:Required

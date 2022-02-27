@@ -476,9 +476,20 @@ func (r *ServiceReconciler) configureCloudflare() error {
 		if target, ok := service.Annotations[targetAnnotation]; ok {
 			targetService = target
 		}
+		originRequest := OriginRequestConfig{}
+		// Check for noTlsVerify
+		if _, noTlsVerify := service.Annotations[noTlsVerifyAnnotation]; noTlsVerify {
+			originRequest.NoTLSVerify = &noTlsVerify
+		}
+		// Check for caPool
+		if caPool, ok := service.Annotations[caPoolAnnotation]; ok {
+			caPath := fmt.Sprintf("/etc/cloudflared/certs/%s", caPool)
+			originRequest.CAPool = &caPath
+		}
 		finalIngresses = append(finalIngresses, UnvalidatedIngressRule{
-			Hostname: service.Labels[configHostnameLabel],
-			Service:  targetService,
+			Hostname:      service.Labels[configHostnameLabel],
+			Service:       targetService,
+			OriginRequest: originRequest,
 		})
 	}
 	// Catchall ingress
