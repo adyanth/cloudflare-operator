@@ -479,6 +479,51 @@ func (r *ClusterTunnelReconciler) deploymentForTunnel() *appsv1.Deployment {
 	ls := labelsForClusterTunnel(*r.tunnel)
 	replicas := r.tunnel.Spec.Size
 
+	args := []string{"tunnel", "--config", "/etc/cloudflared/config/config.yaml", "run"}
+	volumes := []corev1.Volume{{
+		Name: "creds",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{SecretName: r.tunnel.Name},
+		},
+	}, {
+		Name: "config",
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{Name: r.tunnel.Name},
+				Items: []corev1.KeyToPath{{
+					Key:  "config.yaml",
+					Path: "config.yaml",
+				}},
+			},
+		},
+	}}
+	volumeMounts := []corev1.VolumeMount{{
+		Name:      "config",
+		MountPath: "/etc/cloudflared/config",
+		ReadOnly:  true,
+	}, {
+		Name:      "creds",
+		MountPath: "/etc/cloudflared/creds",
+		ReadOnly:  true,
+	}}
+	if r.tunnel.Spec.NoTlsVerify {
+		args = append(args, "--no-tls-verify")
+	}
+	if r.tunnel.Spec.OriginCaPool != "" {
+		args = append(args, "--origin-ca-pool", "/etc/cloudflared/certs/tls.crt")
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "certs",
+			MountPath: "/etc/cloudflared/certs",
+			ReadOnly:  true,
+		})
+		volumes = append(volumes, corev1.Volume{
+			Name: "creds",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{SecretName: r.tunnel.Spec.OriginCaPool},
+			},
+		})
+	}
+
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      r.tunnel.Name,
@@ -498,7 +543,7 @@ func (r *ClusterTunnelReconciler) deploymentForTunnel() *appsv1.Deployment {
 					Containers: []corev1.Container{{
 						Image: r.tunnel.Spec.Image,
 						Name:  "cloudflared",
-						Args:  []string{"tunnel", "--config", "/etc/cloudflared/config/config.yaml", "run"},
+						Args:  args,
 						LivenessProbe: &corev1.Probe{
 							Handler: corev1.Handler{
 								HTTPGet: &corev1.HTTPGetAction{
@@ -510,37 +555,13 @@ func (r *ClusterTunnelReconciler) deploymentForTunnel() *appsv1.Deployment {
 							InitialDelaySeconds: 10,
 							PeriodSeconds:       10,
 						},
-						VolumeMounts: []corev1.VolumeMount{{
-							Name:      "config",
-							MountPath: "/etc/cloudflared/config",
-							ReadOnly:  true,
-						}, {
-							Name:      "creds",
-							MountPath: "/etc/cloudflared/creds",
-							ReadOnly:  true,
-						}},
+						VolumeMounts: volumeMounts,
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{"memory": resource.MustParse("30Mi"), "cpu": resource.MustParse("10m")},
 							Limits:   corev1.ResourceList{"memory": resource.MustParse("256Mi"), "cpu": resource.MustParse("500m")},
 						},
 					}},
-					Volumes: []corev1.Volume{{
-						Name: "creds",
-						VolumeSource: corev1.VolumeSource{
-							Secret: &corev1.SecretVolumeSource{SecretName: r.tunnel.Name},
-						},
-					}, {
-						Name: "config",
-						VolumeSource: corev1.VolumeSource{
-							ConfigMap: &corev1.ConfigMapVolumeSource{
-								LocalObjectReference: corev1.LocalObjectReference{Name: r.tunnel.Name},
-								Items: []corev1.KeyToPath{{
-									Key:  "config.yaml",
-									Path: "config.yaml",
-								}},
-							},
-						},
-					}},
+					Volumes: volumes,
 				},
 			},
 		},
