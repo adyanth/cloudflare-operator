@@ -79,7 +79,7 @@ spec:
                       for new tunnels only, or as an alternate to API Token
                     type: string
                   secret:
-                    description: Secret containing Cloudflare API key
+                    description: Secret containing Cloudflare API key/token
                     type: string
                 type: object
               existingTunnel:
@@ -110,6 +110,15 @@ spec:
                     description: Tunnel name to create on Cloudflare.
                     type: string
                 type: object
+              noTlsVerify:
+                default: false
+                description: NoTlsVerify disables origin TLS certificate checks when
+                  the endpoint is HTTPS.
+                type: boolean
+              originCaPool:
+                description: OriginCaPool speficies the secret with tls.crt of the
+                  Root CA to be trusted when sending traffic to HTTPS endpoints
+                type: string
               size:
                 default: 1
                 description: Size defines the number of Daemon pods to run for this

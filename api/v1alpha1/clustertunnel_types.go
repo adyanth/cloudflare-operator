@@ -29,7 +29,11 @@ import (
 
 // ClusterTunnel is the Schema for the clustertunnels API
 type ClusterTunnel struct {
-	Tunnel `json:",inline"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   TunnelSpec   `json:"spec,omitempty"`
+	Status TunnelStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
