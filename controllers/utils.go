@@ -19,6 +19,8 @@ const (
 	clusterTunnelAnnotation = "cfargotunnel.com/cluster-tunnel"
 	// FQDN to create a DNS entry for and route traffic from internet on, defaults to Service name + cloudflare domain
 	fqdnAnnotation = "cfargotunnel.com/fqdn"
+	// Target can be used to override the target to send traffic to. Ex: Can be used to point to an ingress rather than the service directly
+	targetAnnotation = "cfargotunnel.com/target"
 
 	// Tunnel properties
 	isClusterTunnelAnnotation = "cfargotunnel.com/is-cluster-tunnel"
