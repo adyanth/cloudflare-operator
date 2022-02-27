@@ -472,9 +472,13 @@ func (r *ServiceReconciler) configureCloudflare() error {
 	finalIngresses := make([]UnvalidatedIngressRule, 0, len(services)+1)
 
 	for _, service := range services {
+		targetService := decodeLabel(service.Labels[configServiceLabel], service)
+		if target, ok := service.Annotations[targetAnnotation]; ok {
+			targetService = target
+		}
 		finalIngresses = append(finalIngresses, UnvalidatedIngressRule{
 			Hostname: service.Labels[configHostnameLabel],
-			Service:  decodeLabel(service.Labels[configServiceLabel], service),
+			Service:  targetService,
 		})
 	}
 	// Catchall ingress
