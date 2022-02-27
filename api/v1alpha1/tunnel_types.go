@@ -48,7 +48,7 @@ type CloudflareDetails struct {
 	Domain string `json:"domain,omitempty"`
 
 	//+kubebuilder:validation:Required
-	// Secret containing Cloudflare API key
+	// Secret containing Cloudflare API key/token
 	Secret string `json:"secret,omitempty"`
 
 	//+kubebuilder:validation:Optional
@@ -99,6 +99,15 @@ type TunnelSpec struct {
 	//+kubebuilder:validation:Optional
 	// Image sets the Cloudflared Image to use. Defaults to the image set during the release of the operator.
 	Image string `json:"image,omitempty"`
+
+	//+kubebuilder:default:=false
+	//+kubebuilder:validation:Optional
+	// NoTlsVerify disables origin TLS certificate checks when the endpoint is HTTPS.
+	NoTlsVerify bool `json:"noTlsVerify,omitempty"`
+
+	//+kubebuilder:validation:Optional
+	// OriginCaPool speficies the secret with tls.crt of the Root CA to be trusted when sending traffic to HTTPS endpoints
+	OriginCaPool string `json:"originCaPool,omitempty"`
 
 	//+kubebuilder:validation:Required
 	// Cloudflare Credentials
