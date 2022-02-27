@@ -307,7 +307,7 @@ func (r *TunnelReconciler) createManagedSecret() error {
 	managedSecret := &corev1.Secret{}
 	if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.tunnel.Namespace}, managedSecret); err != nil && apierrors.IsNotFound(err) {
 		// Define a new Secret
-		sec := r.secretForTunnel(r.tunnel, r.tunnelCreds)
+		sec := r.secretForTunnel()
 		r.log.Info("Creating a new Secret", "Secret.Namespace", sec.Namespace, "Secret.Name", sec.Name)
 		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "CreatingSecret", "Creating Tunnel Secret")
 		err = r.Create(r.ctx, sec)
@@ -330,7 +330,7 @@ func (r *TunnelReconciler) createManagedConfigMap() error {
 	cfConfigMap := &corev1.ConfigMap{}
 	if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.tunnel.Namespace}, cfConfigMap); err != nil && apierrors.IsNotFound(err) {
 		// Define a new ConfigMap
-		cm := r.configMapForTunnel(r.tunnel)
+		cm := r.configMapForTunnel()
 		r.log.Info("Creating a new ConfigMap", "ConfigMap.Namespace", cm.Namespace, "ConfigMap.Name", cm.Name)
 		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Configuring", "Creating Tunnel ConfigMap")
 		err = r.Create(r.ctx, cm)
@@ -367,7 +367,7 @@ func (r *TunnelReconciler) createOrScaleManagedDeployment() (ctrl.Result, bool, 
 func (r *TunnelReconciler) createManagedDeployment(cfDeployment *appsv1.Deployment) (ctrl.Result, error) {
 	if err := r.Get(r.ctx, apitypes.NamespacedName{Name: r.tunnel.Name, Namespace: r.tunnel.Namespace}, cfDeployment); err != nil && apierrors.IsNotFound(err) {
 		// Define a new deployment
-		dep := r.deploymentForTunnel(r.tunnel)
+		dep := r.deploymentForTunnel()
 		r.log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
 		r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "Deploying", "Creating Tunnel Deployment")
 		err = r.Create(r.ctx, dep)
@@ -428,10 +428,10 @@ func (r *TunnelReconciler) createManagedResources() (ctrl.Result, bool, error) {
 }
 
 // configMapForTunnel returns a tunnel ConfigMap object
-func (r *TunnelReconciler) configMapForTunnel(cfTunnel *networkingv1alpha1.Tunnel) *corev1.ConfigMap {
-	ls := labelsForTunnel(*cfTunnel)
+func (r *TunnelReconciler) configMapForTunnel() *corev1.ConfigMap {
+	ls := labelsForTunnel(*r.tunnel)
 	initialConfigBytes, _ := yaml.Marshal(Configuration{
-		TunnelId:     cfTunnel.Status.TunnelId,
+		TunnelId:     r.tunnel.Status.TunnelId,
 		SourceFile:   "/etc/cloudflared/creds/credentials.json",
 		Metrics:      "0.0.0.0:2000",
 		NoAutoUpdate: true,
@@ -442,42 +442,43 @@ func (r *TunnelReconciler) configMapForTunnel(cfTunnel *networkingv1alpha1.Tunne
 
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cfTunnel.Name,
-			Namespace: cfTunnel.Namespace,
+			Name:      r.tunnel.Name,
+			Namespace: r.tunnel.Namespace,
 			Labels:    ls,
 		},
 		Data: map[string]string{"config.yaml": string(initialConfigBytes)},
 	}
 	// Set Tunnel instance as the owner and controller
-	ctrl.SetControllerReference(cfTunnel, cm, r.Scheme)
+	ctrl.SetControllerReference(r.tunnel, cm, r.Scheme)
 	return cm
 }
 
 // secretForTunnel returns a tunnel Secret object
-func (r *TunnelReconciler) secretForTunnel(cfTunnel *networkingv1alpha1.Tunnel, tunnelCreds string) *corev1.Secret {
-	ls := labelsForTunnel(*cfTunnel)
+func (r *TunnelReconciler) secretForTunnel() *corev1.Secret {
+	ls := labelsForTunnel(*r.tunnel)
 	sec := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cfTunnel.Name,
-			Namespace: cfTunnel.Namespace,
+			Name:      r.tunnel.Name,
+			Namespace: r.tunnel.Namespace,
 			Labels:    ls,
 		},
-		StringData: map[string]string{"credentials.json": tunnelCreds},
+		StringData: map[string]string{"credentials.json": r.tunnelCreds},
 	}
 	// Set Tunnel instance as the owner and controller
-	ctrl.SetControllerReference(cfTunnel, sec, r.Scheme)
+	ctrl.SetControllerReference(r.tunnel, sec, r.Scheme)
 	return sec
 }
 
 // deploymentForTunnel returns a tunnel Deployment object
-func (r *TunnelReconciler) deploymentForTunnel(cfTunnel *networkingv1alpha1.Tunnel) *appsv1.Deployment {
-	ls := labelsForTunnel(*cfTunnel)
-	replicas := cfTunnel.Spec.Size
+func (r *TunnelReconciler) deploymentForTunnel() *appsv1.Deployment {
+	ls := labelsForTunnel(*r.tunnel)
+	replicas := r.tunnel.Spec.Size
+
 
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cfTunnel.Name,
-			Namespace: cfTunnel.Namespace,
+			Name:      r.tunnel.Name,
+			Namespace: r.tunnel.Namespace,
 			Labels:    ls,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -522,13 +523,13 @@ func (r *TunnelReconciler) deploymentForTunnel(cfTunnel *networkingv1alpha1.Tunn
 					Volumes: []corev1.Volume{{
 						Name: "creds",
 						VolumeSource: corev1.VolumeSource{
-							Secret: &corev1.SecretVolumeSource{SecretName: cfTunnel.Name},
+							Secret: &corev1.SecretVolumeSource{SecretName: r.tunnel.Name},
 						},
 					}, {
 						Name: "config",
 						VolumeSource: corev1.VolumeSource{
 							ConfigMap: &corev1.ConfigMapVolumeSource{
-								LocalObjectReference: corev1.LocalObjectReference{Name: cfTunnel.Name},
+								LocalObjectReference: corev1.LocalObjectReference{Name: r.tunnel.Name},
 								Items: []corev1.KeyToPath{{
 									Key:  "config.yaml",
 									Path: "config.yaml",
@@ -541,7 +542,7 @@ func (r *TunnelReconciler) deploymentForTunnel(cfTunnel *networkingv1alpha1.Tunn
 		},
 	}
 	// Set Tunnel instance as the owner and controller
-	ctrl.SetControllerReference(cfTunnel, dep, r.Scheme)
+	ctrl.SetControllerReference(r.tunnel, dep, r.Scheme)
 	return dep
 }
 
