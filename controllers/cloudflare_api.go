@@ -14,6 +14,7 @@ import (
 
 // CLOUDFLARE_ENDPOINT is the Cloudflare API base URL from https://api.cloudflare.com/#getting-started-endpoints.
 const CLOUDFLARE_ENDPOINT = "https://api.cloudflare.com/client/v4/"
+const TXT_PREFIX = "_managed."
 
 // CloudflareAPI config object holding all relevant fields to use the API
 type CloudflareAPI struct {
@@ -48,8 +49,9 @@ type CloudflareAPIResponse struct {
 // CloudflareAPIMultiResponse object containing a slice of Results with a Name and Id field
 type CloudflareAPIMultiResponse struct {
 	Result []struct {
-		Id   string
-		Name string
+		Id      string
+		Name    string
+		Content string
 	}
 	Errors []struct {
 		Message string
@@ -61,6 +63,13 @@ type CloudflareAPIMultiResponse struct {
 type CloudflareAPITunnelCreate struct {
 	Name         string
 	TunnelSecret string `json:"tunnel_secret"`
+}
+
+// DnsManagedRecordTxt object that represents each managed DNS record in a separate TXT record
+type DnsManagedRecordTxt struct {
+	DnsId      string // DnsId of the managed record
+	TunnelName string // TunnelName of the managed record
+	TunnelId   string // TunnelId of the managed record
 }
 
 func (c CloudflareAPI) addAuthHeader(req *http.Request, delete bool) error {
@@ -454,10 +463,10 @@ func (c *CloudflareAPI) getZoneIdByName() (string, error) {
 }
 
 // InsertOrUpdateCName upsert DNS CNAME record for the given FQDN to point to the tunnel
-func (c *CloudflareAPI) InsertOrUpdateCName(fqdn string) error {
+func (c *CloudflareAPI) InsertOrUpdateCName(fqdn, dnsId string) (string, error) {
 	method := "POST"
 	subPath := ""
-	if dnsId, err := c.getDNSCNameId(fqdn); err == nil {
+	if dnsId != "" {
 		c.Log.Info("Updating existing record", "fqdn", fqdn, "dnsId", dnsId)
 		method = "PUT"
 		subPath = "/" + dnsId
@@ -483,7 +492,7 @@ func (c *CloudflareAPI) InsertOrUpdateCName(fqdn string) error {
 
 	req, _ := http.NewRequest(method, fmt.Sprintf("%szones/%s/dns_records%s", CLOUDFLARE_ENDPOINT, c.ValidZoneId, subPath), reqBody)
 	if err := c.addAuthHeader(req, false); err != nil {
-		return err
+		return "", err
 	}
 	req.Header.Add("Content-Type", "application/json")
 
@@ -491,27 +500,21 @@ func (c *CloudflareAPI) InsertOrUpdateCName(fqdn string) error {
 	resp, err := client.Do(req)
 	if err != nil {
 		c.Log.Error(err, "error code in setting/updating DNS record, check fqdn", "fqdn", fqdn)
-		return err
+		return "", err
 	}
 
 	defer resp.Body.Close()
 	var dnsResponse CloudflareAPIResponse
 	if err := json.NewDecoder(resp.Body).Decode(&dnsResponse); err != nil || !dnsResponse.Success {
 		c.Log.Error(err, "could not read body in setting DNS record", "response", dnsResponse)
-		return err
+		return "", err
 	}
 	c.Log.Info("DNS record set successful", "fqdn", fqdn)
-	return nil
+	return dnsResponse.Result.Id, nil
 }
 
 // DeleteDNSCName deletes DNS CNAME entry for the given FQDN
-func (c *CloudflareAPI) DeleteDNSCName(fqdn string) error {
-	dnsId, err := c.getDNSCNameId(fqdn)
-	if err != nil {
-		c.Log.Info("Cannot find DNS record, already deleted", "fqdn", fqdn)
-		return nil
-	}
-
+func (c *CloudflareAPI) DeleteDNSId(fqdn, dnsId string) error {
 	req, _ := http.NewRequest("DELETE", fmt.Sprintf("%szones/%s/dns_records/%s", CLOUDFLARE_ENDPOINT, c.ValidZoneId, dnsId), nil)
 	if err := c.addAuthHeader(req, false); err != nil {
 		return err
@@ -537,7 +540,8 @@ func (c *CloudflareAPI) DeleteDNSCName(fqdn string) error {
 	return nil
 }
 
-func (c *CloudflareAPI) getDNSCNameId(fqdn string) (string, error) {
+// GetDNSCNameId returns the ID of the CNAME record requested
+func (c *CloudflareAPI) GetDNSCNameId(fqdn string) (string, error) {
 	if _, err := c.GetZoneId(); err != nil {
 		c.Log.Error(err, "error in getting Zone ID")
 		return "", err
@@ -557,8 +561,12 @@ func (c *CloudflareAPI) getDNSCNameId(fqdn string) (string, error) {
 
 	defer resp.Body.Close()
 	var dnsResponse CloudflareAPIMultiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&dnsResponse); err != nil || !dnsResponse.Success {
-		c.Log.Error(err, "could not read body in getting zoneId, check domain", "domain", c.Domain)
+	if err := json.NewDecoder(resp.Body).Decode(&dnsResponse); err != nil {
+		c.Log.Error(err, "could not read body in getting CNAME record, check fqdn", "fqdn", fqdn)
+		return "", err
+	} else if !dnsResponse.Success {
+		err := fmt.Errorf("API returned unsuccessful success code")
+		c.Log.Error(err, "API returned unsuccessful success code in setting DNS record", "response", dnsResponse)
 		return "", err
 	}
 
@@ -575,4 +583,124 @@ func (c *CloudflareAPI) getDNSCNameId(fqdn string) (string, error) {
 	}
 
 	return dnsResponse.Result[0].Id, nil
+}
+
+// GetManagedDnsTxt gets the TXT record corresponding to the fqdn
+func (c *CloudflareAPI) GetManagedDnsTxt(fqdn string) (string, DnsManagedRecordTxt, bool, error) {
+	fqdn = TXT_PREFIX + fqdn
+	if _, err := c.GetZoneId(); err != nil {
+		c.Log.Error(err, "error in getting Zone ID")
+		return "", DnsManagedRecordTxt{}, false, err
+	}
+
+	req, _ := http.NewRequest("GET", fmt.Sprintf("%szones/%s/dns_records?type=TXT&name=%s", CLOUDFLARE_ENDPOINT, c.ValidZoneId, url.QueryEscape(fqdn)), nil)
+	if err := c.addAuthHeader(req, false); err != nil {
+		return "", DnsManagedRecordTxt{}, false, err
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.Log.Error(err, "error code in getting TXT DNS record, check fqdn", "fqdn", fqdn)
+		return "", DnsManagedRecordTxt{}, false, err
+	}
+
+	defer resp.Body.Close()
+	var dnsResponse CloudflareAPIMultiResponse
+	if err := json.NewDecoder(resp.Body).Decode(&dnsResponse); err != nil {
+		c.Log.Error(err, "could not read body in getting TXT record, check fqdn", "fqdn", fqdn)
+		return "", DnsManagedRecordTxt{}, false, err
+	} else if !dnsResponse.Success {
+		err := fmt.Errorf("API returned unsuccessful success code")
+		c.Log.Error(err, "API returned unsuccessful success code in reading DNS TXT record", "response", dnsResponse)
+		return "", DnsManagedRecordTxt{}, false, err
+	}
+
+	if len(dnsResponse.Result) > 1 {
+		err := fmt.Errorf("multiple records returned")
+		c.Log.Error(err, "multiple TXT records returned for fqdn", "fqdn", fqdn)
+		return "", DnsManagedRecordTxt{}, false, err
+	}
+
+	if len(dnsResponse.Result) == 0 {
+		c.Log.Info("no TXT records returned for fqdn", "fqdn", fqdn)
+		return "", DnsManagedRecordTxt{}, true, nil
+	}
+
+	var dnsTxtResponse DnsManagedRecordTxt
+	if err := json.Unmarshal([]byte(dnsResponse.Result[0].Content), &dnsTxtResponse); err != nil {
+		// TXT record exists, but not in JSON
+		c.Log.Error(err, "could not read TXT content in getting zoneId, check domain", "domain", c.Domain)
+		return dnsResponse.Result[0].Id, dnsTxtResponse, false, err
+	} else if dnsTxtResponse.TunnelId != c.TunnelId {
+		// TXT record exists but not controlled by our tunnel
+		return dnsResponse.Result[0].Id, dnsTxtResponse, false, nil
+	}
+	return dnsResponse.Result[0].Id, dnsTxtResponse, true, nil
+}
+
+// InsertOrUpdateTXT upsert DNS TXT record for the given FQDN to point to the tunnel
+func (c *CloudflareAPI) InsertOrUpdateTXT(fqdn, txtId, dnsId string) error {
+	fqdn = TXT_PREFIX + fqdn
+	method := "POST"
+	subPath := ""
+	if txtId != "" {
+		c.Log.Info("Updating existing TXT record", "fqdn", fqdn, "dnsId", txtId)
+		method = "PUT"
+		subPath = "/" + txtId
+	} else {
+		c.Log.Info("Inserting DNS TXT record", "fqdn", fqdn)
+	}
+
+	content, err := json.Marshal(DnsManagedRecordTxt{
+		DnsId:      dnsId,
+		TunnelId:   c.TunnelId,
+		TunnelName: c.TunnelName,
+	})
+	if err != nil {
+		c.Log.Error(err, "could not marshal TXT record", "fqdn", fqdn)
+		return err
+	}
+
+	// Generate body for POST/PUT request
+	body, _ := json.Marshal(struct {
+		Type    string
+		Name    string
+		Content string
+		Ttl     int
+		Proxied bool
+	}{
+		Type:    "TXT",
+		Name:    fqdn,
+		Content: string(content),
+		Ttl:     1,    // Automatic TTL
+		Proxied: true, // For Cloudflare tunnels
+	})
+	reqBody := bytes.NewBuffer(body)
+
+	req, _ := http.NewRequest(method, fmt.Sprintf("%szones/%s/dns_records%s", CLOUDFLARE_ENDPOINT, c.ValidZoneId, subPath), reqBody)
+	if err := c.addAuthHeader(req, false); err != nil {
+		return err
+	}
+	req.Header.Add("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.Log.Error(err, "error code in setting/updating DNS TXT record, check fqdn", "fqdn", fqdn)
+		return err
+	}
+
+	defer resp.Body.Close()
+	var dnsResponse CloudflareAPIResponse
+	if err := json.NewDecoder(resp.Body).Decode(&dnsResponse); err != nil {
+		c.Log.Error(err, "could not read body in setting DNS TXT record", "response", dnsResponse)
+		return err
+	} else if !dnsResponse.Success {
+		err := fmt.Errorf("API returned unsuccessful success code")
+		c.Log.Error(err, "API returned unsuccessful success code in setting DNS TXT record", "response", dnsResponse)
+		return err
+	}
+	c.Log.Info("DNS TXT record set successful", "fqdn", fqdn)
+	return nil
 }
