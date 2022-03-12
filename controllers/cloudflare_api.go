@@ -632,7 +632,7 @@ func (c *CloudflareAPI) GetManagedDnsTxt(fqdn string) (string, DnsManagedRecordT
 		// TXT record exists, but not in JSON
 		c.Log.Error(err, "could not read TXT content in getting zoneId, check domain", "domain", c.Domain)
 		return dnsResponse.Result[0].Id, dnsTxtResponse, false, err
-	} else if dnsTxtResponse.TunnelId != c.TunnelId {
+	} else if dnsTxtResponse.TunnelId != c.ValidTunnelId {
 		// TXT record exists but not controlled by our tunnel
 		return dnsResponse.Result[0].Id, dnsTxtResponse, false, nil
 	}
@@ -654,8 +654,8 @@ func (c *CloudflareAPI) InsertOrUpdateTXT(fqdn, txtId, dnsId string) error {
 
 	content, err := json.Marshal(DnsManagedRecordTxt{
 		DnsId:      dnsId,
-		TunnelId:   c.TunnelId,
-		TunnelName: c.TunnelName,
+		TunnelId:   c.ValidTunnelId,
+		TunnelName: c.ValidTunnelName,
 	})
 	if err != nil {
 		c.Log.Error(err, "could not marshal TXT record", "fqdn", fqdn)
@@ -673,8 +673,8 @@ func (c *CloudflareAPI) InsertOrUpdateTXT(fqdn, txtId, dnsId string) error {
 		Type:    "TXT",
 		Name:    fqdn,
 		Content: string(content),
-		Ttl:     1,    // Automatic TTL
-		Proxied: true, // For Cloudflare tunnels
+		Ttl:     1,     // Automatic TTL
+		Proxied: false, // TXT cannot be proxied
 	})
 	reqBody := bytes.NewBuffer(body)
 
