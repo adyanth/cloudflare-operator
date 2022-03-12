@@ -300,6 +300,9 @@ func (r *ServiceReconciler) creationLogic() error {
 	}
 
 	// Add labels for Service
+	if r.service.Labels == nil {
+		r.service.Labels = make(map[string]string)
+	}
 	for k, v := range r.labelsForService() {
 		r.service.Labels[k] = v
 	}
