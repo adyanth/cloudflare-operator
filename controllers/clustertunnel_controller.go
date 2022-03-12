@@ -283,6 +283,9 @@ func (r *ClusterTunnelReconciler) cleanupTunnel() (ctrl.Result, bool, error) {
 }
 
 func (r *ClusterTunnelReconciler) updateTunnelStatus() error {
+	if r.tunnel.Labels == nil {
+		r.tunnel.Labels = make(map[string]string)
+	}
 	for k, v := range labelsForClusterTunnel(*r.tunnel) {
 		r.tunnel.Labels[k] = v
 	}
