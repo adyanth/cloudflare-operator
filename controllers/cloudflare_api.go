@@ -505,8 +505,16 @@ func (c *CloudflareAPI) InsertOrUpdateCName(fqdn, dnsId string) (string, error) 
 
 	defer resp.Body.Close()
 	var dnsResponse CloudflareAPIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&dnsResponse); err != nil || !dnsResponse.Success {
+	if err := json.NewDecoder(resp.Body).Decode(&dnsResponse); err != nil {
 		c.Log.Error(err, "could not read body in setting DNS record", "response", dnsResponse)
+		return "", err
+	} else if !dnsResponse.Success {
+		errs := ""
+		for _, errData := range dnsResponse.Errors {
+			errs += errData.Message
+		}
+		err := fmt.Errorf(errs)
+		c.Log.Error(err, "API returned unsuccessful success code in setting DNS record", "response", dnsResponse)
 		return "", err
 	}
 	c.Log.Info("DNS record set successful", "fqdn", fqdn)
@@ -565,7 +573,11 @@ func (c *CloudflareAPI) GetDNSCNameId(fqdn string) (string, error) {
 		c.Log.Error(err, "could not read body in getting CNAME record, check fqdn", "fqdn", fqdn)
 		return "", err
 	} else if !dnsResponse.Success {
-		err := fmt.Errorf("API returned unsuccessful success code")
+		errs := ""
+		for _, errData := range dnsResponse.Errors {
+			errs += errData.Message
+		}
+		err := fmt.Errorf(errs)
 		c.Log.Error(err, "API returned unsuccessful success code in setting DNS record", "response", dnsResponse)
 		return "", err
 	}
@@ -611,7 +623,11 @@ func (c *CloudflareAPI) GetManagedDnsTxt(fqdn string) (string, DnsManagedRecordT
 		c.Log.Error(err, "could not read body in getting TXT record, check fqdn", "fqdn", fqdn)
 		return "", DnsManagedRecordTxt{}, false, err
 	} else if !dnsResponse.Success {
-		err := fmt.Errorf("API returned unsuccessful success code")
+		errs := ""
+		for _, errData := range dnsResponse.Errors {
+			errs += errData.Message
+		}
+		err := fmt.Errorf(errs)
 		c.Log.Error(err, "API returned unsuccessful success code in reading DNS TXT record", "response", dnsResponse)
 		return "", DnsManagedRecordTxt{}, false, err
 	}
@@ -697,7 +713,11 @@ func (c *CloudflareAPI) InsertOrUpdateTXT(fqdn, txtId, dnsId string) error {
 		c.Log.Error(err, "could not read body in setting DNS TXT record", "response", dnsResponse)
 		return err
 	} else if !dnsResponse.Success {
-		err := fmt.Errorf("API returned unsuccessful success code")
+		errs := ""
+		for _, errData := range dnsResponse.Errors {
+			errs += errData.Message
+		}
+		err := fmt.Errorf(errs)
 		c.Log.Error(err, "API returned unsuccessful success code in setting DNS TXT record", "response", dnsResponse)
 		return err
 	}
