@@ -435,11 +435,19 @@ func (r *ClusterTunnelReconciler) createManagedResources() (ctrl.Result, bool, e
 // configMapForTunnel returns a tunnel ConfigMap object
 func (r *ClusterTunnelReconciler) configMapForTunnel() *corev1.ConfigMap {
 	ls := labelsForClusterTunnel(*r.tunnel)
+	originRequest := OriginRequestConfig{
+		NoTLSVerify: &r.tunnel.Spec.NoTlsVerify,
+	}
+	if r.tunnel.Spec.OriginCaPool != "" {
+		defaultCaPool := "/etc/cloudflared/certs/tls.crt"
+		originRequest.CAPool = &defaultCaPool
+	}
 	initialConfigBytes, _ := yaml.Marshal(Configuration{
-		TunnelId:     r.tunnel.Status.TunnelId,
-		SourceFile:   "/etc/cloudflared/creds/credentials.json",
-		Metrics:      "0.0.0.0:2000",
-		NoAutoUpdate: true,
+		TunnelId:      r.tunnel.Status.TunnelId,
+		SourceFile:    "/etc/cloudflared/creds/credentials.json",
+		Metrics:       "0.0.0.0:2000",
+		NoAutoUpdate:  true,
+		OriginRequest: originRequest,
 		Ingress: []UnvalidatedIngressRule{{
 			Service: "http_status:404",
 		}},
@@ -506,11 +514,7 @@ func (r *ClusterTunnelReconciler) deploymentForTunnel() *appsv1.Deployment {
 		MountPath: "/etc/cloudflared/creds",
 		ReadOnly:  true,
 	}}
-	if r.tunnel.Spec.NoTlsVerify {
-		args = append(args, "--no-tls-verify")
-	}
 	if r.tunnel.Spec.OriginCaPool != "" {
-		args = append(args, "--origin-ca-pool", "/etc/cloudflared/certs/tls.crt")
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
 			Name:      "certs",
 			MountPath: "/etc/cloudflared/certs",
