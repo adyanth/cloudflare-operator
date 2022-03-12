@@ -102,6 +102,9 @@ docker-build: test ## Build docker image with the manager.
 docker-push: ## Push docker image with the manager.
 	docker push ${IMG}
 
+docker-multiarch-push: test ## Build and push for multiple architectures (amd64, arm and arm64)
+	docker buildx build --push --platform linux/amd64,linux/arm,linux/arm64 --tag ${IMG} .
+
 ##@ Deployment
 
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
