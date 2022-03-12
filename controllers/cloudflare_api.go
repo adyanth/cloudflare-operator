@@ -100,7 +100,7 @@ func (c *CloudflareAPI) CreateCloudflareTunnel() (string, string, error) {
 	})
 	reqBody := bytes.NewBuffer(postBody)
 
-	req, _ := http.NewRequest("POST", CLOUDFLARE_ENDPOINT+"accounts/"+c.ValidAccountId+"/tunnels", reqBody)
+	req, _ := http.NewRequest("POST", fmt.Sprintf("%saccounts/%s/tunnels", CLOUDFLARE_ENDPOINT, c.ValidAccountId), reqBody)
 	if err := c.addAuthHeader(req, false); err != nil {
 		return "", "", err
 	}
@@ -142,7 +142,7 @@ func (c *CloudflareAPI) DeleteCloudflareTunnel() error {
 		return err
 	}
 
-	req, _ := http.NewRequest("DELETE", CLOUDFLARE_ENDPOINT+"accounts/"+c.ValidAccountId+"/tunnels/"+url.QueryEscape(c.ValidTunnelId), nil)
+	req, _ := http.NewRequest("DELETE", fmt.Sprintf("%saccounts/%s/tunnels/%s", CLOUDFLARE_ENDPOINT, c.ValidAccountId, url.QueryEscape(c.ValidTunnelId)), nil)
 	if err := c.addAuthHeader(req, true); err != nil {
 		return err
 	}
@@ -218,7 +218,7 @@ func (c CloudflareAPI) validateAccountId() bool {
 		c.Log.Info("Account ID not provided")
 		return false
 	}
-	req, _ := http.NewRequest("GET", CLOUDFLARE_ENDPOINT+"accounts/"+url.QueryEscape(c.AccountId), nil)
+	req, _ := http.NewRequest("GET", fmt.Sprintf("%saccounts/%s", CLOUDFLARE_ENDPOINT, url.QueryEscape(c.AccountId)), nil)
 	if err := c.addAuthHeader(req, false); err != nil {
 		return false
 	}
@@ -241,7 +241,7 @@ func (c CloudflareAPI) validateAccountId() bool {
 }
 
 func (c *CloudflareAPI) getAccountIdByName() (string, error) {
-	req, _ := http.NewRequest("GET", CLOUDFLARE_ENDPOINT+"accounts?name="+url.QueryEscape(c.AccountName), nil)
+	req, _ := http.NewRequest("GET", fmt.Sprintf("%saccounts?name=%s", CLOUDFLARE_ENDPOINT, url.QueryEscape(c.AccountName)), nil)
 	if err := c.addAuthHeader(req, false); err != nil {
 		return "", err
 	}
@@ -313,7 +313,7 @@ func (c *CloudflareAPI) validateTunnelId() bool {
 		return false
 	}
 
-	req, _ := http.NewRequest("GET", CLOUDFLARE_ENDPOINT+"accounts/"+c.ValidAccountId+"/tunnels/"+url.QueryEscape(c.TunnelId), nil)
+	req, _ := http.NewRequest("GET", fmt.Sprintf("%saccounts/%s/tunnels/%s", CLOUDFLARE_ENDPOINT, c.ValidAccountId, url.QueryEscape(c.TunnelId)), nil)
 	if err := c.addAuthHeader(req, false); err != nil {
 		return false
 	}
@@ -343,7 +343,7 @@ func (c *CloudflareAPI) getTunnelIdByName() (string, error) {
 		return "", err
 	}
 
-	req, _ := http.NewRequest("GET", CLOUDFLARE_ENDPOINT+"accounts/"+c.ValidAccountId+"/tunnels?name="+url.QueryEscape(c.TunnelName), nil)
+	req, _ := http.NewRequest("GET", fmt.Sprintf("%saccounts/%s/tunnels?name=%s", CLOUDFLARE_ENDPOINT, c.ValidAccountId, url.QueryEscape(c.TunnelName)), nil)
 	if err := c.addAuthHeader(req, false); err != nil {
 		return "", err
 	}
@@ -420,7 +420,7 @@ func (c *CloudflareAPI) GetZoneId() (string, error) {
 }
 
 func (c *CloudflareAPI) getZoneIdByName() (string, error) {
-	req, _ := http.NewRequest("GET", CLOUDFLARE_ENDPOINT+"zones/?name="+url.QueryEscape(c.Domain), nil)
+	req, _ := http.NewRequest("GET", fmt.Sprintf("%szones?name=%s", CLOUDFLARE_ENDPOINT, url.QueryEscape(c.Domain)), nil)
 	if err := c.addAuthHeader(req, false); err != nil {
 		return "", err
 	}
@@ -481,7 +481,7 @@ func (c *CloudflareAPI) InsertOrUpdateCName(fqdn string) error {
 	})
 	reqBody := bytes.NewBuffer(body)
 
-	req, _ := http.NewRequest(method, CLOUDFLARE_ENDPOINT+"zones/"+c.ValidZoneId+"/dns_records"+subPath, reqBody)
+	req, _ := http.NewRequest(method, fmt.Sprintf("%szones/%s/dns_records%s", CLOUDFLARE_ENDPOINT, c.ValidZoneId, subPath), reqBody)
 	if err := c.addAuthHeader(req, false); err != nil {
 		return err
 	}
@@ -512,7 +512,7 @@ func (c *CloudflareAPI) DeleteDNSCName(fqdn string) error {
 		return nil
 	}
 
-	req, _ := http.NewRequest("DELETE", CLOUDFLARE_ENDPOINT+"zones/"+c.ValidZoneId+"/dns_records/"+dnsId, nil)
+	req, _ := http.NewRequest("DELETE", fmt.Sprintf("%szones/%s/dns_records/%s", CLOUDFLARE_ENDPOINT, c.ValidZoneId, dnsId), nil)
 	if err := c.addAuthHeader(req, false); err != nil {
 		return err
 	}
@@ -543,7 +543,7 @@ func (c *CloudflareAPI) getDNSCNameId(fqdn string) (string, error) {
 		return "", err
 	}
 
-	req, _ := http.NewRequest("GET", CLOUDFLARE_ENDPOINT+"zones/"+c.ValidZoneId+"/dns_records?type=CNAME&name="+url.QueryEscape(fqdn), nil)
+	req, _ := http.NewRequest("GET", fmt.Sprintf("%szones/%s/dns_records?type=CNAME&name=%s", CLOUDFLARE_ENDPOINT, c.ValidZoneId, url.QueryEscape(fqdn)), nil)
 	if err := c.addAuthHeader(req, false); err != nil {
 		return "", err
 	}
