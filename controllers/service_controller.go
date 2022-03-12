@@ -264,18 +264,28 @@ func (r *ServiceReconciler) deletionLogic() error {
 			// We cannot use this entry. This should be happen if all controllers are using DNS management with the same prefix.
 			r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedReadingTxt", fmt.Sprintf("FQDN already managed by Tunnel Name: %s, Id: %s, not cleaning up", dnsTxtResponse.TunnelName, dnsTxtResponse.TunnelId))
 		} else {
-			if err := r.cfAPI.DeleteDNSId(r.config.Hostname, dnsTxtResponse.DnsId); err != nil {
-				r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingDns", "Failed to delete DNS entry")
-				return err
+			if id, err := r.cfAPI.GetDNSCNameId(r.config.Hostname); err != nil {
+				r.log.Error(err, "Error fetching DNS record", "Hostname", r.config.Hostname)
+				r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingDns", "Error fetching DNS record")
+			} else if id != dnsTxtResponse.DnsId {
+				err := fmt.Errorf("DNS ID from TXT and real DNS record does not match")
+				r.log.Error(err, "DNS ID from TXT and real DNS record does not match", "Hostname", r.config.Hostname)
+				r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingDns", "DNS/TXT ID Mismatch")
+			} else {
+				if err := r.cfAPI.DeleteDNSId(r.config.Hostname, dnsTxtResponse.DnsId); err != nil {
+					r.log.Info("Failed to delete DNS entry", "Hostname", r.config.Hostname)
+					r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingDns", fmt.Sprintf("Failed to delete DNS entry: %s", err.Error()))
+					return err
+				}
+				r.log.Info("Deleted DNS entry", "Hostname", r.config.Hostname)
+				r.Recorder.Event(r.service, corev1.EventTypeNormal, "DeletedDns", "Deleted DNS entry")
+				if err := r.cfAPI.DeleteDNSId(r.config.Hostname, txtId); err != nil {
+					r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingTxt", fmt.Sprintf("Failed to delete TXT entry: %s", err.Error()))
+					return err
+				}
+				r.log.Info("Deleted DNS TXT entry", "Hostname", r.config.Hostname)
+				r.Recorder.Event(r.service, corev1.EventTypeNormal, "DeletedTxt", "Deleted DNS TXT entry")
 			}
-			r.log.Info("Deleted DNS entry", "Hostname", r.config.Hostname)
-			r.Recorder.Event(r.service, corev1.EventTypeNormal, "DeletedDns", "Deleted DNS entry")
-			if err := r.cfAPI.DeleteDNSId(r.config.Hostname, txtId); err != nil {
-				r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingTxt", "Failed to delete DNS TXT entry")
-				return err
-			}
-			r.log.Info("Deleted DNS TXT entry", "Hostname", r.config.Hostname)
-			r.Recorder.Event(r.service, corev1.EventTypeNormal, "DeletedTxt", "Deleted DNS TXT entry")
 		}
 
 		// Remove tunnelFinalizer. Once all finalizers have been
@@ -326,27 +336,40 @@ func (r *ServiceReconciler) creationLogic() error {
 		r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedReadingTxt", fmt.Sprintf("FQDN already managed by Tunnel Name: %s, Id: %s", dnsTxtResponse.TunnelName, dnsTxtResponse.TunnelId))
 		return err
 	}
-	if !r.OverwriteUnmanaged && txtId == "" {
-		// Check if a DNS record exists without a managed TXT record
-		if id, err := r.cfAPI.GetDNSCNameId(r.config.Hostname); err == nil || id != "" {
+	existingId, err := r.cfAPI.GetDNSCNameId(r.config.Hostname)
+	// Check if a DNS record exists
+	if err == nil || existingId != "" {
+		// without a managed TXT record when we are not supposed to overwrite it
+		if !r.OverwriteUnmanaged && txtId == "" {
 			err := fmt.Errorf("unmanaged FQDN present")
 			r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedReadingTxt", "FQDN present but unmanaged by Tunnel")
 			return err
 		}
+		// To overwrite
+		dnsTxtResponse.DnsId = existingId
 	}
 
 	newDnsId, err := r.cfAPI.InsertOrUpdateCName(r.config.Hostname, dnsTxtResponse.DnsId)
 	if err != nil {
-		r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedCreatingDns", "Failed to insert/update DNS entry")
+		r.log.Error(err, "Failed to insert/update DNS entry", "Hostname", r.config.Hostname)
+		r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedCreatingDns", fmt.Sprintf("Failed to insert/update DNS entry: %s", err.Error()))
 		return err
 	}
 	if err := r.cfAPI.InsertOrUpdateTXT(r.config.Hostname, txtId, newDnsId); err != nil {
-		r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedCreatingTxt", "Failed to insert/update TXT DNS entry")
+		r.log.Error(err, "Failed to insert/update TXT entry", "Hostname", r.config.Hostname)
+		r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedCreatingTxt", fmt.Sprintf("Failed to insert/update TXT entry: %s", err.Error()))
+		if err := r.cfAPI.DeleteDNSId(r.config.Hostname, newDnsId); err != nil {
+			r.log.Info("Failed to delete DNS entry, left in broken state", "Hostname", r.config.Hostname)
+			r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingDns", "Failed to delete DNS entry, left in broken state")
+			return err
+		}
+		r.Recorder.Event(r.service, corev1.EventTypeWarning, "DeletedDns", "Deleted DNS entry, retrying")
+		r.log.Info("Deleted DNS entry", "Hostname", r.config.Hostname)
 		return err
 	}
 
-	r.log.Info("Inserted/Updated DNS entry")
-	r.Recorder.Event(r.service, corev1.EventTypeNormal, "CreatedDns", "Inserted/Updated DNS entry")
+	r.log.Info("Inserted/Updated DNS/TXT entry")
+	r.Recorder.Event(r.service, corev1.EventTypeNormal, "CreatedDns", "Inserted/Updated DNS/TXT entry")
 	return nil
 }
 
