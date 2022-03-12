@@ -436,7 +436,7 @@ func (r *TunnelReconciler) configMapForTunnel() *corev1.ConfigMap {
 		Metrics:      "0.0.0.0:2000",
 		NoAutoUpdate: true,
 		Ingress: []UnvalidatedIngressRule{{
-			Service: "http_status:404",
+			Service: r.tunnel.Spec.FallbackTarget,
 		}},
 	})
 

@@ -57,6 +57,7 @@ type ServiceReconciler struct {
 	clusterTunnel   *networkingv1alpha1.ClusterTunnel
 	service         *corev1.Service
 	configmap       *corev1.ConfigMap
+	fallbackTarget  string
 	namespacedName  apitypes.NamespacedName
 	cfAPI           *CloudflareAPI
 	isClusterTunnel bool
@@ -119,6 +120,8 @@ func (r *ServiceReconciler) initStruct(ctx context.Context, service *corev1.Serv
 			return err
 		}
 
+		r.fallbackTarget = r.clusterTunnel.Spec.FallbackTarget
+
 		if r.cfAPI, _, err = getAPIDetails(r.ctx, r.Client, r.log, r.clusterTunnel.Spec, r.clusterTunnel.Status, r.Namespace); err != nil {
 			r.log.Error(err, "unable to get API details")
 			r.Recorder.Event(service, corev1.EventTypeWarning, "ErrApiConfig", "Error getting API details")
@@ -134,6 +137,8 @@ func (r *ServiceReconciler) initStruct(ctx context.Context, service *corev1.Serv
 			r.Recorder.Event(service, corev1.EventTypeWarning, "ErrTunnel", "Error getting Tunnel")
 			return err
 		}
+
+		r.fallbackTarget = r.tunnel.Spec.FallbackTarget
 
 		if r.cfAPI, _, err = getAPIDetails(r.ctx, r.Client, r.log, r.tunnel.Spec, r.tunnel.Status, r.service.Namespace); err != nil {
 			r.log.Error(err, "unable to get API details")
@@ -537,7 +542,7 @@ func (r *ServiceReconciler) configureCloudflare() error {
 	}
 	// Catchall ingress
 	finalIngresses = append(finalIngresses, UnvalidatedIngressRule{
-		Service: "http_status:404",
+		Service: r.fallbackTarget,
 	})
 
 	config.Ingress = finalIngresses
