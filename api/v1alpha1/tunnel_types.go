@@ -109,6 +109,11 @@ type TunnelSpec struct {
 	// OriginCaPool speficies the secret with tls.crt (and other certs as needed to be referred in the service annotation) of the Root CA to be trusted when sending traffic to HTTPS endpoints
 	OriginCaPool string `json:"originCaPool,omitempty"`
 
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:="http_status:404"
+	// FallbackTarget speficies the target for requests that do not match an ingress. It can be pointed to the IngressController for using without the service controller. Defaults to http_status:404
+	FallbackTarget string `json:"fallbackTarget,omitempty"`
+
 	//+kubebuilder:validation:Required
 	// Cloudflare Credentials
 	Cloudflare CloudflareDetails `json:"cloudflare,omitempty"`

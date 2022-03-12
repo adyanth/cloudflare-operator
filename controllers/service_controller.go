@@ -43,9 +43,10 @@ import (
 // ServiceReconciler reconciles a Service object
 type ServiceReconciler struct {
 	client.Client
-	Scheme    *runtime.Scheme
-	Recorder  record.EventRecorder
-	Namespace string
+	Scheme             *runtime.Scheme
+	Recorder           record.EventRecorder
+	Namespace          string
+	OverwriteUnmanaged bool
 
 	// Custom data for ease of (re)use
 
@@ -56,6 +57,7 @@ type ServiceReconciler struct {
 	clusterTunnel   *networkingv1alpha1.ClusterTunnel
 	service         *corev1.Service
 	configmap       *corev1.ConfigMap
+	fallbackTarget  string
 	namespacedName  apitypes.NamespacedName
 	cfAPI           *CloudflareAPI
 	isClusterTunnel bool
@@ -118,6 +120,8 @@ func (r *ServiceReconciler) initStruct(ctx context.Context, service *corev1.Serv
 			return err
 		}
 
+		r.fallbackTarget = r.clusterTunnel.Spec.FallbackTarget
+
 		if r.cfAPI, _, err = getAPIDetails(r.ctx, r.Client, r.log, r.clusterTunnel.Spec, r.clusterTunnel.Status, r.Namespace); err != nil {
 			r.log.Error(err, "unable to get API details")
 			r.Recorder.Event(service, corev1.EventTypeWarning, "ErrApiConfig", "Error getting API details")
@@ -133,6 +137,8 @@ func (r *ServiceReconciler) initStruct(ctx context.Context, service *corev1.Serv
 			r.Recorder.Event(service, corev1.EventTypeWarning, "ErrTunnel", "Error getting Tunnel")
 			return err
 		}
+
+		r.fallbackTarget = r.tunnel.Spec.FallbackTarget
 
 		if r.cfAPI, _, err = getAPIDetails(r.ctx, r.Client, r.log, r.tunnel.Spec, r.tunnel.Status, r.service.Namespace); err != nil {
 			r.log.Error(err, "unable to get API details")
@@ -249,17 +255,43 @@ func (r *ServiceReconciler) deletionLogic() error {
 		// Run finalization logic. If the finalization logic fails,
 		// don't remove the finalizer so that we can retry during the next reconciliation.
 
-		if err := r.cfAPI.DeleteDNSCName(r.config.Hostname); err != nil {
-			r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingDns", "Failed to delete DNS entry")
-			return err
+		// Delete DNS entry
+		txtId, dnsTxtResponse, canUseDns, err := r.cfAPI.GetManagedDnsTxt(r.config.Hostname)
+		if err != nil {
+			// We should not use this entry
+			r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedReadingTxt", "Failed to read existing TXT DNS entry, not cleaning up")
+		} else if !canUseDns {
+			// We cannot use this entry. This should be happen if all controllers are using DNS management with the same prefix.
+			r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedReadingTxt", fmt.Sprintf("FQDN already managed by Tunnel Name: %s, Id: %s, not cleaning up", dnsTxtResponse.TunnelName, dnsTxtResponse.TunnelId))
+		} else {
+			if id, err := r.cfAPI.GetDNSCNameId(r.config.Hostname); err != nil {
+				r.log.Error(err, "Error fetching DNS record", "Hostname", r.config.Hostname)
+				r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingDns", "Error fetching DNS record")
+			} else if id != dnsTxtResponse.DnsId {
+				err := fmt.Errorf("DNS ID from TXT and real DNS record does not match")
+				r.log.Error(err, "DNS ID from TXT and real DNS record does not match", "Hostname", r.config.Hostname)
+				r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingDns", "DNS/TXT ID Mismatch")
+			} else {
+				if err := r.cfAPI.DeleteDNSId(r.config.Hostname, dnsTxtResponse.DnsId); err != nil {
+					r.log.Info("Failed to delete DNS entry", "Hostname", r.config.Hostname)
+					r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingDns", fmt.Sprintf("Failed to delete DNS entry: %s", err.Error()))
+					return err
+				}
+				r.log.Info("Deleted DNS entry", "Hostname", r.config.Hostname)
+				r.Recorder.Event(r.service, corev1.EventTypeNormal, "DeletedDns", "Deleted DNS entry")
+				if err := r.cfAPI.DeleteDNSId(r.config.Hostname, txtId); err != nil {
+					r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingTxt", fmt.Sprintf("Failed to delete TXT entry: %s", err.Error()))
+					return err
+				}
+				r.log.Info("Deleted DNS TXT entry", "Hostname", r.config.Hostname)
+				r.Recorder.Event(r.service, corev1.EventTypeNormal, "DeletedTxt", "Deleted DNS TXT entry")
+			}
 		}
-		r.log.Info("Deleted DNS entry", "Hostname", r.config.Hostname)
-		r.Recorder.Event(r.service, corev1.EventTypeNormal, "DeletedDns", "Deleted DNS entry")
 
 		// Remove tunnelFinalizer. Once all finalizers have been
 		// removed, the object will be deleted.
 		controllerutil.RemoveFinalizer(r.service, tunnelFinalizerAnnotation)
-		err := r.Update(r.ctx, r.service)
+		err = r.Update(r.ctx, r.service)
 		if err != nil {
 			r.log.Error(err, "unable to continue with Service deletion")
 			r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedFinalizerUnset", "Failed to remove Service Finalizer")
@@ -278,6 +310,9 @@ func (r *ServiceReconciler) creationLogic() error {
 	}
 
 	// Add labels for Service
+	if r.service.Labels == nil {
+		r.service.Labels = make(map[string]string)
+	}
 	for k, v := range r.labelsForService() {
 		r.service.Labels[k] = v
 	}
@@ -290,12 +325,51 @@ func (r *ServiceReconciler) creationLogic() error {
 	r.Recorder.Event(r.service, corev1.EventTypeNormal, "MetaSet", "Service Finalizer and Labels added")
 
 	// Create DNS entry
-	if err := r.cfAPI.InsertOrUpdateCName(r.config.Hostname); err != nil {
-		r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedCreatingDns", "Failed to insert/update DNS entry")
+	txtId, dnsTxtResponse, canUseDns, err := r.cfAPI.GetManagedDnsTxt(r.config.Hostname)
+	if err != nil {
+		// We should not use this entry
+		r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedReadingTxt", "Failed to read existing TXT DNS entry")
 		return err
 	}
-	r.log.Info("Inserted/Updated DNS entry")
-	r.Recorder.Event(r.service, corev1.EventTypeNormal, "CreatedDns", "Inserted/Updated DNS entry")
+	if !canUseDns {
+		// We cannot use this entry
+		r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedReadingTxt", fmt.Sprintf("FQDN already managed by Tunnel Name: %s, Id: %s", dnsTxtResponse.TunnelName, dnsTxtResponse.TunnelId))
+		return err
+	}
+	existingId, err := r.cfAPI.GetDNSCNameId(r.config.Hostname)
+	// Check if a DNS record exists
+	if err == nil || existingId != "" {
+		// without a managed TXT record when we are not supposed to overwrite it
+		if !r.OverwriteUnmanaged && txtId == "" {
+			err := fmt.Errorf("unmanaged FQDN present")
+			r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedReadingTxt", "FQDN present but unmanaged by Tunnel")
+			return err
+		}
+		// To overwrite
+		dnsTxtResponse.DnsId = existingId
+	}
+
+	newDnsId, err := r.cfAPI.InsertOrUpdateCName(r.config.Hostname, dnsTxtResponse.DnsId)
+	if err != nil {
+		r.log.Error(err, "Failed to insert/update DNS entry", "Hostname", r.config.Hostname)
+		r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedCreatingDns", fmt.Sprintf("Failed to insert/update DNS entry: %s", err.Error()))
+		return err
+	}
+	if err := r.cfAPI.InsertOrUpdateTXT(r.config.Hostname, txtId, newDnsId); err != nil {
+		r.log.Error(err, "Failed to insert/update TXT entry", "Hostname", r.config.Hostname)
+		r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedCreatingTxt", fmt.Sprintf("Failed to insert/update TXT entry: %s", err.Error()))
+		if err := r.cfAPI.DeleteDNSId(r.config.Hostname, newDnsId); err != nil {
+			r.log.Info("Failed to delete DNS entry, left in broken state", "Hostname", r.config.Hostname)
+			r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingDns", "Failed to delete DNS entry, left in broken state")
+			return err
+		}
+		r.Recorder.Event(r.service, corev1.EventTypeWarning, "DeletedDns", "Deleted DNS entry, retrying")
+		r.log.Info("Deleted DNS entry", "Hostname", r.config.Hostname)
+		return err
+	}
+
+	r.log.Info("Inserted/Updated DNS/TXT entry")
+	r.Recorder.Event(r.service, corev1.EventTypeNormal, "CreatedDns", "Inserted/Updated DNS/TXT entry")
 	return nil
 }
 
@@ -494,7 +568,7 @@ func (r *ServiceReconciler) configureCloudflare() error {
 	}
 	// Catchall ingress
 	finalIngresses = append(finalIngresses, UnvalidatedIngressRule{
-		Service: "http_status:404",
+		Service: r.fallbackTarget,
 	})
 
 	config.Ingress = finalIngresses
