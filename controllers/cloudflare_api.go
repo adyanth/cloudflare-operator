@@ -14,6 +14,8 @@ import (
 
 // CLOUDFLARE_ENDPOINT is the Cloudflare API base URL from https://api.cloudflare.com/#getting-started-endpoints.
 const CLOUDFLARE_ENDPOINT = "https://api.cloudflare.com/client/v4/"
+
+// TXT_PREFIX is the prefix added to TXT records for whom the corresponding DNS records are managed by the operator.
 const TXT_PREFIX = "_managed."
 
 // CloudflareAPI config object holding all relevant fields to use the API
@@ -521,7 +523,7 @@ func (c *CloudflareAPI) InsertOrUpdateCName(fqdn, dnsId string) (string, error) 
 	return dnsResponse.Result.Id, nil
 }
 
-// DeleteDNSCName deletes DNS CNAME entry for the given FQDN
+// DeleteDNSId deletes DNS entry for the given dnsId
 func (c *CloudflareAPI) DeleteDNSId(fqdn, dnsId string) error {
 	req, _ := http.NewRequest("DELETE", fmt.Sprintf("%szones/%s/dns_records/%s", CLOUDFLARE_ENDPOINT, c.ValidZoneId, dnsId), nil)
 	if err := c.addAuthHeader(req, false); err != nil {
