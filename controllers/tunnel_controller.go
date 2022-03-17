@@ -485,7 +485,7 @@ func (r *TunnelReconciler) deploymentForTunnel() *appsv1.Deployment {
 	ls := labelsForTunnel(*r.tunnel)
 	replicas := r.tunnel.Spec.Size
 
-	args := []string{"tunnel", "--config", "/etc/cloudflared/config/config.yaml", "run"}
+	args := []string{"tunnel", "--config", "/etc/cloudflared/config/config.yaml", "--metrics", "0.0.0.0:8099", "run"}
 	volumes := []corev1.Volume{{
 		Name: "creds",
 		VolumeSource: corev1.VolumeSource{
@@ -556,6 +556,13 @@ func (r *TunnelReconciler) deploymentForTunnel() *appsv1.Deployment {
 							FailureThreshold:    1,
 							InitialDelaySeconds: 10,
 							PeriodSeconds:       10,
+						},
+						Ports: []corev1.ContainerPort{
+							{
+								Name:          "metrics",
+								ContainerPort: 8099,
+								Protocol:      corev1.ProtocolTCP,
+							},
 						},
 						VolumeMounts: volumeMounts,
 						Resources: corev1.ResourceRequirements{
