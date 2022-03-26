@@ -26,17 +26,7 @@ const (
 	// Name of the key containing the origin CA certificate in the Secret mentioned under the Tunnel.spec.originCaPool
 	caPoolAnnotation = "cfargotunnel.com/caPool"
 
-	// Tunnel properties
-	isClusterTunnelAnnotation = "cfargotunnel.com/is-cluster-tunnel"
-	tunnelIdAnnotation        = "cfargotunnel.com/id"
-	tunnelNameAnnotation      = "cfargotunnel.com/name"
-	tunnelAppAnnotation       = "cfargotunnel.com/app"
-	tunnelDomainAnnotation    = "cfargotunnel.com/domain"
-
 	// Protocol to use between cloudflared and the Service.
-	// Defaults to http if protocol is tcp and port is 80, https if protocol is tcp and port is 443
-	// Else, defaults to tcp if Service Proto is tcp and udp if Service Proto is udp.
-	// Allowed values are in tunnelValidProtoMap (http, https, tcp, udp)
 	tunnelProtoAnnotation = "cfargotunnel.com/proto"
 	tunnelProtoHTTP       = "http"
 	tunnelProtoHTTPS      = "https"
@@ -48,12 +38,20 @@ const (
 	// Checksum of the config, used to restart pods in the deployment
 	tunnelConfigChecksum = "cfargotunnel.com/checksum"
 
-	tunnelFinalizerAnnotation = "cfargotunnel.com/finalizer"
-	tunnelDomainLabel         = "cfargotunnel.com/domain"
-	configHostnameLabel       = "cfargotunnel.com/hostname"
-	configServiceLabel        = "cfargotunnel.com/service"
-	configServiceLabelSplit   = "."
-	configmapKey              = "config.yaml"
+	// Tunnel properties labels
+	tunnelLabel          = "cfargotunnel.com/tunnel"
+	clusterTunnelLabel   = "cfargotunnel.com/cluster-tunnel"
+	isClusterTunnelLabel = "cfargotunnel.com/is-cluster-tunnel"
+	tunnelIdLabel        = "cfargotunnel.com/id"
+	tunnelNameLabel      = "cfargotunnel.com/name"
+	tunnelAppLabel       = "cfargotunnel.com/app"
+	tunnelDomainLabel    = "cfargotunnel.com/domain"
+	tunnelFinalizer      = "cfargotunnel.com/finalizer"
+	// Service labels
+	configHostnameLabel     = "cfargotunnel.com/hostname"
+	configServiceLabel      = "cfargotunnel.com/service"
+	configServiceLabelSplit = "."
+	configmapKey            = "config.yaml"
 )
 
 var tunnelValidProtoMap map[string]bool = map[string]bool{
