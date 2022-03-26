@@ -61,12 +61,12 @@ type ClusterTunnelReconciler struct {
 // belonging to the given Tunnel.
 func labelsForClusterTunnel(cf networkingv1alpha1.ClusterTunnel) map[string]string {
 	return map[string]string{
-		clusterTunnelAnnotation:   cf.Name,
-		tunnelAppAnnotation:       "cloudflared",
-		tunnelIdAnnotation:        cf.Status.TunnelId,
-		tunnelNameAnnotation:      cf.Status.TunnelName,
-		tunnelDomainAnnotation:    cf.Spec.Cloudflare.Domain,
-		isClusterTunnelAnnotation: "true",
+		clusterTunnelLabel:   cf.Name,
+		tunnelAppLabel:       "cloudflared",
+		tunnelIdLabel:        cf.Status.TunnelId,
+		tunnelNameLabel:      cf.Status.TunnelName,
+		tunnelDomainLabel:    cf.Spec.Cloudflare.Domain,
+		isClusterTunnelLabel: "true",
 	}
 }
 
@@ -220,8 +220,8 @@ func (r *ClusterTunnelReconciler) setupNewTunnel() error {
 	}
 
 	// Add finalizer for tunnel
-	if !controllerutil.ContainsFinalizer(r.tunnel, tunnelFinalizerAnnotation) {
-		controllerutil.AddFinalizer(r.tunnel, tunnelFinalizerAnnotation)
+	if !controllerutil.ContainsFinalizer(r.tunnel, tunnelFinalizer) {
+		controllerutil.AddFinalizer(r.tunnel, tunnelFinalizer)
 		if err := r.Update(r.ctx, r.tunnel); err != nil {
 			r.Recorder.Event(r.tunnel, corev1.EventTypeNormal, "FailedFinalizerSet", "Failed to add Tunnel Finalizer")
 			return err
@@ -232,7 +232,7 @@ func (r *ClusterTunnelReconciler) setupNewTunnel() error {
 }
 
 func (r *ClusterTunnelReconciler) cleanupTunnel() (ctrl.Result, bool, error) {
-	if controllerutil.ContainsFinalizer(r.tunnel, tunnelFinalizerAnnotation) {
+	if controllerutil.ContainsFinalizer(r.tunnel, tunnelFinalizer) {
 		// Run finalization logic. If the finalization logic fails,
 		// don't remove the finalizer so that we can retry during the next reconciliation.
 
@@ -268,7 +268,7 @@ func (r *ClusterTunnelReconciler) cleanupTunnel() (ctrl.Result, bool, error) {
 
 			// Remove tunnelFinalizer. Once all finalizers have been
 			// removed, the object will be deleted.
-			controllerutil.RemoveFinalizer(r.tunnel, tunnelFinalizerAnnotation)
+			controllerutil.RemoveFinalizer(r.tunnel, tunnelFinalizer)
 			err := r.Update(r.ctx, r.tunnel)
 			if err != nil {
 				r.log.Error(err, "unable to continue with tunnel deletion")

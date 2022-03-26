@@ -235,9 +235,9 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *ServiceReconciler) unManagedService(ctx context.Context, service *corev1.Service) error {
 	r.log.Info("No related annotations not found, skipping Service")
 	// Check if our finalizer is present on a non managed resource and remove it. This can happen if annotations were removed from the Service.
-	if controllerutil.ContainsFinalizer(service, tunnelFinalizerAnnotation) {
+	if controllerutil.ContainsFinalizer(service, tunnelFinalizer) {
 		r.log.Info("Finalizer found on unmanaged Service, removing it")
-		controllerutil.RemoveFinalizer(service, tunnelFinalizerAnnotation)
+		controllerutil.RemoveFinalizer(service, tunnelFinalizer)
 		err := r.Update(ctx, service)
 		if err != nil {
 			r.log.Error(err, "unable to remove finalizer from unmanaged Service")
@@ -251,7 +251,7 @@ func (r *ServiceReconciler) unManagedService(ctx context.Context, service *corev
 }
 
 func (r *ServiceReconciler) deletionLogic() error {
-	if controllerutil.ContainsFinalizer(r.service, tunnelFinalizerAnnotation) {
+	if controllerutil.ContainsFinalizer(r.service, tunnelFinalizer) {
 		// Run finalization logic. If the finalization logic fails,
 		// don't remove the finalizer so that we can retry during the next reconciliation.
 
@@ -290,7 +290,7 @@ func (r *ServiceReconciler) deletionLogic() error {
 
 		// Remove tunnelFinalizer. Once all finalizers have been
 		// removed, the object will be deleted.
-		controllerutil.RemoveFinalizer(r.service, tunnelFinalizerAnnotation)
+		controllerutil.RemoveFinalizer(r.service, tunnelFinalizer)
 		err = r.Update(r.ctx, r.service)
 		if err != nil {
 			r.log.Error(err, "unable to continue with Service deletion")
@@ -305,8 +305,8 @@ func (r *ServiceReconciler) deletionLogic() error {
 
 func (r *ServiceReconciler) creationLogic() error {
 	// Add finalizer for Service
-	if !controllerutil.ContainsFinalizer(r.service, tunnelFinalizerAnnotation) {
-		controllerutil.AddFinalizer(r.service, tunnelFinalizerAnnotation)
+	if !controllerutil.ContainsFinalizer(r.service, tunnelFinalizer) {
+		controllerutil.AddFinalizer(r.service, tunnelFinalizer)
 	}
 
 	// Add labels for Service

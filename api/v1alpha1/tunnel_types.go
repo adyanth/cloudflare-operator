@@ -76,12 +76,12 @@ type CloudflareDetails struct {
 
 	//+kubebuilder:validation:Optional
 	//+kubebuilder:default:=CLOUDFLARE_TUNNEL_CREDENTIAL_FILE
-	// Key in the secret to use as credentials.json for the tunnel, defaults to CLOUDFLARE_TUNNEL_CREDENTIAL_FILE
+	// Key in the secret to use as credentials.json for an existing tunnel, defaults to CLOUDFLARE_TUNNEL_CREDENTIAL_FILE
 	CLOUDFLARE_TUNNEL_CREDENTIAL_FILE string `json:"CLOUDFLARE_TUNNEL_CREDENTIAL_FILE,omitempty"`
 
 	//+kubebuilder:validation:Optional
 	//+kubebuilder:default:=CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET
-	// Key in the secret to use as credentials.json for the tunnel, defaults to CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET
+	// Key in the secret to use as tunnel secret for an existing tunnel, defaults to CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET
 	CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET string `json:"CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET,omitempty"`
 }
 

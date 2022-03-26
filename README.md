@@ -20,7 +20,6 @@
   </p>
 </div>
 
-
 [![GitHub license](https://img.shields.io/github/license/adyanth/cloudflare-operator?color=brightgreen)](https://github.com/adyanth/cloudflare-operator/blob/main/LICENSE)
 [![GitHub forks](https://img.shields.io/github/forks/adyanth/cloudflare-operator)](https://github.com/adyanth/cloudflare-operator/network)
 [![GitHub stars](https://img.shields.io/github/stars/adyanth/cloudflare-operator)](https://github.com/adyanth/cloudflare-operator/stargazers)
@@ -64,4 +63,4 @@ Go through the dedicated documentation on [Getting Started](docs/getting-started
 
 Look into the [Configuration](docs/configuration.md) documentation to understand various configurable parameters of this operator.
 
-> **_NOTE_**: This is **NOT** an official operator provided/backed by Cloudflare Inc. It utilizes their [v4 API](https://api.cloudflare.com/) and their [`cloudflared`](https://github.com/cloudflare/cloudflared) to automate setting up of tunnels on Kubernetes. 
+> **_NOTE_**: This is **NOT** an official operator provided/backed by Cloudflare Inc. It utilizes their [v4 API](https://api.cloudflare.com/) and their [`cloudflared`](https://github.com/cloudflare/cloudflared) to automate setting up of tunnels on Kubernetes.
