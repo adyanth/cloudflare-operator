@@ -433,12 +433,14 @@ func (r ServiceReconciler) getConfigForService(tunnelDomain string, service *cor
 	} else if servicePort.Protocol == corev1.ProtocolTCP {
 		// Default protocol selection logic
 		switch servicePort.Port {
-		case 80:
-			serviceProto = tunnelProtoHTTP
+		case 22:
+			serviceProto = tunnelProtoSSH
 		case 443:
 			serviceProto = tunnelProtoHTTPS
+		case 3389:
+			serviceProto = tunnelProtoRDP
 		default:
-			serviceProto = tunnelProtoTCP
+			serviceProto = tunnelProtoHTTP
 		}
 	} else if servicePort.Protocol == corev1.ProtocolUDP {
 		serviceProto = tunnelProtoUDP

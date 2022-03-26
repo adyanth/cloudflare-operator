@@ -111,7 +111,7 @@ type TunnelSpec struct {
 
 	//+kubebuilder:validation:Optional
 	//+kubebuilder:default:="http_status:404"
-	// FallbackTarget speficies the target for requests that do not match an ingress. It can be pointed to the IngressController for using without the service controller. Defaults to http_status:404
+	// FallbackTarget speficies the target for requests that do not match an ingress. Defaults to http_status:404
 	FallbackTarget string `json:"fallbackTarget,omitempty"`
 
 	//+kubebuilder:validation:Required
