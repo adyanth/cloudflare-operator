@@ -43,7 +43,7 @@ kubectl apply -k 'https://github.com/adyanth/cloudflare-operator.git//config/def
 
 ## Create a Custom ClusterTunnel Resource
 
-To create a ClusterTunnel, we need to store Cloudflare credentials in a Secret. Follow the steps below.
+To create a ClusterTunnel, we need to store Cloudflare credentials in a Secret. Follow the steps below. Have a look at the [detailed configuration guide](configuration.md) for more details.
 
 1. Create a Secret containing Cloudflare credentials. More information on what these tokens do are [provided here](#cloudflare-tokens). We create the Secret in the operator namespace for using ClusterTunnels.
 
