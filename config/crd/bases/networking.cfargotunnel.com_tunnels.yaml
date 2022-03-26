@@ -54,12 +54,12 @@ spec:
                   CLOUDFLARE_TUNNEL_CREDENTIAL_FILE:
                     default: CLOUDFLARE_TUNNEL_CREDENTIAL_FILE
                     description: Key in the secret to use as credentials.json for
-                      the tunnel, defaults to CLOUDFLARE_TUNNEL_CREDENTIAL_FILE
+                      an existing tunnel, defaults to CLOUDFLARE_TUNNEL_CREDENTIAL_FILE
                     type: string
                   CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET:
                     default: CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET
-                    description: Key in the secret to use as credentials.json for
-                      the tunnel, defaults to CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET
+                    description: Key in the secret to use as tunnel secret for an
+                      existing tunnel, defaults to CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET
                     type: string
                   accountId:
                     description: Account ID in Cloudflare. AccountId and AccountName
