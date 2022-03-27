@@ -4,20 +4,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.7.0
   creationTimestamp: null
-  name: tunnels.networking.cfargotunnel.com
+  name: clustertunnels.networking.cfargotunnel.com
 spec:
   group: networking.cfargotunnel.com
   names:
-    kind: Tunnel
-    listKind: TunnelList
-    plural: tunnels
-    singular: tunnel
-  scope: Namespaced
+    kind: ClusterTunnel
+    listKind: ClusterTunnelList
+    plural: clustertunnels
+    singular: clustertunnel
+  scope: Cluster
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Tunnel is the Schema for the tunnels API
+        description: ClusterTunnel is the Schema for the clustertunnels API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation

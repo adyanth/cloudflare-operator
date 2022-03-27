@@ -6,6 +6,26 @@ metadata:
       [
         {
           "apiVersion": "networking.cfargotunnel.com/v1alpha1",
+          "kind": "ClusterTunnel",
+          "metadata": {
+            "name": "clustertunnel-sample"
+          },
+          "spec": {
+            "cloudflare": {
+              "accountId": "\u003cCloudflare account ID\u003e",
+              "accountName": "\u003cCloudflare account name\u003e",
+              "domain": "example.com",
+              "email": "email@domain.com",
+              "secret": "cloudflare-secrets"
+            },
+            "newTunnel": {
+              "name": "new-k8s-cluster-tunnel"
+            },
+            "size": 2
+          }
+        },
+        {
+          "apiVersion": "networking.cfargotunnel.com/v1alpha1",
           "kind": "Tunnel",
           "metadata": {
             "name": "tunnel-sample",
@@ -27,259 +47,296 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    operators.operatorframework.io/builder: operator-sdk-v1.15.0
+    operators.operatorframework.io/builder: operator-sdk-v1.18.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-  name: cloudflare-operator.v0.8.0
+  name: cloudflare-operator.v0.8.1
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-      - description: Tunnel is the Schema for the tunnels API
-        displayName: Tunnel
-        kind: Tunnel
-        name: tunnels.networking.cfargotunnel.com
-        version: v1alpha1
-  description:
-    This operator provides a Tunnel Custom Resource to create and use existing
+    - description: ClusterTunnel is the Schema for the clustertunnels API
+      displayName: Cluster Tunnel
+      kind: ClusterTunnel
+      name: clustertunnels.networking.cfargotunnel.com
+      version: v1alpha1
+    - description: Tunnel is the Schema for the tunnels API
+      displayName: Tunnel
+      kind: Tunnel
+      name: tunnels.networking.cfargotunnel.com
+      version: v1alpha1
+  description: This operator provides a Tunnel Custom Resource to create and use existing
     Cloudflare Tunnels. Further, it provides a Service Controller to add services
     to be accessible via the internet using the Tunnel resource.
   displayName: Cloudflare Tunnel Service Operator
   icon:
-    - base64data: ""
-      mediatype: ""
+  - base64data: ""
+    mediatype: ""
   install:
     spec:
       clusterPermissions:
-        - rules:
-            - apiGroups:
-                - apps
-              resources:
-                - deployments
-              verbs:
-                - create
-                - delete
-                - get
-                - list
-                - patch
-                - update
-                - watch
-            - apiGroups:
-                - ""
-              resources:
-                - configmaps
-              verbs:
-                - create
-                - delete
-                - get
-                - list
-                - patch
-                - update
-                - watch
-            - apiGroups:
-                - ""
-              resources:
-                - secrets
-              verbs:
-                - create
-                - delete
-                - get
-                - list
-                - patch
-                - update
-                - watch
-            - apiGroups:
-                - ""
-              resources:
-                - services
-              verbs:
-                - get
-                - list
-                - update
-                - watch
-            - apiGroups:
-                - ""
-              resources:
-                - services/finalizers
-              verbs:
-                - update
-            - apiGroups:
-                - networking.cfargotunnel.com
-              resources:
-                - tunnels
-              verbs:
-                - create
-                - delete
-                - get
-                - list
-                - patch
-                - update
-                - watch
-            - apiGroups:
-                - networking.cfargotunnel.com
-              resources:
-                - tunnels/finalizers
-              verbs:
-                - update
-            - apiGroups:
-                - networking.cfargotunnel.com
-              resources:
-                - tunnels/status
-              verbs:
-                - get
-                - patch
-                - update
-            - apiGroups:
-                - authentication.k8s.io
-              resources:
-                - tokenreviews
-              verbs:
-                - create
-            - apiGroups:
-                - authorization.k8s.io
-              resources:
-                - subjectaccessreviews
-              verbs:
-                - create
-          serviceAccountName: cloudflare-operator-controller-manager
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - secrets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - services
+          verbs:
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - services/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - networking.cfargotunnel.com
+          resources:
+          - clustertunnels
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - networking.cfargotunnel.com
+          resources:
+          - clustertunnels/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - networking.cfargotunnel.com
+          resources:
+          - clustertunnels/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - networking.cfargotunnel.com
+          resources:
+          - tunnels
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - networking.cfargotunnel.com
+          resources:
+          - tunnels/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - networking.cfargotunnel.com
+          resources:
+          - tunnels/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - authentication.k8s.io
+          resources:
+          - tokenreviews
+          verbs:
+          - create
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
+        serviceAccountName: cloudflare-operator-controller-manager
       deployments:
-        - name: cloudflare-operator-controller-manager
-          spec:
-            replicas: 1
-            selector:
-              matchLabels:
+      - name: cloudflare-operator-controller-manager
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              control-plane: controller-manager
+          strategy: {}
+          template:
+            metadata:
+              labels:
                 control-plane: controller-manager
-            strategy: {}
-            template:
-              metadata:
-                labels:
-                  control-plane: controller-manager
-              spec:
-                containers:
-                  - args:
-                      - --secure-listen-address=0.0.0.0:8443
-                      - --upstream=http://127.0.0.1:8080/
-                      - --logtostderr=true
-                      - --v=10
-                    image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
-                    name: kube-rbac-proxy
-                    ports:
-                      - containerPort: 8443
-                        name: https
-                        protocol: TCP
-                    resources: {}
-                  - args:
-                      - --health-probe-bind-address=:8081
-                      - --metrics-bind-address=127.0.0.1:8080
-                      - --leader-elect
-                    command:
-                      - /manager
-                    image: adyanth/cloudflare-operator:0.8.0
-                    livenessProbe:
-                      httpGet:
-                        path: /healthz
-                        port: 8081
-                      initialDelaySeconds: 15
-                      periodSeconds: 20
-                    name: manager
-                    readinessProbe:
-                      httpGet:
-                        path: /readyz
-                        port: 8081
-                      initialDelaySeconds: 5
-                      periodSeconds: 10
-                    resources:
-                      limits:
-                        cpu: 200m
-                        memory: 100Mi
-                      requests:
-                        cpu: 100m
-                        memory: 20Mi
-                    securityContext:
-                      allowPrivilegeEscalation: false
+            spec:
+              containers:
+              - args:
+                - --secure-listen-address=0.0.0.0:8443
+                - --upstream=http://127.0.0.1:8080/
+                - --logtostderr=true
+                - --v=10
+                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
+                name: kube-rbac-proxy
+                ports:
+                - containerPort: 8443
+                  name: https
+                  protocol: TCP
+                resources: {}
+              - args:
+                - --health-probe-bind-address=:8081
+                - --metrics-bind-address=127.0.0.1:8080
+                - --leader-elect
+                command:
+                - /manager
+                image: adyanth/cloudflare-operator:0.8.1
+                livenessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 8081
+                  initialDelaySeconds: 15
+                  periodSeconds: 20
+                name: manager
+                readinessProbe:
+                  httpGet:
+                    path: /readyz
+                    port: 8081
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+                resources:
+                  limits:
+                    cpu: 200m
+                    memory: 100Mi
+                  requests:
+                    cpu: 100m
+                    memory: 20Mi
                 securityContext:
-                  runAsNonRoot: true
-                serviceAccountName: cloudflare-operator-controller-manager
-                terminationGracePeriodSeconds: 10
-        - name: whoami
-          spec:
-            selector:
-              matchLabels:
+                  allowPrivilegeEscalation: false
+              securityContext:
+                runAsNonRoot: true
+              serviceAccountName: cloudflare-operator-controller-manager
+              terminationGracePeriodSeconds: 10
+      - name: whoami
+        spec:
+          selector:
+            matchLabels:
+              app: whoami
+          strategy: {}
+          template:
+            metadata:
+              labels:
                 app: whoami
-            strategy: {}
-            template:
-              metadata:
-                labels:
-                  app: whoami
-              spec:
-                containers:
-                  - image: traefik/whoami
-                    name: whoami
-                    ports:
-                      - containerPort: 80
-                    resources:
-                      limits:
-                        cpu: 500m
-                        memory: 128Mi
+            spec:
+              containers:
+              - image: traefik/whoami
+                name: whoami
+                ports:
+                - containerPort: 80
+                resources:
+                  limits:
+                    cpu: 500m
+                    memory: 128Mi
       permissions:
-        - rules:
-            - apiGroups:
-                - ""
-              resources:
-                - configmaps
-              verbs:
-                - get
-                - list
-                - watch
-                - create
-                - update
-                - patch
-                - delete
-            - apiGroups:
-                - coordination.k8s.io
-              resources:
-                - leases
-              verbs:
-                - get
-                - list
-                - watch
-                - create
-                - update
-                - patch
-                - delete
-            - apiGroups:
-                - ""
-              resources:
-                - events
-              verbs:
-                - create
-                - patch
-          serviceAccountName: cloudflare-operator-controller-manager
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        serviceAccountName: cloudflare-operator-controller-manager
     strategy: deployment
   installModes:
-    - supported: false
-      type: OwnNamespace
-    - supported: false
-      type: SingleNamespace
-    - supported: false
-      type: MultiNamespace
-    - supported: true
-      type: AllNamespaces
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
   keywords:
-    - operator
-    - cloudflare
-    - cloudflare-tunnel
-    - cloudflared
-    - kubernetes
-    - kubernetes-operator
+  - operator
+  - cloudflare
+  - cloudflare-tunnel
+  - cloudflared
+  - kubernetes
+  - kubernetes-operator
   links:
-    - name: Cloudflare Operator
-      url: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/run-tunnel
+  - name: Cloudflare Operator
+    url: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/run-tunnel
   maintainers:
-    - email: me@adyanth.dev
-      name: adyanth
+  - email: me@adyanth.dev
+    name: adyanth
   maturity: alpha
   provider:
     name: adyanth.dev
     url: https://github.com/adyanth/cloudflare-operator
-  version: 0.8.0
+  version: 0.8.1

@@ -10,6 +10,11 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - description: ClusterTunnel is the Schema for the clustertunnels API
+      displayName: Cluster Tunnel
+      kind: ClusterTunnel
+      name: clustertunnels.networking.cfargotunnel.com
+      version: v1alpha1
     - description: Tunnel is the Schema for the tunnels API
       displayName: Tunnel
       kind: Tunnel
