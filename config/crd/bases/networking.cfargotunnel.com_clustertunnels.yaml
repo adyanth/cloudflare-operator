@@ -103,7 +103,7 @@ spec:
                   do not match an ingress. Defaults to http_status:404
                 type: string
               image:
-                default: cloudflare/cloudflared:2022.3.1
+                default: cloudflare/cloudflared:2022.3.4
                 description: Image sets the Cloudflared Image to use. Defaults to
                   the image set during the release of the operator.
                 type: string
