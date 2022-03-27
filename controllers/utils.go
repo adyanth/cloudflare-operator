@@ -30,10 +30,11 @@ const (
 	tunnelProtoAnnotation = "cfargotunnel.com/proto"
 	tunnelProtoHTTP       = "http"
 	tunnelProtoHTTPS      = "https"
+	tunnelProtoRDP        = "rdp"
+	tunnelProtoSMB        = "smb"
+	tunnelProtoSSH        = "ssh"
 	tunnelProtoTCP        = "tcp"
 	tunnelProtoUDP        = "udp"
-	tunnelProtoSSH        = "ssh"
-	tunnelProtoRDP        = "rdp"
 
 	// Checksum of the config, used to restart pods in the deployment
 	tunnelConfigChecksum = "cfargotunnel.com/checksum"
@@ -57,10 +58,11 @@ const (
 var tunnelValidProtoMap map[string]bool = map[string]bool{
 	tunnelProtoHTTP:  true,
 	tunnelProtoHTTPS: true,
+	tunnelProtoRDP:   true,
+	tunnelProtoSMB:   true,
+	tunnelProtoSSH:   true,
 	tunnelProtoTCP:   true,
 	tunnelProtoUDP:   true,
-	tunnelProtoSSH:   true,
-	tunnelProtoRDP:   true,
 }
 
 func getAPIDetails(ctx context.Context, c client.Client, log logr.Logger, tunnelSpec networkingv1alpha1.TunnelSpec, tunnelStatus networkingv1alpha1.TunnelStatus, namespace string) (*CloudflareAPI, *corev1.Secret, error) {

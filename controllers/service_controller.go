@@ -435,6 +435,8 @@ func (r ServiceReconciler) getConfigForService(tunnelDomain string, service *cor
 		switch servicePort.Port {
 		case 22:
 			serviceProto = tunnelProtoSSH
+		case 139, 445:
+			serviceProto = tunnelProtoSMB
 		case 443:
 			serviceProto = tunnelProtoHTTPS
 		case 3389:
