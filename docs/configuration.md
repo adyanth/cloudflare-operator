@@ -68,7 +68,7 @@ Making a tunnel proxy a service is done through annotations. Here are the availa
 
 * `cfargotunnel.com/tunnel` or `cfargotunnel.com/cluster-tunnel`: This annotation is needed for the Service controller to pick this service. Specify the name of the Tunnel/ClusterTunnel CRD which should serve this service
 * `cfargotunnel.com/fqdn`: DNS name to access this service from. Defaults to the `service.metadata.name` + `tunnel.spec.domain`. If specifying this, make sure to use the same domain that the tunnel belongs to. This is not validated and used as provided
-* `cfargotunnel.com/proto`: Specify the protocol for the service. Should be one of `http`, `https`, `tcp`, `udp`, `ssh` or `rdp`. Defaults to `http`, with the exceptions of `https` for 443, `ssh` for 22 and `rdp` for 3389 if the service has a TCP port. The only available option for a UDP port is `udp`, which is default
+* `cfargotunnel.com/proto`: Specify the protocol for the service. Should be one of `http`, `https`, `tcp`, `udp`, `ssh` or `rdp`. Defaults to `http`, with the exceptions of `https` for 443, `smb` for 139 and 445, `rdp` for 3389 and `ssh` for 22 if the service has a TCP port. The only available option for a UDP port is `udp`, which is default
 * `cfargotunnel.com/target`: Where the tunnel should proxy to. Defaults to the form of `<protocol>://<service.metadata.name>.<service.metadata.namespace>.svc:<port>`
 * `cfargotunnel.com/caPool`: Specify the name of the key in the secret specified in `tunnel.spec.originCaPool` and that CA certificate will be trusted. `tls.crt` is trusted globally and does not need to be specified. Only useful if the protocol is HTTPS
 * `cfargotunnel.com/noTlsVerify`: Disable TLS verification for this service. Only useful if the protocol is HTTPS
