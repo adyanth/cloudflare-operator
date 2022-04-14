@@ -325,6 +325,10 @@ func (r *ServiceReconciler) creationLogic() error {
 	r.Recorder.Event(r.service, corev1.EventTypeNormal, "MetaSet", "Service Finalizer and Labels added")
 
 	// Create DNS entry
+	return r.createDNSLogic()
+}
+
+func (r *ServiceReconciler) createDNSLogic() error {
 	txtId, dnsTxtResponse, canUseDns, err := r.cfAPI.GetManagedDnsTxt(r.config.Hostname)
 	if err != nil {
 		// We should not use this entry
@@ -418,12 +422,35 @@ func (r ServiceReconciler) getConfigForService(tunnelDomain string, service *cor
 	}
 
 	servicePort := service.Spec.Ports[0]
-
-	// Logic to get serviceProto
-	var serviceProto string
 	tunnelProto := service.Annotations[tunnelProtoAnnotation]
 	validProto := tunnelValidProtoMap[tunnelProto]
 
+	serviceProto := r.getServiceProto(tunnelProto, validProto, servicePort)
+
+	r.log.Info("Selected protocol", "protocol", serviceProto)
+
+	cfService := fmt.Sprintf("%s://%s.%s.svc:%d", serviceProto, service.Name, service.Namespace, servicePort.Port)
+
+	cfHostname := service.Annotations[fqdnAnnotation]
+
+	// Generate cfHostname string from Service Spec if not provided
+	if cfHostname == "" {
+		if tunnelDomain == "" {
+			r.log.Info("Using current tunnel's domain for generating config")
+			tunnelDomain = r.cfAPI.Domain
+		}
+		cfHostname = fmt.Sprintf("%s.%s", service.Name, tunnelDomain)
+		r.log.Info("using default domain value", "domain", tunnelDomain)
+	}
+
+	r.log.Info("generated cloudflare config", "cfHostname", cfHostname, "cfService", cfService)
+
+	return UnvalidatedIngressRule{Hostname: cfHostname, Service: cfService}, nil
+}
+
+// getServiceProto returns the service protocol to be used
+func (r *ServiceReconciler) getServiceProto(tunnelProto string, validProto bool, servicePort corev1.ServicePort) string {
+	var serviceProto string
 	if tunnelProto != "" && !validProto {
 		r.log.Info("Invalid Protocol provided, following default protocol logic")
 	}
@@ -450,26 +477,7 @@ func (r ServiceReconciler) getConfigForService(tunnelDomain string, service *cor
 		err := fmt.Errorf("unsupported protocol")
 		r.log.Error(err, "could not select protocol", "portProtocol", servicePort.Protocol, "annotationProtocol", tunnelProto)
 	}
-
-	r.log.Info("Selected protocol", "protocol", serviceProto)
-
-	cfService := fmt.Sprintf("%s://%s.%s.svc:%d", serviceProto, service.Name, service.Namespace, servicePort.Port)
-
-	cfHostname := service.Annotations[fqdnAnnotation]
-
-	// Generate cfHostname string from Service Spec if not provided
-	if cfHostname == "" {
-		if tunnelDomain == "" {
-			r.log.Info("Using current tunnel's domain for generating config")
-			tunnelDomain = r.cfAPI.Domain
-		}
-		cfHostname = fmt.Sprintf("%s.%s", service.Name, tunnelDomain)
-		r.log.Info("using default domain value", "domain", tunnelDomain)
-	}
-
-	r.log.Info("generated cloudflare config", "cfHostname", cfHostname, "cfService", cfService)
-
-	return UnvalidatedIngressRule{Hostname: cfHostname, Service: cfService}, nil
+	return serviceProto
 }
 
 func (r *ServiceReconciler) getConfigMapConfiguration() (*Configuration, error) {
