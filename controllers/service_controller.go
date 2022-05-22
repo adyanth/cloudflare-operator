@@ -272,14 +272,14 @@ func (r *ServiceReconciler) deletionLogic() error {
 				r.log.Error(err, "DNS ID from TXT and real DNS record does not match", "Hostname", r.config.Hostname)
 				r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingDns", "DNS/TXT ID Mismatch")
 			} else {
-				if err := r.cfAPI.DeleteDNSId(r.config.Hostname, dnsTxtResponse.DnsId); err != nil {
+				if err := r.cfAPI.DeleteDNSId(r.config.Hostname, dnsTxtResponse.DnsId, true); err != nil {
 					r.log.Info("Failed to delete DNS entry", "Hostname", r.config.Hostname)
 					r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingDns", fmt.Sprintf("Failed to delete DNS entry: %s", err.Error()))
 					return err
 				}
 				r.log.Info("Deleted DNS entry", "Hostname", r.config.Hostname)
 				r.Recorder.Event(r.service, corev1.EventTypeNormal, "DeletedDns", "Deleted DNS entry")
-				if err := r.cfAPI.DeleteDNSId(r.config.Hostname, txtId); err != nil {
+				if err := r.cfAPI.DeleteDNSId(r.config.Hostname, txtId, true); err != nil {
 					r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingTxt", fmt.Sprintf("Failed to delete TXT entry: %s", err.Error()))
 					return err
 				}
@@ -362,13 +362,18 @@ func (r *ServiceReconciler) createDNSLogic() error {
 	if err := r.cfAPI.InsertOrUpdateTXT(r.config.Hostname, txtId, newDnsId); err != nil {
 		r.log.Error(err, "Failed to insert/update TXT entry", "Hostname", r.config.Hostname)
 		r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedCreatingTxt", fmt.Sprintf("Failed to insert/update TXT entry: %s", err.Error()))
-		if err := r.cfAPI.DeleteDNSId(r.config.Hostname, newDnsId); err != nil {
+		if err := r.cfAPI.DeleteDNSId(r.config.Hostname, newDnsId, dnsTxtResponse.DnsId != ""); err != nil {
 			r.log.Info("Failed to delete DNS entry, left in broken state", "Hostname", r.config.Hostname)
 			r.Recorder.Event(r.service, corev1.EventTypeWarning, "FailedDeletingDns", "Failed to delete DNS entry, left in broken state")
 			return err
 		}
-		r.Recorder.Event(r.service, corev1.EventTypeWarning, "DeletedDns", "Deleted DNS entry, retrying")
-		r.log.Info("Deleted DNS entry", "Hostname", r.config.Hostname)
+		if dnsTxtResponse.DnsId != "" {
+			r.Recorder.Event(r.service, corev1.EventTypeWarning, "DeletedDns", "Deleted DNS entry, retrying")
+			r.log.Info("Deleted DNS entry", "Hostname", r.config.Hostname)
+		} else {
+			r.Recorder.Event(r.service, corev1.EventTypeWarning, "PreventDeleteDns", "Prevented DNS entry deletion, retrying")
+			r.log.Info("Did not delete DNS entry", "Hostname", r.config.Hostname)
+		}
 		return err
 	}
 

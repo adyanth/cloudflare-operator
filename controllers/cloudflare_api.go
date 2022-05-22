@@ -524,7 +524,11 @@ func (c *CloudflareAPI) InsertOrUpdateCName(fqdn, dnsId string) (string, error) 
 }
 
 // DeleteDNSId deletes DNS entry for the given dnsId
-func (c *CloudflareAPI) DeleteDNSId(fqdn, dnsId string) error {
+func (c *CloudflareAPI) DeleteDNSId(fqdn, dnsId string, created bool) error {
+	// Do not delete if we did not create the DNS in this cycle
+	if !created {
+		return nil
+	}
 	req, _ := http.NewRequest("DELETE", fmt.Sprintf("%szones/%s/dns_records/%s", CLOUDFLARE_ENDPOINT, c.ValidZoneId, dnsId), nil)
 	if err := c.addAuthHeader(req, false); err != nil {
 		return err
