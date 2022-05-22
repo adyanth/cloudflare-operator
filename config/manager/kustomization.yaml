@@ -13,4 +13,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: adyanth/cloudflare-operator
-  newTag: 0.8.1
+  newTag: 0.8.2

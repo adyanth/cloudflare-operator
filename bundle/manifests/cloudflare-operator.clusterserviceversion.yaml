@@ -47,9 +47,9 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    operators.operatorframework.io/builder: operator-sdk-v1.18.1
+    operators.operatorframework.io/builder: operator-sdk-v1.20.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-  name: cloudflare-operator.v0.8.1
+  name: cloudflare-operator.v0.8.2
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -200,7 +200,9 @@ spec:
           - create
         serviceAccountName: cloudflare-operator-controller-manager
       deployments:
-      - name: cloudflare-operator-controller-manager
+      - label:
+          control-plane: controller-manager
+        name: cloudflare-operator-controller-manager
         spec:
           replicas: 1
           selector:
@@ -231,7 +233,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: adyanth/cloudflare-operator:0.8.1
+                image: adyanth/cloudflare-operator:0.8.2
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -339,4 +341,4 @@ spec:
   provider:
     name: adyanth.dev
     url: https://github.com/adyanth/cloudflare-operator
-  version: 0.8.1
+  version: 0.8.2
