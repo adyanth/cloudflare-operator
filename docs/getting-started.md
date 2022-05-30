@@ -80,9 +80,9 @@ To create a ClusterTunnel, we need to store Cloudflare credentials in a Secret. 
 3. Verify that the tunnel resource was successful and generated a configmap and a deployment.
 
     ```bash
-    kubectl get clustertunnel k3s-cluster-tunnel
-    kubectl get configmap k3s-cluster-tunnel
-    kubectl get deployment k3s-cluster-tunnel
+    kubectl get clustertunnel k3s-cluster-tunnel -n cloudflare-operator-system
+    kubectl get configmap k3s-cluster-tunnel -n cloudflare-operator-system
+    kubectl get deployment k3s-cluster-tunnel -n cloudflare-operator-system
     ```
 
 ## Sample Deployment and a Service to utilize the Tunnel
