@@ -50,21 +50,6 @@ rules:
   - update
   - watch
 - apiGroups:
-  - ""
-  resources:
-  - services
-  verbs:
-  - get
-  - list
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - services/finalizers
-  verbs:
-  - update
-- apiGroups:
   - networking.cfargotunnel.com
   resources:
   - clustertunnels
@@ -86,6 +71,32 @@ rules:
   - networking.cfargotunnel.com
   resources:
   - clustertunnels/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - networking.cfargotunnel.com
+  resources:
+  - tunnelbindings
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - networking.cfargotunnel.com
+  resources:
+  - tunnelbindings/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - networking.cfargotunnel.com
+  resources:
+  - tunnelbindings/status
   verbs:
   - get
   - patch

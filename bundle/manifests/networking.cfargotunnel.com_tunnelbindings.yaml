@@ -1,0 +1,111 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: tunnelbindings.networking.cfargotunnel.com
+spec:
+  group: networking.cfargotunnel.com
+  names:
+    kind: TunnelBinding
+    listKind: TunnelBindingList
+    plural: tunnelbindings
+    singular: tunnelbinding
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: TunnelBinding is the Schema for the tunnelbindings API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          status:
+            description: TunnelBindingStatus defines the observed state of TunnelBinding
+            properties:
+              services:
+                items:
+                  description: ServiceInfo stores the Hostname and Target for each
+                    service
+                  properties:
+                    hostname:
+                      type: string
+                    target:
+                      type: string
+                  required:
+                  - hostname
+                  - target
+                  type: object
+                type: array
+            required:
+            - services
+            type: object
+          subjects:
+            items:
+              description: TunnelBindingSubject defines the subject TunnelBinding
+                connects to the Tunnel
+              properties:
+                kind:
+                  default: Service
+                  description: Kind can be Service
+                  type: string
+                name:
+                  type: string
+                spec:
+                  properties:
+                    caPool:
+                      type: string
+                    fqdn:
+                      type: string
+                    noTlsVerify:
+                      default: "false"
+                      type: boolean
+                    protocol:
+                      type: string
+                    target:
+                      type: string
+                  type: object
+              required:
+              - kind
+              - name
+              - spec
+              type: object
+            type: array
+          tunnelRef:
+            description: TunnelRef defines the Tunnel TunnelBinding connects to
+            properties:
+              kind:
+                description: Kind can be Tunnel or ClusterTunnel
+                type: string
+              name:
+                type: string
+            required:
+            - kind
+            - name
+            type: object
+        required:
+        - status
+        - subjects
+        - tunnelRef
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

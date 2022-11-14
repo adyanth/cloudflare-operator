@@ -6,4 +6,5 @@ resources:
 - apps_v1_deployment.yaml
 - v1_service.yaml
 - networking_v1alpha1_clustertunnel.yaml
+- networking_v1alpha1_tunnelbinding.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

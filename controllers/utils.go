@@ -12,20 +12,6 @@ import (
 )
 
 const (
-	// Either tunnel or clustertunnel is mandatory
-	// Tunnel CR Name
-	tunnelAnnotation = "cfargotunnel.com/tunnel"
-	// ClusterTunnel CR Name
-	clusterTunnelAnnotation = "cfargotunnel.com/cluster-tunnel"
-	// FQDN to create a DNS entry for and route traffic from internet on, defaults to Service name + cloudflare domain
-	fqdnAnnotation = "cfargotunnel.com/fqdn"
-	// Target can be used to override the target to send traffic to. Ex: Can be used to point to an ingress rather than the service directly
-	targetAnnotation = "cfargotunnel.com/target"
-	// Setting this annotation skips TLS verification for this ingress. Content does not matter. Delete the annotation if not desired. https://github.com/cloudflare/cloudflared/issues/585
-	noTlsVerifyAnnotation = "cfargotunnel.com/noTlsVerify"
-	// Name of the key containing the origin CA certificate in the Secret mentioned under the Tunnel.spec.originCaPool
-	caPoolAnnotation = "cfargotunnel.com/caPool"
-
 	// Protocol to use between cloudflared and the Service.
 	tunnelProtoAnnotation = "cfargotunnel.com/proto"
 	tunnelProtoHTTP       = "http"
@@ -45,14 +31,11 @@ const (
 	isClusterTunnelLabel = "cfargotunnel.com/is-cluster-tunnel"
 	tunnelIdLabel        = "cfargotunnel.com/id"
 	tunnelNameLabel      = "cfargotunnel.com/name"
+	tunnelKindLabel      = "cfargotunnel.com/kind"
 	tunnelAppLabel       = "cfargotunnel.com/app"
 	tunnelDomainLabel    = "cfargotunnel.com/domain"
 	tunnelFinalizer      = "cfargotunnel.com/finalizer"
-	// Service labels
-	configHostnameLabel     = "cfargotunnel.com/hostname"
-	configServiceLabel      = "cfargotunnel.com/service"
-	configServiceLabelSplit = "."
-	configmapKey            = "config.yaml"
+	configmapKey         = "config.yaml"
 )
 
 var tunnelValidProtoMap map[string]bool = map[string]bool{
