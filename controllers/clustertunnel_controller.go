@@ -49,47 +49,47 @@ type ClusterTunnelReconciler struct {
 	tunnelCreds string
 }
 
-func (r ClusterTunnelReconciler) GetClient() client.Client {
+func (r *ClusterTunnelReconciler) GetClient() client.Client {
 	return r.Client
 }
 
-func (r ClusterTunnelReconciler) GetRecorder() record.EventRecorder {
+func (r *ClusterTunnelReconciler) GetRecorder() record.EventRecorder {
 	return r.Recorder
 }
 
-func (r ClusterTunnelReconciler) GetScheme() *runtime.Scheme {
+func (r *ClusterTunnelReconciler) GetScheme() *runtime.Scheme {
 	return r.Scheme
 }
 
-func (r ClusterTunnelReconciler) GetContext() context.Context {
+func (r *ClusterTunnelReconciler) GetContext() context.Context {
 	return r.ctx
 }
 
-func (r ClusterTunnelReconciler) GetLog() logr.Logger {
+func (r *ClusterTunnelReconciler) GetLog() logr.Logger {
 	return r.log
 }
 
-func (r ClusterTunnelReconciler) GetTunnel() Tunnel {
+func (r *ClusterTunnelReconciler) GetTunnel() Tunnel {
 	return r.tunnel
 }
 
-func (r ClusterTunnelReconciler) GetCfAPI() *CloudflareAPI {
+func (r *ClusterTunnelReconciler) GetCfAPI() *CloudflareAPI {
 	return r.cfAPI
 }
 
-func (r ClusterTunnelReconciler) SetCfAPI(in *CloudflareAPI) {
+func (r *ClusterTunnelReconciler) SetCfAPI(in *CloudflareAPI) {
 	r.cfAPI = in
 }
 
-func (r ClusterTunnelReconciler) GetCfSecret() *corev1.Secret {
+func (r *ClusterTunnelReconciler) GetCfSecret() *corev1.Secret {
 	return r.cfSecret
 }
 
-func (r ClusterTunnelReconciler) GetTunnelCreds() string {
+func (r *ClusterTunnelReconciler) GetTunnelCreds() string {
 	return r.tunnelCreds
 }
 
-func (r ClusterTunnelReconciler) SetTunnelCreds(in string) {
+func (r *ClusterTunnelReconciler) SetTunnelCreds(in string) {
 	r.tunnelCreds = in
 }
 
