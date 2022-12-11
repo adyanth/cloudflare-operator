@@ -45,6 +45,7 @@ type TunnelBindingReconciler struct {
 	client.Client
 	Scheme             *runtime.Scheme
 	Recorder           record.EventRecorder
+	Namespace          string
 	OverwriteUnmanaged bool
 
 	// Custom data for ease of (re)use
@@ -86,7 +87,7 @@ func (r *TunnelBindingReconciler) initStruct(ctx context.Context, tunnelBinding 
 
 		r.fallbackTarget = clusterTunnel.Spec.FallbackTarget
 
-		if r.cfAPI, _, err = getAPIDetails(r.ctx, r.Client, r.log, clusterTunnel.Spec, clusterTunnel.Status, r.binding.Namespace); err != nil {
+		if r.cfAPI, _, err = getAPIDetails(r.ctx, r.Client, r.log, clusterTunnel.Spec, clusterTunnel.Status, r.Namespace); err != nil {
 			r.log.Error(err, "unable to get API details")
 			r.Recorder.Event(tunnelBinding, corev1.EventTypeWarning, "ErrApiConfig", "Error getting API details")
 			return err

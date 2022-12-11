@@ -84,8 +84,9 @@ func main() {
 	}
 
 	if err = (&controllers.TunnelBindingReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+		Namespace: clusterResourceNamespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "TunnelBinding")
 		os.Exit(1)
