@@ -133,6 +133,7 @@ func (r *TunnelBindingReconciler) initStruct(ctx context.Context, tunnelBinding 
 //+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels/status,verbs=get
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;update;patch
+//+kubebuilder:rbac:groups=core,resources=services,verbs=get
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -147,13 +148,13 @@ func (r *TunnelBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	tunnelBinding := &networkingv1alpha1.TunnelBinding{}
 	if err := r.Get(ctx, req.NamespacedName, tunnelBinding); err != nil {
 		if apierrors.IsNotFound(err) {
-			// Service object not found, could have been deleted after reconcile request.
+			// TunnelBinding object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			r.log.Info("Service deleted, nothing to do")
+			r.log.Info("TunnelBinding deleted, nothing to do")
 			return ctrl.Result{}, nil
 		}
-		r.log.Error(err, "unable to fetch Service")
+		r.log.Error(err, "unable to fetch TunnelBinding")
 		return ctrl.Result{}, err
 	}
 
@@ -245,12 +246,12 @@ func (r *TunnelBindingReconciler) deletionLogic() error {
 }
 
 func (r *TunnelBindingReconciler) creationLogic() error {
-	// Add finalizer for Service
+	// Add finalizer for TunnelBinding
 	if !controllerutil.ContainsFinalizer(r.binding, tunnelFinalizer) {
 		controllerutil.AddFinalizer(r.binding, tunnelFinalizer)
 	}
 
-	// Add labels for Service
+	// Add labels for TunnelBinding
 	if r.binding.Labels == nil {
 		r.binding.Labels = make(map[string]string)
 	}
@@ -258,7 +259,7 @@ func (r *TunnelBindingReconciler) creationLogic() error {
 		r.binding.Labels[k] = v
 	}
 
-	// Update Service resource
+	// Update TunnelBinding resource
 	if err := r.Update(r.ctx, r.binding); err != nil {
 		r.Recorder.Event(r.binding, corev1.EventTypeWarning, "FailedMetaSet", "Failed to set TunnelBinding Finalizer and Labels")
 		return err
@@ -386,7 +387,8 @@ func (r *TunnelBindingReconciler) getRelevantTunnelBindings() ([]networkingv1alp
 	bindings := tunnelBindingList.Items
 
 	if len(bindings) == 0 {
-		r.log.Info("No services found, tunnel not in use")
+		// Is this possible? Shouldn't the one that triggered this exist?
+		r.log.Info("No tunnelBindings found, tunnel not in use")
 	}
 
 	// Sort by binding name for idempotent config generation
@@ -397,12 +399,12 @@ func (r *TunnelBindingReconciler) getRelevantTunnelBindings() ([]networkingv1alp
 	return bindings, nil
 }
 
-// Get the config entry to be added for this service
+// Get the config entry to be added for this subject
 func (r TunnelBindingReconciler) getConfigForSubject(subject networkingv1alpha1.TunnelBindingSubject) (string, string, error) {
 	hostname := subject.Spec.Fqdn
 	target := "http_status:404"
 
-	// Generate cfHostname string from Service Spec if not provided
+	// Generate cfHostname string from Subject Spec if not provided
 	if hostname == "" {
 		r.log.Info("Using current tunnel's domain for generating config")
 		hostname = fmt.Sprintf("%s.%s", subject.Name, r.cfAPI.Domain)
