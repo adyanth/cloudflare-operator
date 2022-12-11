@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"strings"
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
 	"github.com/go-logr/logr"
@@ -74,8 +75,8 @@ func (r *TunnelBindingReconciler) initStruct(ctx context.Context, tunnelBinding 
 	namespacedName := apitypes.NamespacedName{Name: r.binding.TunnelRef.Name, Namespace: r.binding.Namespace}
 
 	// Process based on Tunnel Kind
-	switch r.binding.TunnelRef.Kind {
-	case "ClusterTunnel":
+	switch strings.ToLower(r.binding.TunnelRef.Kind) {
+	case "clustertunnel":
 		clusterTunnel := &networkingv1alpha1.ClusterTunnel{}
 		if err := r.Get(r.ctx, namespacedName, clusterTunnel); err != nil {
 			r.log.Error(err, "Failed to get ClusterTunnel", "namespacedName", namespacedName)
@@ -90,7 +91,7 @@ func (r *TunnelBindingReconciler) initStruct(ctx context.Context, tunnelBinding 
 			r.Recorder.Event(tunnelBinding, corev1.EventTypeWarning, "ErrApiConfig", "Error getting API details")
 			return err
 		}
-	case "Tunnel":
+	case "tunnel":
 		tunnel := &networkingv1alpha1.Tunnel{}
 		if err := r.Get(r.ctx, namespacedName, tunnel); err != nil {
 			r.log.Error(err, "Failed to get Tunnel", "namespacedName", namespacedName)
