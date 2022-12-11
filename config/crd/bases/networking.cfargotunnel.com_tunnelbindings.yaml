@@ -107,7 +107,6 @@ spec:
                       type: string
                   type: object
               required:
-              - kind
               - name
               type: object
             type: array

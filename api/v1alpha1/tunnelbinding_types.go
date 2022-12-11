@@ -23,7 +23,7 @@ import (
 // TunnelBindingSubject defines the subject TunnelBinding connects to the Tunnel
 type TunnelBindingSubject struct {
 	// Kind can be Service
-	//+kubebuilder:validation:Required
+	//+kubebuilder:validation:Optional
 	//+kubebuilder:default:="Service"
 	Kind string `json:"kind"`
 	//+kubebuilder:validation:Required
