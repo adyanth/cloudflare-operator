@@ -27,7 +27,8 @@ type TunnelBindingSubject struct {
 	//+kubebuilder:default:="Service"
 	Kind string `json:"kind"`
 	//+kubebuilder:validation:Required
-	Name string                   `json:"name"`
+	Name string `json:"name"`
+	//+kubebuilder:validation:Optional
 	Spec TunnelBindingSubjectSpec `json:"spec"`
 }
 
@@ -58,7 +59,7 @@ type TunnelBindingSubjectSpec struct {
 	// NoTlsVerify sisables TLS verification for this service.
 	// Only useful if the protocol is HTTPS.
 	//+kubebuilder:validation:Optional
-	//+kubebuilder:default:="false"
+	//+kubebuilder:default:=false
 	NoTlsVerify bool `json:"noTlsVerify"`
 }
 
@@ -95,7 +96,7 @@ type TunnelBinding struct {
 
 	Subjects  []TunnelBindingSubject `json:"subjects"`
 	TunnelRef TunnelRef              `json:"tunnelRef"`
-	Status    TunnelBindingStatus    `json:"status"`
+	Status    TunnelBindingStatus    `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
