@@ -71,7 +71,7 @@ metadata:
     capabilities: Basic Install
     operators.operatorframework.io/builder: operator-sdk-v1.25.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-  name: cloudflare-operator.v0.9.0
+  name: cloudflare-operator.v0.9.1
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -275,7 +275,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: adyanth/cloudflare-operator:0.9.0
+                image: adyanth/cloudflare-operator:0.9.1
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -383,4 +383,4 @@ spec:
   provider:
     name: adyanth.dev
     url: https://github.com/adyanth/cloudflare-operator
-  version: 0.9.0
+  version: 0.9.1
