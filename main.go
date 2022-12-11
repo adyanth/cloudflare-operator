@@ -83,13 +83,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.ServiceReconciler{
-		Client:             mgr.GetClient(),
-		Scheme:             mgr.GetScheme(),
-		Namespace:          clusterResourceNamespace,
-		OverwriteUnmanaged: overwriteUnmanaged,
+	if err = (&controllers.TunnelBindingReconciler{
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+		Namespace: clusterResourceNamespace,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Service")
+		setupLog.Error(err, "unable to create controller", "controller", "TunnelBinding")
 		os.Exit(1)
 	}
 	if err = (&controllers.TunnelReconciler{

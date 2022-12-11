@@ -39,6 +39,7 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var cfg *rest.Config
+var err error
 var k8sClient client.Client
 var testEnv *envtest.Environment
 
@@ -59,7 +60,7 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: false,
 	}
 
-	cfg, err := testEnv.Start()
+	cfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 

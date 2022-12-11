@@ -1,0 +1,14 @@
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: tunnelbinding-sample
+subjects:
+  - name: whoami-test
+    spec:
+      fqdn: whoami-test.example.com
+      target: http://svc-1.namespace.cluster.local:8080
+      caPool: custom
+      noTlsVerify: false
+tunnelRef:
+  kind: ClusterTunnel
+  name: clustertunnel-sample

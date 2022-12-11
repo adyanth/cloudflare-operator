@@ -1,0 +1,27 @@
+# permissions for end users to view tunnelbindings.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: tunnelbinding-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: cloudflare-operator
+    app.kubernetes.io/part-of: cloudflare-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: tunnelbinding-viewer-role
+rules:
+- apiGroups:
+  - networking.cfargotunnel.com
+  resources:
+  - tunnelbindings
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - networking.cfargotunnel.com
+  resources:
+  - tunnelbindings/status
+  verbs:
+  - get

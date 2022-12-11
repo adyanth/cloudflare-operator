@@ -20,9 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // ExistingTunnel spec needs either a Tunnel Id or a Name to find it on Cloudflare.
 type ExistingTunnel struct {
 	//+kubebuilder:validation:Optional
@@ -87,8 +84,6 @@ type CloudflareDetails struct {
 
 // TunnelSpec defines the desired state of Tunnel
 type TunnelSpec struct {
-	// Important: Run "make" to regenerate code after modifying this file
-
 	//+kubebuilder:validation:Minimum=0
 	//+kubebuilder:default:=1
 	//+kubebuilder:validation:Optional
@@ -131,8 +126,6 @@ type TunnelSpec struct {
 
 // TunnelStatus defines the observed state of Tunnel
 type TunnelStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
 	TunnelId   string `json:"tunnelId"`
 	TunnelName string `json:"tunnelName"`
 	AccountId  string `json:"accountId"`
@@ -141,6 +134,7 @@ type TunnelStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="TunnelID",type=string,JSONPath=`.status.tunnelId`
 
 // Tunnel is the Schema for the tunnels API
 type Tunnel struct {

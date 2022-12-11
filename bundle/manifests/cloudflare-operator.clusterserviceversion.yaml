@@ -15,7 +15,7 @@ metadata:
               "accountId": "\u003cCloudflare account ID\u003e",
               "accountName": "\u003cCloudflare account name\u003e",
               "domain": "example.com",
-              "email": "email@domain.com",
+              "email": "email@example.com",
               "secret": "cloudflare-secrets"
             },
             "newTunnel": {
@@ -36,7 +36,7 @@ metadata:
               "accountId": "\u003cCloudflare account ID\u003e",
               "accountName": "\u003cCloudflare account name\u003e",
               "domain": "example.com",
-              "email": "email@domain.com",
+              "email": "email@example.com",
               "secret": "cloudflare-secrets"
             },
             "newTunnel": {
@@ -44,10 +44,32 @@ metadata:
             },
             "size": 2
           }
+        },
+        {
+          "apiVersion": "networking.cfargotunnel.com/v1alpha1",
+          "kind": "TunnelBinding",
+          "metadata": {
+            "name": "tunnelbinding-sample"
+          },
+          "subjects": [
+            {
+              "name": "whoami-test",
+              "spec": {
+                "caPool": "custom",
+                "fqdn": "whoami-test.example.com",
+                "noTlsVerify": false,
+                "target": "http://svc-1.namespace.cluster.local:8080"
+              }
+            }
+          ],
+          "tunnelRef": {
+            "kind": "ClusterTunnel",
+            "name": "clustertunnel-sample"
+          }
         }
       ]
     capabilities: Basic Install
-    operators.operatorframework.io/builder: operator-sdk-v1.20.1
+    operators.operatorframework.io/builder: operator-sdk-v1.25.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: cloudflare-operator.v0.8.2
   namespace: placeholder
@@ -59,6 +81,9 @@ spec:
       displayName: Cluster Tunnel
       kind: ClusterTunnel
       name: clustertunnels.networking.cfargotunnel.com
+      version: v1alpha1
+    - kind: TunnelBinding
+      name: tunnelbindings.networking.cfargotunnel.com
       version: v1alpha1
     - description: Tunnel is the Schema for the tunnels API
       displayName: Tunnel
@@ -120,21 +145,6 @@ spec:
           - update
           - watch
         - apiGroups:
-          - ""
-          resources:
-          - services
-          verbs:
-          - get
-          - list
-          - update
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - services/finalizers
-          verbs:
-          - update
-        - apiGroups:
           - networking.cfargotunnel.com
           resources:
           - clustertunnels
@@ -156,6 +166,32 @@ spec:
           - networking.cfargotunnel.com
           resources:
           - clustertunnels/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - networking.cfargotunnel.com
+          resources:
+          - tunnelbindings
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - networking.cfargotunnel.com
+          resources:
+          - tunnelbindings/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - networking.cfargotunnel.com
+          resources:
+          - tunnelbindings/status
           verbs:
           - get
           - patch

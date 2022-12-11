@@ -16,7 +16,11 @@ spec:
     singular: clustertunnel
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.tunnelId
+      name: TunnelID
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: ClusterTunnel is the Schema for the clustertunnels API
@@ -139,9 +143,6 @@ spec:
               accountId:
                 type: string
               tunnelId:
-                description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
-                  of cluster Important: Run "make" to regenerate code after modifying
-                  this file'
                 type: string
               tunnelName:
                 type: string
