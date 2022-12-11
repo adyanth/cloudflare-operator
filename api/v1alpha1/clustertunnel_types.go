@@ -23,6 +23,7 @@ import (
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:scope=Cluster
+//+kubebuilder:printcolumn:name="TunnelID",type=string,JSONPath=`.status.tunnelId`
 
 // ClusterTunnel is the Schema for the clustertunnels API
 type ClusterTunnel struct {

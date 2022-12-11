@@ -16,7 +16,11 @@ spec:
     singular: clustertunnel
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.tunnelId
+      name: TunnelID
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: ClusterTunnel is the Schema for the clustertunnels API

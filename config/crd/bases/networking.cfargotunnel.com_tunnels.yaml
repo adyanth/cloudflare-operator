@@ -16,7 +16,11 @@ spec:
     singular: tunnel
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.tunnelId
+      name: TunnelID
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: Tunnel is the Schema for the tunnels API
