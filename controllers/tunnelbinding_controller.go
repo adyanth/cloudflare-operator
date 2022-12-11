@@ -44,7 +44,6 @@ type TunnelBindingReconciler struct {
 	client.Client
 	Scheme             *runtime.Scheme
 	Recorder           record.EventRecorder
-	Namespace          string
 	OverwriteUnmanaged bool
 
 	// Custom data for ease of (re)use
@@ -72,7 +71,7 @@ func (r *TunnelBindingReconciler) initStruct(ctx context.Context, tunnelBinding 
 	r.binding = tunnelBinding
 
 	var err error
-	namespacedName := apitypes.NamespacedName{Name: tunnelBinding.TunnelRef.Name, Namespace: r.Namespace}
+	namespacedName := apitypes.NamespacedName{Name: r.binding.TunnelRef.Name, Namespace: r.binding.Namespace}
 
 	// Process based on Tunnel Kind
 	switch r.binding.TunnelRef.Kind {
@@ -86,7 +85,7 @@ func (r *TunnelBindingReconciler) initStruct(ctx context.Context, tunnelBinding 
 
 		r.fallbackTarget = clusterTunnel.Spec.FallbackTarget
 
-		if r.cfAPI, _, err = getAPIDetails(r.ctx, r.Client, r.log, clusterTunnel.Spec, clusterTunnel.Status, r.Namespace); err != nil {
+		if r.cfAPI, _, err = getAPIDetails(r.ctx, r.Client, r.log, clusterTunnel.Spec, clusterTunnel.Status, r.binding.Namespace); err != nil {
 			r.log.Error(err, "unable to get API details")
 			r.Recorder.Event(tunnelBinding, corev1.EventTypeWarning, "ErrApiConfig", "Error getting API details")
 			return err
@@ -101,7 +100,7 @@ func (r *TunnelBindingReconciler) initStruct(ctx context.Context, tunnelBinding 
 
 		r.fallbackTarget = tunnel.Spec.FallbackTarget
 
-		if r.cfAPI, _, err = getAPIDetails(r.ctx, r.Client, r.log, tunnel.Spec, tunnel.Status, r.Namespace); err != nil {
+		if r.cfAPI, _, err = getAPIDetails(r.ctx, r.Client, r.log, tunnel.Spec, tunnel.Status, r.binding.Namespace); err != nil {
 			r.log.Error(err, "unable to get API details")
 			r.Recorder.Event(tunnelBinding, corev1.EventTypeWarning, "ErrApiConfig", "Error getting API details")
 			return err
@@ -395,7 +394,7 @@ func (r TunnelBindingReconciler) getConfigForSubject(subject networkingv1alpha1.
 	}
 
 	service := &corev1.Service{}
-	if err := r.Get(r.ctx, apitypes.NamespacedName{Name: subject.Name, Namespace: r.Namespace}, service); err != nil {
+	if err := r.Get(r.ctx, apitypes.NamespacedName{Name: subject.Name, Namespace: r.binding.Namespace}, service); err != nil {
 		r.log.Error(err, "Error getting referenced service")
 		r.Recorder.Event(r.binding, corev1.EventTypeWarning, "FailedService", "Failed to get Service")
 		return hostname, target, err
