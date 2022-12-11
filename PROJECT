@@ -30,13 +30,4 @@ resources:
   kind: ClusterTunnel
   path: github.com/adyanth/cloudflare-operator/api/v1alpha1
   version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: cfargotunnel.com
-  group: networking
-  kind: TunnelBinding
-  path: github.com/adyanth/cloudflare-operator/api/v1alpha1
-  version: v1alpha1
 version: "3"
