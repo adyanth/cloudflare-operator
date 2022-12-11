@@ -61,7 +61,7 @@ type TunnelBindingReconciler struct {
 // labelsForBinding returns the labels for selecting the Bindings served by a Tunnel.
 func (r TunnelBindingReconciler) labelsForBinding() map[string]string {
 	labels := map[string]string{
-		tunnelNameLabel: r.binding.Name,
+		tunnelNameLabel: r.binding.TunnelRef.Name,
 		tunnelKindLabel: r.binding.Kind,
 	}
 
@@ -73,11 +73,12 @@ func (r *TunnelBindingReconciler) initStruct(ctx context.Context, tunnelBinding 
 	r.binding = tunnelBinding
 
 	var err error
-	namespacedName := apitypes.NamespacedName{Name: r.binding.TunnelRef.Name, Namespace: r.binding.Namespace}
+	var namespacedName apitypes.NamespacedName
 
 	// Process based on Tunnel Kind
 	switch strings.ToLower(r.binding.TunnelRef.Kind) {
 	case "clustertunnel":
+		namespacedName = apitypes.NamespacedName{Name: r.binding.TunnelRef.Name, Namespace: r.Namespace}
 		clusterTunnel := &networkingv1alpha1.ClusterTunnel{}
 		if err := r.Get(r.ctx, namespacedName, clusterTunnel); err != nil {
 			r.log.Error(err, "Failed to get ClusterTunnel", "namespacedName", namespacedName)
@@ -93,6 +94,7 @@ func (r *TunnelBindingReconciler) initStruct(ctx context.Context, tunnelBinding 
 			return err
 		}
 	case "tunnel":
+		namespacedName = apitypes.NamespacedName{Name: r.binding.TunnelRef.Name, Namespace: r.binding.Namespace}
 		tunnel := &networkingv1alpha1.Tunnel{}
 		if err := r.Get(r.ctx, namespacedName, tunnel); err != nil {
 			r.log.Error(err, "Failed to get Tunnel", "namespacedName", namespacedName)
@@ -133,7 +135,7 @@ func (r *TunnelBindingReconciler) initStruct(ctx context.Context, tunnelBinding 
 //+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels/status,verbs=get
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;update;patch
-//+kubebuilder:rbac:groups=core,resources=services,verbs=get
+//+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -375,7 +377,7 @@ func (r *TunnelBindingReconciler) deleteDNSLogic(hostname string) error {
 func (r *TunnelBindingReconciler) getRelevantTunnelBindings() ([]networkingv1alpha1.TunnelBinding, error) {
 	// Fetch TunnelBindings from API
 	listOpts := []client.ListOption{client.MatchingLabels(map[string]string{
-		tunnelNameLabel: r.binding.Name,
+		tunnelNameLabel: r.binding.TunnelRef.Name,
 		tunnelKindLabel: r.binding.Kind,
 	})}
 	tunnelBindingList := &networkingv1alpha1.TunnelBindingList{}
