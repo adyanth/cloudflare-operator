@@ -468,7 +468,7 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 						Name:  "cloudflared",
 						Args:  args,
 						LivenessProbe: &corev1.Probe{
-							Handler: corev1.Handler{
+							ProbeHandler: corev1.ProbeHandler{
 								HTTPGet: &corev1.HTTPGetAction{
 									Path: "/ready",
 									Port: intstr.IntOrString{IntVal: 2000},
