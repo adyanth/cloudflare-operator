@@ -15,7 +15,7 @@ metadata:
               "accountId": "\u003cCloudflare account ID\u003e",
               "accountName": "\u003cCloudflare account name\u003e",
               "domain": "example.com",
-              "email": "email@domain.com",
+              "email": "email@example.com",
               "secret": "cloudflare-secrets"
             },
             "newTunnel": {
@@ -36,7 +36,7 @@ metadata:
               "accountId": "\u003cCloudflare account ID\u003e",
               "accountName": "\u003cCloudflare account name\u003e",
               "domain": "example.com",
-              "email": "email@domain.com",
+              "email": "email@example.com",
               "secret": "cloudflare-secrets"
             },
             "newTunnel": {
@@ -49,20 +49,27 @@ metadata:
           "apiVersion": "networking.cfargotunnel.com/v1alpha1",
           "kind": "TunnelBinding",
           "metadata": {
-            "labels": {
-              "app.kubernetes.io/created-by": "cloudflare-operator",
-              "app.kubernetes.io/instance": "tunnelbinding-sample",
-              "app.kubernetes.io/managed-by": "kustomize",
-              "app.kubernetes.io/name": "tunnelbinding",
-              "app.kubernetes.io/part-of": "cloudflare-operator"
-            },
             "name": "tunnelbinding-sample"
           },
-          "spec": null
+          "subjects": [
+            {
+              "name": "whoami-test",
+              "spec": {
+                "caPool": "custom",
+                "fqdn": "whoami-test.example.com",
+                "noTlsVerify": false,
+                "target": "http://svc-1.namespace.cluster.local:8080"
+              }
+            }
+          ],
+          "tunnelRef": {
+            "kind": "ClusterTunnel",
+            "name": "clustertunnel-sample"
+          }
         }
       ]
     capabilities: Basic Install
-    operators.operatorframework.io/builder: operator-sdk-v1.25.1
+    operators.operatorframework.io/builder: operator-sdk-v1.25.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: cloudflare-operator.v0.8.2
   namespace: placeholder
@@ -137,21 +144,6 @@ spec:
           - patch
           - update
           - watch
-        - apiGroups:
-          - ""
-          resources:
-          - services
-          verbs:
-          - get
-          - list
-          - update
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - services/finalizers
-          verbs:
-          - update
         - apiGroups:
           - networking.cfargotunnel.com
           resources:

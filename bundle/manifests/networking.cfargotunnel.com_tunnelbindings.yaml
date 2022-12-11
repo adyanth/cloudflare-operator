@@ -14,7 +14,11 @@ spec:
     singular: tunnelbinding
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.hostnames
+      name: FQDNs
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: TunnelBinding is the Schema for the tunnelbindings API
@@ -34,14 +38,19 @@ spec:
           status:
             description: TunnelBindingStatus defines the observed state of TunnelBinding
             properties:
+              hostnames:
+                description: To show on the kubectl cli
+                type: string
               services:
                 items:
                   description: ServiceInfo stores the Hostname and Target for each
                     service
                   properties:
                     hostname:
+                      description: FQDN of the service
                       type: string
                     target:
+                      description: Target for cloudflared
                       type: string
                   required:
                   - hostname
@@ -49,6 +58,7 @@ spec:
                   type: object
                 type: array
             required:
+            - hostnames
             - services
             type: object
           subjects:
@@ -65,21 +75,38 @@ spec:
                 spec:
                   properties:
                     caPool:
+                      description: CaPool trusts the CA certificate referenced by
+                        the key in the secret specified in tunnel.spec.originCaPool.
+                        tls.crt is trusted globally and does not need to be specified.
+                        Only useful if the protocol is HTTPS.
                       type: string
                     fqdn:
+                      description: Fqdn specifies the DNS name to access this service
+                        from. Defaults to the service.metadata.name + tunnel.spec.domain.
+                        If specifying this, make sure to use the same domain that
+                        the tunnel belongs to. This is not validated and used as provided
                       type: string
                     noTlsVerify:
-                      default: "false"
+                      default: false
+                      description: NoTlsVerify sisables TLS verification for this
+                        service. Only useful if the protocol is HTTPS.
                       type: boolean
                     protocol:
+                      description: Protocol specifies the protocol for the service.
+                        Should be one of http, https, tcp, udp, ssh or rdp. Defaults
+                        to http, with the exceptions of https for 443, smb for 139
+                        and 445, rdp for 3389 and ssh for 22 if the service has a
+                        TCP port. The only available option for a UDP port is udp,
+                        which is default.
                       type: string
                     target:
+                      description: Target specified where the tunnel should proxy
+                        to. Defaults to the form of <protocol>://<service.metadata.name>.<service.metadata.namespace>.svc:<port>
                       type: string
                   type: object
               required:
               - kind
               - name
-              - spec
               type: object
             type: array
           tunnelRef:
@@ -89,13 +116,13 @@ spec:
                 description: Kind can be Tunnel or ClusterTunnel
                 type: string
               name:
+                description: Name of the tunnel resource
                 type: string
             required:
             - kind
             - name
             type: object
         required:
-        - status
         - subjects
         - tunnelRef
         type: object
