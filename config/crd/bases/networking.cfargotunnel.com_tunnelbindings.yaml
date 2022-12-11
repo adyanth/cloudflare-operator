@@ -16,7 +16,11 @@ spec:
     singular: tunnelbinding
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.hostnames
+      name: FQDNs
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: TunnelBinding is the Schema for the tunnelbindings API
@@ -36,6 +40,9 @@ spec:
           status:
             description: TunnelBindingStatus defines the observed state of TunnelBinding
             properties:
+              hostnames:
+                description: To show on the kubectl cli
+                type: string
               services:
                 items:
                   description: ServiceInfo stores the Hostname and Target for each
@@ -53,6 +60,7 @@ spec:
                   type: object
                 type: array
             required:
+            - hostnames
             - services
             type: object
           subjects:
@@ -81,7 +89,7 @@ spec:
                         the tunnel belongs to. This is not validated and used as provided
                       type: string
                     noTlsVerify:
-                      default: "false"
+                      default: false
                       description: NoTlsVerify sisables TLS verification for this
                         service. Only useful if the protocol is HTTPS.
                       type: boolean
@@ -101,7 +109,6 @@ spec:
               required:
               - kind
               - name
-              - spec
               type: object
             type: array
           tunnelRef:
@@ -118,7 +125,6 @@ spec:
             - name
             type: object
         required:
-        - status
         - subjects
         - tunnelRef
         type: object

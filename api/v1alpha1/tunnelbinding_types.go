@@ -83,11 +83,14 @@ type ServiceInfo struct {
 
 // TunnelBindingStatus defines the observed state of TunnelBinding
 type TunnelBindingStatus struct {
-	Services []ServiceInfo `json:"services"`
+	// To show on the kubectl cli
+	Hostnames string        `json:"hostnames"`
+	Services  []ServiceInfo `json:"services"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="FQDNs",type=string,JSONPath=`.status.hostnames`
 
 // TunnelBinding is the Schema for the tunnelbindings API
 type TunnelBinding struct {

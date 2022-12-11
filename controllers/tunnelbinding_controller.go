@@ -166,7 +166,9 @@ func (r *TunnelBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, r.deletionLogic()
 	}
 
-	r.setStatus()
+	if err := r.setStatus(); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	// Configure ConfigMap
 	r.Recorder.Event(tunnelBinding, corev1.EventTypeNormal, "Configuring", "Configuring ConfigMap")
@@ -183,18 +185,30 @@ func (r *TunnelBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{}, nil
 }
 
-func (r *TunnelBindingReconciler) setStatus() {
+func (r *TunnelBindingReconciler) setStatus() error {
 	status := make([]networkingv1alpha1.ServiceInfo, 0, len(r.binding.Subjects))
+	var hostnames string
 	for _, sub := range r.binding.Subjects {
 		hostname, target, err := r.getConfigForSubject(sub)
 		if err != nil {
 			r.log.Error(err, "error getting config for service", "svc", sub.Name)
 			r.Recorder.Event(r.binding, corev1.EventTypeWarning, "ErrBuildConfig",
-				fmt.Sprintf("Error building Tunnel configuration, svc: %s", sub.Name))
+				fmt.Sprintf("Error building TunnelBinding configuration, svc: %s", sub.Name))
 		}
 		status = append(status, networkingv1alpha1.ServiceInfo{Hostname: hostname, Target: target})
+		hostnames += hostname + ","
 	}
+
 	r.binding.Status.Services = status
+	r.binding.Status.Hostnames = strings.TrimSuffix(hostnames, ",")
+
+	if err := r.Client.Status().Update(r.ctx, r.binding); err != nil {
+		r.log.Error(err, "Failed to update TunnelBinding status", "TunnelBinding.Namespace", r.binding.Namespace, "TunnelBinding.Name", r.binding.Name)
+		r.Recorder.Event(r.binding, corev1.EventTypeWarning, "FailedStatusSet", "Failed to set Tunnel status required for operation")
+		return err
+	}
+	r.log.Info("Tunnel status is set", "status", r.binding.Status)
+	return nil
 }
 
 func (r *TunnelBindingReconciler) deletionLogic() error {
