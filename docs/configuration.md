@@ -14,13 +14,15 @@ The operator iself accepts command line arguments to override some of the defaul
 
 ## Custom Resource Definition
 
+### Tunnel and ClusterTunnel 
+
 The Tunnel and the ClusterTunnel have the exact same configuration options. The best way to get the latest documentation on them is to run the below command after installing the CRDs.
 
 ```bash
 kubectl explain tunnel.spec
 ```
 
-Here is an overview of the same as YAML.
+Here is an overview of a ClusterTunnel as YAML.
 
 ```yaml
 apiVersion: networking.cfargotunnel.com/v1alpha1
@@ -62,9 +64,37 @@ spec:
   size: 1                                   # Replica count for the tunnel deployment
 ```
 
-## Service Annotations
+### TunnelBinding
 
-Making a tunnel proxy a service is done through annotations. Here are the available annotations. Only the first one is mandatory. Rest of them have defaults as needed.
+This replaces the older implementation which used annotations on services to configure the endpoints. The TunnelBinding resource, inspired by RoleBinding, uses a similar structure with `subjects`, which are the target services to tunnel, and `tunnelRef` which provides details on what tunnel to use. Below is a detailed sample. Again, using `kubectl explain tunnelbinding.subjects` and `kubectl explain tunnelbinding.tunnelRef` gives the latest documentation on these.
+
+```yaml
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: svc-binding
+subjects:
+  - kind: Service # Default
+    name: svc01
+    spec:
+      fqdn: mysvc.example.com
+      protocol: http
+      target: http://svc01.ns.svc.cluster.local:8080
+      caPool: custom.crt
+      noTlsVerify: false
+  - name: svc02  # Points to the second service
+tunnelRef:
+  kind: Tunnel # Or ClusterTunnel
+  name: k3s-tunnel
+```
+
+## Migrating from pre v0.9
+
+Pre v0.9.x versions utilized service annotations with a service controller instead of the TunnelBinding resource. All the annotations neatly map to the custom resource definitions, and multiple services on the same tunnel can be mapped using a single TunnelBinding custom resource. The previous configuration options (which do not work anymore) are kept below for posterity.
+
+### Service Configuration (deprecated)
+
+Making a tunnel proxy a service is done through the TunnelBinding custom resource. Here are the available annotations. Only the first one is mandatory. Rest of them have defaults as needed.
 
 * `cfargotunnel.com/tunnel` or `cfargotunnel.com/cluster-tunnel`: This annotation is needed for the Service controller to pick this service. Specify the name of the Tunnel/ClusterTunnel CRD which should serve this service
 * `cfargotunnel.com/fqdn`: DNS name to access this service from. Defaults to the `service.metadata.name` + `tunnel.spec.domain`. If specifying this, make sure to use the same domain that the tunnel belongs to. This is not validated and used as provided

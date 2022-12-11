@@ -43,11 +43,11 @@ The Cloudflare Operator aims to provide a new way of dynamically deploying the [
   * Run a scaled (configurable) Deployment of `cloudflared`
   * Manage a ConfigMap for the above Deployment
   * Have Cluster and Namespace scoped Tunnels
-* A Service controller which monitors Service Resources for Annotations and do the following:
-  * Update the `cloudflared` ConfigMap to include the new Service to be served
+* A TunnelBinding controller which does the following:
+  * Update the `cloudflared` ConfigMap to include the new Services to be served under a given Tunnel
   * Restart the `cloudflared` Deployment to make the configuration change take effect
   * Add a DNS entry in Cloudflare for the specified domain to be a [proxied CNAME to the referenced tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/routing-to-tunnel/dns)
-  * Reverse the above when the Service is deleted using Finalizers
+  * Reverse the above when the TunnelBinding is deleted using Finalizers
 
 ## Bird's eye view
 
@@ -55,7 +55,7 @@ Here is how the operator and the Tunnel Resource fit into your deployment.
 
 ![Operator Architecture](images/OperatorArchitecture.png#center)
 
-There is more detailed information on this architecture and thought process behind it in my [blog post](https://adyanth.site/posts/migration-compose-k8s/cloudflare-tunnel-operator-architecture/).
+There is more detailed information on this architecture and the thought process behind it in my [blog post](https://adyanth.site/posts/migration-compose-k8s/cloudflare-tunnel-operator-architecture/).
 
 ## Getting Started
 

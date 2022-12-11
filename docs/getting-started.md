@@ -25,7 +25,7 @@ Usage of these tokens can be validated from the source code of [cloudflare_api.g
 
 To install this operator, you need the following:
 
-* A kubernetes cluster with a recent enough version to support Custom Resource Definitions. The operator was initially built on `v1.22.5+k3s1`
+* A kubernetes cluster with a recent enough version to support Custom Resource Definitions. The operator was initially built on `v1.22.5+k3s1` and being developed on `v1.25.4+k3s1`.
 * [`kubectl` cli](https://kubernetes.io/docs/tasks/tools/#kubectl) for deploying the operator, custom resources and samples.
 
 ## Deploy the Operator
@@ -69,7 +69,7 @@ To create a ClusterTunnel, we need to store Cloudflare credentials in a Secret. 
         name: my-k8s-tunnel         # Name of your new tunnel on Cloudflare
       size: 2                       # This is the number of replicas for cloudflared
       cloudflare:
-        email: email@domain.com     # Your email used to login to the Cloudflare Dashboard
+        email: email@example.com     # Your email used to login to the Cloudflare Dashboard
         domain: example.com         # Domain under which the tunnel runs and adds DNS entries to
         secret: cloudflare-secrets  # The secret created before
         # accountId and accountName cannot be both empty. If both are provided, Account ID is used if valid, else falls back to Account Name.
@@ -85,11 +85,11 @@ To create a ClusterTunnel, we need to store Cloudflare credentials in a Secret. 
     kubectl get deployment k3s-cluster-tunnel -n cloudflare-operator-system
     ```
 
-## Sample Deployment and a Service to utilize the Tunnel
+## Sample Deployment, Service and TunnelBinding to utilize the Tunnel
 
 Deploy the below file using `kubectl apply -f sample.yaml` to run a [`whoami`](https://github.com/traefik/whoami) app and expose it to the internet using Cloudflare Tunnel.
 
-The name of the service and the domain of the ClusterTunnel is used to add the DNS record. In this case, `whoami.example.com` would be added.
+The name of the service and the domain of the ClusterTunnel is used to add the DNS record. In this case, `whoami.example.com` and `whoami-2.example.com` would be added.
 
 ```yaml
 # sample.yaml
@@ -120,15 +120,39 @@ apiVersion: v1
 kind: Service
 metadata:
   name: whoami
-  annotations:
-    # Specifies the name of the ClusterTunnel resource created before
-    cfargotunnel.com/cluster-tunnel: k3s-cluster-tunnel
 spec:
   selector:
     app: whoami
   ports:
     - port: 80
       targetPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: whoami-2  # Sample service, points to the same deployment
+spec:
+  selector:
+    app: whoami
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: whoami-cluster-tun
+subjects:
+  - name: whoami
+  - name: whoami-2  # Points to the second service
+tunnelRef:
+  kind: ClusterTunnel
+  name: k3s-cluster-tunnel
 ```
 
 And that's it. Head over to `whoami.example.com` to see your deployment exposed securely through Cloudflare Tunnels!
+
+## Deleting a tunnel
+
+Remember the delete order while deleting the tunnel. If you delete the secrets before deleting the tunnel, the operator won't be able to clean up the tunnel from Cloudflare, since it no longer has the credentials for the same.
+The correct order is to delete the tunnel, wait for it to actually get deleted (after the finalizer is removed) and then delete the secret.
