@@ -1,0 +1,27 @@
+# permissions for end users to view accessservices.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: accessservice-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: cloudflare-operator
+    app.kubernetes.io/part-of: cloudflare-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: accessservice-viewer-role
+rules:
+- apiGroups:
+  - networking.cfargotunnel.com
+  resources:
+  - accessservices
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - networking.cfargotunnel.com
+  resources:
+  - accessservices/status
+  verbs:
+  - get
