@@ -54,9 +54,39 @@ rules:
   resources:
   - services
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
+- apiGroups:
+  - networking.cfargotunnel.com
+  resources:
+  - accessservices
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - networking.cfargotunnel.com
+  resources:
+  - accessservices/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - networking.cfargotunnel.com
+  resources:
+  - accessservices/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - networking.cfargotunnel.com
   resources:

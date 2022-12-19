@@ -20,16 +20,28 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // AccessServiceSpec defines the desired state of AccessService
 type AccessServiceSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// FQDN to connect to for the TCP tunnel
+	//+kubebuilder:validation:Required
+	Hostname string `json:"hostname"`
 
-	// Foo is an example field of AccessService. Edit accessservice_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Protocol defines the protocol to use, only TCP for now, default
+	//+kubebuilder:validation:Enum:="tcp";"udp"
+	//+kubebuilder:default="tcp"
+	Protocol string `json:"protocol"`
+
+	// Port defines the port for the service to listen on
+	//+kubebuilder:validation:Minimum:=1
+	//+kubebuilder:validation:Maximum:=65535
+	Port int32 `json:"port"`
+
+	// ServiceName defines the name of the service for this port to be exposed on
+	//+kubebuilder:validation:Required
+	ServiceName string `json:"serviceName"`
+
+	// Replicas defines the number of cloudflared access replicas to run
+	Replicas int32 `json:"replicas"`
 }
 
 // AccessServiceStatus defines the observed state of AccessService
