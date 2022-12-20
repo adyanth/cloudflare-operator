@@ -71,6 +71,10 @@ type TunnelRef struct {
 	// Name of the tunnel resource
 	//+kubebuilder:validation:Required
 	Name string `json:"name"`
+
+	//+kubebuilder:validation:Optional
+	// DisableDNSUpdates disables the DNS updates on Cloudflare, just managing the configs. Assumes the DNS entries are manually added.
+	DisableDNSUpdates bool `json:"disableDNSUpdates"`
 }
 
 // ServiceInfo stores the Hostname and Target for each service

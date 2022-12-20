@@ -248,10 +248,6 @@ func (r *TunnelBindingReconciler) deletionLogic() error {
 }
 
 func (r *TunnelBindingReconciler) creationLogic() error {
-	// Add finalizer for TunnelBinding
-	if !controllerutil.ContainsFinalizer(r.binding, tunnelFinalizer) {
-		controllerutil.AddFinalizer(r.binding, tunnelFinalizer)
-	}
 
 	// Add labels for TunnelBinding
 	if r.binding.Labels == nil {
@@ -266,6 +262,16 @@ func (r *TunnelBindingReconciler) creationLogic() error {
 		r.Recorder.Event(r.binding, corev1.EventTypeWarning, "FailedMetaSet", "Failed to set TunnelBinding Finalizer and Labels")
 		return err
 	}
+
+	// Add finalizer for TunnelBinding if DNS updates are not disabled
+	if r.binding.TunnelRef.DisableDNSUpdates {
+		return nil
+	}
+
+	if !controllerutil.ContainsFinalizer(r.binding, tunnelFinalizer) {
+		controllerutil.AddFinalizer(r.binding, tunnelFinalizer)
+	}
+
 	r.Recorder.Event(r.binding, corev1.EventTypeNormal, "MetaSet", "TunnelBinding Finalizer and Labels added")
 
 	errors := false

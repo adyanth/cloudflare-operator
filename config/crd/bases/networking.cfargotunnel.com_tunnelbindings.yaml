@@ -113,6 +113,11 @@ spec:
           tunnelRef:
             description: TunnelRef defines the Tunnel TunnelBinding connects to
             properties:
+              disableDNSUpdates:
+                description: DisableDNSUpdates disables the DNS updates on Cloudflare,
+                  just managing the configs. Assumes the DNS entries are manually
+                  added.
+                type: boolean
               kind:
                 description: Kind can be Tunnel or ClusterTunnel
                 type: string
