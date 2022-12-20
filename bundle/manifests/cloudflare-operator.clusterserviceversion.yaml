@@ -150,6 +150,8 @@ spec:
           - services
           verbs:
           - get
+          - list
+          - watch
         - apiGroups:
           - networking.cfargotunnel.com
           resources:
