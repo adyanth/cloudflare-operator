@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -401,10 +402,24 @@ func secretForTunnel(r GenericTunnelReconciler) *corev1.Secret {
 	return sec
 }
 
+func mergeContainerSpec(containerSpec corev1.Container, required *corev1.Container) error {
+	var bytes []byte
+	var err error
+	if bytes, err = json.Marshal(containerSpec); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(bytes, required); err != nil {
+		return err
+	}
+	return nil
+}
+
 // deploymentForTunnel returns a tunnel Deployment object
 func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 	ls := labelsForTunnel(r.GetTunnel())
 	replicas := r.GetTunnel().GetSpec().Size
+
+	podSpec := r.GetTunnel().GetSpec().PodSpec
 
 	args := []string{"tunnel", "--config", "/etc/cloudflared/config/config.yaml", "--metrics", "0.0.0.0:2000", "run"}
 	volumes := []corev1.Volume{{
@@ -447,6 +462,54 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 		})
 	}
 
+	defaultContainerSpec := corev1.Container{
+		Image: r.GetTunnel().GetSpec().Image,
+		Name:  "cloudflared",
+		Args:  args,
+		LivenessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/ready",
+					Port: intstr.IntOrString{IntVal: 2000},
+				},
+			},
+			FailureThreshold:    1,
+			InitialDelaySeconds: 10,
+			PeriodSeconds:       10,
+		},
+		Ports: []corev1.ContainerPort{
+			{
+				Name:          "metrics",
+				ContainerPort: 2000,
+				Protocol:      corev1.ProtocolTCP,
+			},
+		},
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{"memory": resource.MustParse("30Mi"), "cpu": resource.MustParse("10m")},
+			Limits:   corev1.ResourceList{"memory": resource.MustParse("256Mi"), "cpu": resource.MustParse("500m")},
+		},
+	}
+
+	requiredContainerSpec := defaultContainerSpec
+	if len(podSpec.Containers) != 0 {
+		// Merge input onto required
+		if err := mergeContainerSpec(podSpec.Containers[0], &requiredContainerSpec); err != nil {
+			r.GetLog().Error(err, "error using podSpec input")
+			requiredContainerSpec = defaultContainerSpec
+		}
+	} else {
+		podSpec.Containers = make([]corev1.Container, 1)
+	}
+
+	// Overwrite some important fields
+	requiredContainerSpec.Name = defaultContainerSpec.Name
+	requiredContainerSpec.Args = defaultContainerSpec.Args
+	requiredContainerSpec.VolumeMounts = append(requiredContainerSpec.VolumeMounts, volumeMounts...)
+	podSpec.Volumes = append(podSpec.Volumes, volumes...)
+	podSpec.Containers[0] = requiredContainerSpec
+
+	// TODO: Set podSpec.Affinity
+
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      r.GetTunnel().GetName(),
@@ -462,37 +525,7 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: ls,
 				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{
-						Image: r.GetTunnel().GetSpec().Image,
-						Name:  "cloudflared",
-						Args:  args,
-						LivenessProbe: &corev1.Probe{
-							ProbeHandler: corev1.ProbeHandler{
-								HTTPGet: &corev1.HTTPGetAction{
-									Path: "/ready",
-									Port: intstr.IntOrString{IntVal: 2000},
-								},
-							},
-							FailureThreshold:    1,
-							InitialDelaySeconds: 10,
-							PeriodSeconds:       10,
-						},
-						Ports: []corev1.ContainerPort{
-							{
-								Name:          "metrics",
-								ContainerPort: 2000,
-								Protocol:      corev1.ProtocolTCP,
-							},
-						},
-						VolumeMounts: volumeMounts,
-						Resources: corev1.ResourceRequirements{
-							Requests: corev1.ResourceList{"memory": resource.MustParse("30Mi"), "cpu": resource.MustParse("10m")},
-							Limits:   corev1.ResourceList{"memory": resource.MustParse("256Mi"), "cpu": resource.MustParse("500m")},
-						},
-					}},
-					Volumes: volumes,
-				},
+				Spec: podSpec,
 			},
 		},
 	}
