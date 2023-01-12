@@ -9,6 +9,7 @@ type Tunnel interface {
 	GetObject() client.Object
 	GetNamespace() string
 	GetName() string
+	GetDefaultImage() string
 	GetLabels() map[string]string
 	SetLabels(map[string]string)
 	GetAnnotations() map[string]string

@@ -463,7 +463,7 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 	}
 
 	defaultContainerSpec := corev1.Container{
-		Image: r.GetTunnel().GetSpec().Image,
+		Image: r.GetTunnel().GetDefaultImage(),
 		Name:  "cloudflared",
 		Args:  args,
 		LivenessProbe: &corev1.Probe{

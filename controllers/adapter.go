@@ -8,7 +8,8 @@ import (
 
 // TunnelAdapater implementation
 type TunnelAdapter struct {
-	Tunnel *networkingv1alpha1.Tunnel
+	Tunnel       *networkingv1alpha1.Tunnel
+	DefaultImage string
 }
 
 func (o TunnelAdapter) GetObject() client.Object {
@@ -17,6 +18,10 @@ func (o TunnelAdapter) GetObject() client.Object {
 
 func (o TunnelAdapter) GetNamespace() string {
 	return o.Tunnel.Namespace
+}
+
+func (o TunnelAdapter) GetDefaultImage() string {
+	return o.DefaultImage
 }
 
 func (o TunnelAdapter) GetName() string {
@@ -58,13 +63,15 @@ func (o TunnelAdapter) SetStatus(in networkingv1alpha1.TunnelStatus) {
 func (o TunnelAdapter) DeepCopyTunnel() Tunnel {
 	return TunnelAdapter{
 		o.Tunnel.DeepCopy(),
+		o.DefaultImage,
 	}
 }
 
 // ClusterTunnelAdapter implementation
 type ClusterTunnelAdapter struct {
-	Tunnel    *networkingv1alpha1.ClusterTunnel
-	Namespace string
+	Tunnel       *networkingv1alpha1.ClusterTunnel
+	Namespace    string
+	DefaultImage string
 }
 
 func (o ClusterTunnelAdapter) GetObject() client.Object {
@@ -73,6 +80,10 @@ func (o ClusterTunnelAdapter) GetObject() client.Object {
 
 func (o ClusterTunnelAdapter) GetNamespace() string {
 	return o.Namespace
+}
+
+func (o ClusterTunnelAdapter) GetDefaultImage() string {
+	return o.DefaultImage
 }
 
 func (o ClusterTunnelAdapter) GetName() string {
@@ -115,5 +126,6 @@ func (o ClusterTunnelAdapter) DeepCopyTunnel() Tunnel {
 	return ClusterTunnelAdapter{
 		o.Tunnel.DeepCopy(),
 		o.Namespace,
+		o.DefaultImage,
 	}
 }

@@ -106,11 +106,6 @@ spec:
                 description: FallbackTarget speficies the target for requests that
                   do not match an ingress. Defaults to http_status:404
                 type: string
-              image:
-                default: cloudflare/cloudflared:2022.12.1
-                description: Image sets the Cloudflared Image to use. Defaults to
-                  the image set during the release of the operator.
-                type: string
               newTunnel:
                 description: New tunnel object. NewTunnel and ExistingTunnel cannot
                   be both empty and are mutually exclusive.

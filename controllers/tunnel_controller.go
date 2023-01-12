@@ -35,8 +35,9 @@ import (
 // TunnelReconciler reconciles a Tunnel object
 type TunnelReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme       *runtime.Scheme
+	Recorder     record.EventRecorder
+	DefaultImage string
 
 	// Custom data for ease of (re)use
 
@@ -137,7 +138,7 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	if err := r.initStruct(ctx, TunnelAdapter{tunnel}); err != nil {
+	if err := r.initStruct(ctx, TunnelAdapter{tunnel, r.DefaultImage}); err != nil {
 		return ctrl.Result{}, err
 	}
 

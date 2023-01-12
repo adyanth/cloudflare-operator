@@ -53,10 +53,12 @@ func main() {
 	var enableLeaderElection bool
 	var probeAddr string
 	var clusterResourceNamespace string
+	var defaultImage string
 	var overwriteUnmanaged bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.StringVar(&clusterResourceNamespace, "cluster-resource-namespace", "cloudflare-operator-system", "The default namespace for cluster scoped resources.")
+	flag.StringVar(&defaultImage, "default-image", "cloudflared:2022.12.1", "The default cloudflared image to use for tunnels.")
 	flag.BoolVar(&overwriteUnmanaged, "overwrite-unmanaged-dns", false, "Overwrite DNS records that do not have a corresponding managed TXT record, defaults to false.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", true,
 		"Enable leader election for controller manager. "+
@@ -92,16 +94,18 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controllers.TunnelReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:       mgr.GetClient(),
+		Scheme:       mgr.GetScheme(),
+		DefaultImage: defaultImage,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Tunnel")
 		os.Exit(1)
 	}
 	if err = (&controllers.ClusterTunnelReconciler{
-		Client:    mgr.GetClient(),
-		Scheme:    mgr.GetScheme(),
-		Namespace: clusterResourceNamespace,
+		Client:       mgr.GetClient(),
+		Scheme:       mgr.GetScheme(),
+		Namespace:    clusterResourceNamespace,
+		DefaultImage: defaultImage,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterTunnel")
 		os.Exit(1)

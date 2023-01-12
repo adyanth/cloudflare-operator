@@ -35,9 +35,10 @@ import (
 // ClusterTunnelReconciler reconciles a ClusterTunnel object
 type ClusterTunnelReconciler struct {
 	client.Client
-	Scheme    *runtime.Scheme
-	Recorder  record.EventRecorder
-	Namespace string
+	Scheme       *runtime.Scheme
+	Recorder     record.EventRecorder
+	Namespace    string
+	DefaultImage string
 
 	// Custom data for ease of (re)use
 
@@ -59,6 +60,10 @@ func (r *ClusterTunnelReconciler) GetRecorder() record.EventRecorder {
 
 func (r *ClusterTunnelReconciler) GetScheme() *runtime.Scheme {
 	return r.Scheme
+}
+
+func (r *ClusterTunnelReconciler) GetDefaultImage() string {
+	return r.DefaultImage
 }
 
 func (r *ClusterTunnelReconciler) GetContext() context.Context {
@@ -142,7 +147,7 @@ func (r *ClusterTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	if err := r.initStruct(ctx, ClusterTunnelAdapter{tunnel, r.Namespace}); err != nil {
+	if err := r.initStruct(ctx, ClusterTunnelAdapter{tunnel, r.Namespace, r.DefaultImage}); err != nil {
 		return ctrl.Result{}, err
 	}
 
