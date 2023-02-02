@@ -117,7 +117,8 @@ spec:
                       default: ""
                       description: ProxyType configures the proxy type.
                       enum:
-                      - ;socks
+                      - ""
+                      - socks
                       type: string
                     target:
                       description: Target specified where the tunnel should proxy

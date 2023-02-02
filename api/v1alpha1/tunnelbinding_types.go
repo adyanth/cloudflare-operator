@@ -80,7 +80,7 @@ type TunnelBindingSubjectSpec struct {
 	// ProxyType configures the proxy type.
 	//+kubebuilder:validation:Optional
 	//+kubebuilder:default:=""
-	//+kubebuilder:validation:Enum:=;socks
+	//+kubebuilder:validation:Enum:="";"socks"
 	ProxyType string `json:"proxyType,omitempty"`
 }
 
