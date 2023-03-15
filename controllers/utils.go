@@ -8,6 +8,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
+	"github.com/cloudflare/cloudflare-go"
 	"github.com/go-logr/logr"
 )
 
@@ -69,18 +70,41 @@ func getAPIDetails(ctx context.Context, c client.Client, log logr.Logger, tunnel
 		log.Info("key not found in secret", "secret", tunnelSpec.Cloudflare.Secret, "key", tunnelSpec.Cloudflare.CLOUDFLARE_API_KEY)
 	}
 
+	apiToken := string(cfAPITokenB64)
+	apiKey := string(cfAPIKeyB64)
+	apiEmail := tunnelSpec.Cloudflare.Email
 	cfAPI := &CloudflareAPI{
 		Log:             log,
 		AccountName:     tunnelSpec.Cloudflare.AccountName,
 		AccountId:       tunnelSpec.Cloudflare.AccountId,
 		Domain:          tunnelSpec.Cloudflare.Domain,
-		APIToken:        string(cfAPITokenB64),
-		APIKey:          string(cfAPIKeyB64),
-		APIEmail:        tunnelSpec.Cloudflare.Email,
+		APIToken:        apiToken,
+		APIKey:          apiKey,
+		APIEmail:        apiEmail,
 		ValidAccountId:  tunnelStatus.AccountId,
 		ValidTunnelId:   tunnelStatus.TunnelId,
 		ValidTunnelName: tunnelStatus.TunnelName,
 		ValidZoneId:     tunnelStatus.ZoneId,
 	}
+
+	cloudflareClient, err := getCloudflareClient(apiKey, apiEmail, apiToken)
+	if err != nil {
+		log.Error(err, "error initializing cloudflare api client", "client", cloudflareClient)
+		return &CloudflareAPI{}, &corev1.Secret{}, err
+	}
+	cfAPI.CloudflareClient = cloudflareClient
+
 	return cfAPI, cfSecret, nil
+}
+
+//getCloudflareClient returns an initialized *cloudflare.API using either an API Key + Email or an API Token
+func getCloudflareClient(apiKey, apiEmail, apiToken string) (*cloudflare.API, error) {
+	var cloudflareClient *cloudflare.API
+	var err error
+	if apiKey != "" && apiEmail != "" {
+		cloudflareClient, err = cloudflare.New(apiKey, apiEmail)
+	} else {
+		cloudflareClient, err = cloudflare.NewWithAPIToken(apiToken)
+	}
+	return cloudflareClient, err
 }

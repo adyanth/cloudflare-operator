@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/cloudflare/cloudflare-go"
 	"github.com/go-logr/logr"
 )
 
@@ -20,19 +22,20 @@ const TXT_PREFIX = "_managed."
 
 // CloudflareAPI config object holding all relevant fields to use the API
 type CloudflareAPI struct {
-	Log             logr.Logger
-	TunnelName      string
-	TunnelId        string
-	AccountName     string
-	AccountId       string
-	Domain          string
-	APIToken        string
-	APIKey          string
-	APIEmail        string
-	ValidAccountId  string
-	ValidTunnelId   string
-	ValidTunnelName string
-	ValidZoneId     string
+	Log              logr.Logger
+	TunnelName       string
+	TunnelId         string
+	AccountName      string
+	AccountId        string
+	Domain           string
+	APIToken         string
+	APIKey           string
+	APIEmail         string
+	ValidAccountId   string
+	ValidTunnelId    string
+	ValidTunnelName  string
+	ValidZoneId      string
+	CloudflareClient *cloudflare.API
 }
 
 // CloudflareAPIResponse object containing Result with a Name and Id field (includes an optional CredentialsFile for Tunnel responses)
@@ -153,27 +156,12 @@ func (c *CloudflareAPI) DeleteCloudflareTunnel() error {
 		return err
 	}
 
-	req, _ := http.NewRequest("DELETE", fmt.Sprintf("%saccounts/%s/tunnels/%s", CLOUDFLARE_ENDPOINT, c.ValidAccountId, url.QueryEscape(c.ValidTunnelId)), nil)
-	if err := c.addAuthHeader(req, true); err != nil {
-		return err
-	}
+	ctx := context.Background()
+	rc := cloudflare.AccountIdentifier(c.ValidAccountId)
+	err := c.CloudflareClient.DeleteTunnel(ctx, rc, c.ValidTunnelId)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
 	if err != nil {
 		c.Log.Error(err, "error code in deleting tunnel", "tunnelId", c.TunnelId)
-		return err
-	}
-
-	defer resp.Body.Close()
-	var tunnelResponse CloudflareAPIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tunnelResponse); err != nil {
-		c.Log.Error(err, "could not read body in deleting tunnel", "tunnelId", c.TunnelId)
-		return err
-	}
-
-	if !tunnelResponse.Success {
-		c.Log.Error(err, "failed to delete tunnel", "tunnelId", c.TunnelId, "tunnelResponse", tunnelResponse)
 		return err
 	}
 
