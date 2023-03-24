@@ -222,55 +222,36 @@ func (c CloudflareAPI) validateAccountId() bool {
 		c.Log.Info("Account ID not provided")
 		return false
 	}
-	req, _ := http.NewRequest("GET", fmt.Sprintf("%saccounts/%s", CLOUDFLARE_ENDPOINT, url.QueryEscape(c.AccountId)), nil)
-	if err := c.addAuthHeader(req, false); err != nil {
-		return false
-	}
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	ctx := context.Background()
+	account, _, err := c.CloudflareClient.Account(ctx, c.AccountId)
+
 	if err != nil {
-		c.Log.Error(err, "error code in getting account by Account ID", "accountId", c.AccountId)
+		c.Log.Error(err, "error retrieving account details", "accountId", c.AccountId)
 		return false
 	}
 
-	defer resp.Body.Close()
-	var accountResponse CloudflareAPIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&accountResponse); err != nil {
-		c.Log.Error(err, "could not read body in getting account by Account ID", "accountId", c.AccountId)
-		return false
-	}
-
-	return accountResponse.Success && accountResponse.Result.Id == c.AccountId
+	return account.ID == c.AccountId
 }
 
 func (c *CloudflareAPI) getAccountIdByName() (string, error) {
-	req, _ := http.NewRequest("GET", fmt.Sprintf("%saccounts?name=%s", CLOUDFLARE_ENDPOINT, url.QueryEscape(c.AccountName)), nil)
-	if err := c.addAuthHeader(req, false); err != nil {
-		return "", err
+	ctx := context.Background()
+	params := cloudflare.AccountsListParams{
+		Name: c.AccountName,
 	}
+	accounts, _, err := c.CloudflareClient.Accounts(ctx, params)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
 	if err != nil {
-		c.Log.Error(err, "error code in getting account, check accountName", "accountName", c.AccountName)
-		return "", err
+		c.Log.Error(err, "error listing accounts", "accountName", c.AccountName)
 	}
 
-	defer resp.Body.Close()
-	var accountResponse CloudflareAPIMultiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&accountResponse); err != nil || !accountResponse.Success {
-		c.Log.Error(err, "could not read body in getting account, check accountName", "accountName", c.AccountName)
-		return "", err
-	}
-
-	switch len(accountResponse.Result) {
+	switch len(accounts) {
 	case 0:
 		err := fmt.Errorf("no account in response")
 		c.Log.Error(err, "found no account, check accountName", "accountName", c.AccountName)
 		return "", err
 	case 1:
-		return accountResponse.Result[0].Id, nil
+		return accounts[0].ID, nil
 	default:
 		err := fmt.Errorf("more than one account in response")
 		c.Log.Error(err, "found more than one account, check accountName", "accountName", c.AccountName)
