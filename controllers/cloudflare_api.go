@@ -316,33 +316,26 @@ func (c *CloudflareAPI) getTunnelIdByName() (string, error) {
 		return "", err
 	}
 
-	req, _ := http.NewRequest("GET", fmt.Sprintf("%saccounts/%s/tunnels?name=%s", CLOUDFLARE_ENDPOINT, c.ValidAccountId, url.QueryEscape(c.TunnelName)), nil)
-	if err := c.addAuthHeader(req, false); err != nil {
-		return "", err
+	ctx := context.Background()
+	rc := cloudflare.AccountIdentifier(c.ValidAccountId)
+	params := cloudflare.TunnelListParams{
+		Name: c.TunnelName,
 	}
+	tunnels, _, err := c.CloudflareClient.ListTunnels(ctx, rc, params)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
 	if err != nil {
-		c.Log.Error(err, "error code in getting tunnel, check tunnelName", "tunnelName", c.TunnelName)
+		c.Log.Error(err, "error listing tunnels by name", "tunnelName", c.TunnelName)
 		return "", err
 	}
 
-	defer resp.Body.Close()
-	var tunnelResponse CloudflareAPIMultiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tunnelResponse); err != nil || !tunnelResponse.Success {
-		c.Log.Error(err, "could not read body in getting tunnel, check tunnelName", "tunnelName", c.TunnelName)
-		return "", err
-	}
-
-	switch len(tunnelResponse.Result) {
+	switch len(tunnels) {
 	case 0:
 		err := fmt.Errorf("no tunnel in response")
 		c.Log.Error(err, "found no tunnel, check tunnelName", "tunnelName", c.TunnelName)
 		return "", err
 	case 1:
-		c.ValidTunnelName = tunnelResponse.Result[0].Name
-		return tunnelResponse.Result[0].Id, nil
+		c.ValidTunnelName = tunnel[0].Name
+		return tunnel[0].ID, nil
 	default:
 		err := fmt.Errorf("more than one tunnel in response")
 		c.Log.Error(err, "found more than one tunnel, check tunnelName", "tunnelName", c.TunnelName)
