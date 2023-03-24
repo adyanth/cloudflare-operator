@@ -38,6 +38,14 @@ type CloudflareAPI struct {
 	CloudflareClient *cloudflare.API
 }
 
+// CloudflareTunnelCredentialsFile object containing the fields that make up a Cloudflare Tunnel's credentials
+type CloudflareTunnelCredentialsFile struct {
+	AccountTag   string `json:"AccountTag"`
+	TunnelID     string `json:"TunnelID"`
+	TunnelName   string `json:"TunnelName"`
+	TunnelSecret string `json:"TunnelSecret"`
+}
+
 // CloudflareAPIResponse object containing Result with a Name and Id field (includes an optional CredentialsFile for Tunnel responses)
 type CloudflareAPIResponse struct {
 	Result struct {
@@ -107,46 +115,35 @@ func (c *CloudflareAPI) CreateCloudflareTunnel() (string, string, error) {
 	}
 	tunnelSecret := base64.StdEncoding.EncodeToString(randSecret)
 
-	// Generate body for POST request
-	postBody, _ := json.Marshal(map[string]string{
-		"name":          c.TunnelName,
-		"tunnel_secret": tunnelSecret,
-	})
-	reqBody := bytes.NewBuffer(postBody)
-
-	req, _ := http.NewRequest("POST", fmt.Sprintf("%saccounts/%s/tunnels", CLOUDFLARE_ENDPOINT, c.ValidAccountId), reqBody)
-	if err := c.addAuthHeader(req, false); err != nil {
-		return "", "", err
+	params := cloudflare.TunnelCreateParams{
+		Name:   c.TunnelName,
+		Secret: tunnelSecret,
+		// Indicates if this is a locally or remotely configured tunnel "local" or "cloudflare"
+		ConfigSrc: "local",
 	}
-	req.Header.Add("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	ctx := context.Background()
+	rc := cloudflare.AccountIdentifier(c.ValidAccountId)
+	tunnel, err := c.CloudflareClient.CreateTunnel(ctx, rc, params)
+
 	if err != nil {
-		c.Log.Error(err, "error code in creating tunnel")
+		c.Log.Error(err, "error creating tunnel")
 		return "", "", err
 	}
 
-	defer resp.Body.Close()
+	c.ValidTunnelId = tunnel.ID
+	c.ValidTunnelName = tunnel.Name
 
-	var tunnelResponse CloudflareAPIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tunnelResponse); err != nil {
-		c.Log.Error(err, "could not read body in creating tunnel")
-		return "", "", err
+	credentialsFile := CloudflareTunnelCredentialsFile{
+		AccountTag:   c.ValidAccountId,
+		TunnelID:     tunnel.ID,
+		TunnelName:   tunnel.Name,
+		TunnelSecret: tunnelSecret,
 	}
 
-	if !tunnelResponse.Success {
-		err := fmt.Errorf("%v", tunnelResponse.Errors)
-		c.Log.Error(err, "received error in creating tunnel")
-		return "", "", err
-	}
-
-	c.ValidTunnelId = tunnelResponse.Result.Id
-	c.ValidTunnelName = tunnelResponse.Result.Name
-
-	// Read credentials section and marshal to string
-	creds, _ := json.Marshal(tunnelResponse.Result.CredentialsFile)
-	return tunnelResponse.Result.Id, string(creds), nil
+	// Marshal the tunnel credentials into a string
+	creds, _ := json.Marshal(credentialsFile)
+	return tunnel.ID, string(creds), nil
 }
 
 // DeleteCloudflareTunnel deletes a Cloudflare Tunnel
