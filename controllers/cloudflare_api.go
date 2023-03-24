@@ -155,10 +155,18 @@ func (c *CloudflareAPI) DeleteCloudflareTunnel() error {
 
 	ctx := context.Background()
 	rc := cloudflare.AccountIdentifier(c.ValidAccountId)
-	err := c.CloudflareClient.DeleteTunnel(ctx, rc, c.ValidTunnelId)
 
+	// Deletes any inactive connections on a tunnel
+	err := c.CloudflareClient.CleanupTunnelConnections(ctx, rc, c.ValidTunnelId)
 	if err != nil {
-		c.Log.Error(err, "error code in deleting tunnel", "tunnelId", c.TunnelId)
+		c.Log.Error(err, "error cleaning tunnel connections", "tunnelId", c.TunnelId)
+		return err
+	}
+
+	ctx = context.Background()
+	err = c.CloudflareClient.DeleteTunnel(ctx, rc, c.ValidTunnelId)
+	if err != nil {
+		c.Log.Error(err, "error deleting tunnel", "tunnelId", c.TunnelId)
 		return err
 	}
 
