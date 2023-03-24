@@ -298,28 +298,16 @@ func (c *CloudflareAPI) validateTunnelId() bool {
 		return false
 	}
 
-	req, _ := http.NewRequest("GET", fmt.Sprintf("%saccounts/%s/tunnels/%s", CLOUDFLARE_ENDPOINT, c.ValidAccountId, url.QueryEscape(c.TunnelId)), nil)
-	if err := c.addAuthHeader(req, false); err != nil {
-		return false
-	}
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	ctx := context.Background()
+	rc := cloudflare.AccountIdentifier(c.ValidAccountId)
+	tunnel, err := c.CloudflareClient.GetTunnel(ctx, rc, c.TunnelId)
 	if err != nil {
-		c.Log.Error(err, "error code in getting tunnel by Tunnel ID", "tunnelId", c.TunnelId)
+		c.Log.Error(err, "error retrieving tunnel")
 		return false
 	}
 
-	defer resp.Body.Close()
-	var tunnelResponse CloudflareAPIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tunnelResponse); err != nil {
-		c.Log.Error(err, "could not read body in getting tunnel by Tunnel ID", "tunnelId", c.TunnelId)
-		return false
-	}
-
-	c.ValidTunnelName = tunnelResponse.Result.Name
-
-	return tunnelResponse.Success && tunnelResponse.Result.Id == c.TunnelId
+	c.ValidTunnelName = tunnel.Name
+	return tunnel.ID == c.TunnelId
 }
 
 func (c *CloudflareAPI) getTunnelIdByName() (string, error) {
