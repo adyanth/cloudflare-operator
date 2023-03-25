@@ -461,28 +461,16 @@ func (c *CloudflareAPI) DeleteDNSId(fqdn, dnsId string, created bool) error {
 	if !created {
 		return nil
 	}
-	req, _ := http.NewRequest("DELETE", fmt.Sprintf("%szones/%s/dns_records/%s", CLOUDFLARE_ENDPOINT, c.ValidZoneId, dnsId), nil)
-	if err := c.addAuthHeader(req, false); err != nil {
-		return err
-	}
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	ctx := context.Background()
+	rc := cloudflare.ZoneIdentifier(c.ValidZoneId)
+	err := c.CloudflareClient.DeleteDNSRecord(ctx, rc, dnsId)
+
 	if err != nil {
-		c.Log.Error(err, "error code in deleting DNS record, check fqdn", "dnsId", dnsId, "fqdn", fqdn)
+		c.Log.Error(err, "error deleting DNS record, check fqdn", "dnsId", dnsId, "fqdn", fqdn)
 		return err
 	}
 
-	defer resp.Body.Close()
-	var dnsResponse struct {
-		Result struct {
-			Id string
-		}
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&dnsResponse); err != nil || dnsResponse.Result.Id != dnsId {
-		c.Log.Error(err, "could not read body in deleting DNS record", "fqdn", fqdn, "dnsId", dnsId, "response", dnsResponse)
-		return err
-	}
 	return nil
 }
 
