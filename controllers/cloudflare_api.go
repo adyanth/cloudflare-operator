@@ -386,32 +386,21 @@ func (c *CloudflareAPI) GetZoneId() (string, error) {
 }
 
 func (c *CloudflareAPI) getZoneIdByName() (string, error) {
-	req, _ := http.NewRequest("GET", fmt.Sprintf("%szones?name=%s", CLOUDFLARE_ENDPOINT, url.QueryEscape(c.Domain)), nil)
-	if err := c.addAuthHeader(req, false); err != nil {
-		return "", err
-	}
+	ctx := context.Background()
+	zones, err := c.CloudflareClient.ListZones(ctx, c.Domain)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
 	if err != nil {
-		c.Log.Error(err, "error code in getting zoneId, check domain", "domain", c.Domain)
+		c.Log.Error(err, "error listing zones, check domain", "domain", c.Domain)
 		return "", err
 	}
 
-	defer resp.Body.Close()
-	var zoneResponse CloudflareAPIMultiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&zoneResponse); err != nil || !zoneResponse.Success {
-		c.Log.Error(err, "could not read body in getting zoneId, check domain", "domain", c.Domain)
-		return "", err
-	}
-
-	switch len(zoneResponse.Result) {
+	switch len(zones) {
 	case 0:
 		err := fmt.Errorf("no zone in response")
-		c.Log.Error(err, "found no zone, check domain", "domain", c.Domain, "zoneResponse", zoneResponse)
+		c.Log.Error(err, "found no zone, check domain", "domain", c.Domain, "zones", zones)
 		return "", err
 	case 1:
-		return zoneResponse.Result[0].Id, nil
+		return zones[0].ID, nil
 	default:
 		err := fmt.Errorf("more than one zone in response")
 		c.Log.Error(err, "found more than one zone, check domain", "domain", c.Domain)
