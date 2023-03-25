@@ -408,63 +408,51 @@ func (c *CloudflareAPI) getZoneIdByName() (string, error) {
 	}
 }
 
+// Been a while writing Go... returns a pointer to a type
+func ptr[T any](v T) *T {
+	return &v
+}
+
 // InsertOrUpdateCName upsert DNS CNAME record for the given FQDN to point to the tunnel
 func (c *CloudflareAPI) InsertOrUpdateCName(fqdn, dnsId string) (string, error) {
-	method := "POST"
-	subPath := ""
+
+	ctx := context.Background()
+	rc := cloudflare.ZoneIdentifier(c.ValidZoneId)
 	if dnsId != "" {
 		c.Log.Info("Updating existing record", "fqdn", fqdn, "dnsId", dnsId)
-		method = "PUT"
-		subPath = "/" + dnsId
+		updateParams := cloudflare.UpdateDNSRecordParams{
+			Type:    "CNAME",
+			Name:    fqdn,
+			Content: fmt.Sprintf("%s.cfargotunnel.com", c.ValidTunnelId),
+			Comment: "Managed by cloudflare-operator",
+			TTL:     1,         // Automatic TTL
+			Proxied: ptr(true), // For Cloudflare tunnels
+		}
+		err := c.CloudflareClient.UpdateDNSRecord(ctx, rc, updateParams)
+		if err != nil {
+			c.Log.Error(err, "error code in setting/updating DNS record, check fqdn", "fqdn", fqdn)
+			return "", err
+		}
+		c.Log.Info("DNS record updated successfully", "fqdn", fqdn)
+		return dnsId, nil
 	} else {
 		c.Log.Info("Inserting DNS record", "fqdn", fqdn)
-	}
-
-	// Generate body for POST/PUT request
-	body, _ := json.Marshal(struct {
-		Type    string
-		Name    string
-		Content string
-		Ttl     int
-		Proxied bool
-	}{
-		Type:    "CNAME",
-		Name:    fqdn,
-		Content: c.ValidTunnelId + ".cfargotunnel.com",
-		Ttl:     1,    // Automatic TTL
-		Proxied: true, // For Cloudflare tunnels
-	})
-	reqBody := bytes.NewBuffer(body)
-
-	req, _ := http.NewRequest(method, fmt.Sprintf("%szones/%s/dns_records%s", CLOUDFLARE_ENDPOINT, c.ValidZoneId, subPath), reqBody)
-	if err := c.addAuthHeader(req, false); err != nil {
-		return "", err
-	}
-	req.Header.Add("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		c.Log.Error(err, "error code in setting/updating DNS record, check fqdn", "fqdn", fqdn)
-		return "", err
-	}
-
-	defer resp.Body.Close()
-	var dnsResponse CloudflareAPIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&dnsResponse); err != nil {
-		c.Log.Error(err, "could not read body in setting DNS record", "response", dnsResponse)
-		return "", err
-	} else if !dnsResponse.Success {
-		errs := ""
-		for _, errData := range dnsResponse.Errors {
-			errs += errData.Message
+		createParams := cloudflare.CreateDNSRecordParams{
+			Type:    "CNAME",
+			Name:    fqdn,
+			Content: fmt.Sprintf("%s.cfargotunnel.com", c.ValidTunnelId),
+			Comment: "Managed by cloudflare-operator",
+			TTL:     1,         // Automatic TTL
+			Proxied: ptr(true), // For Cloudflare tunnels
 		}
-		err := fmt.Errorf(errs)
-		c.Log.Error(err, "API returned unsuccessful success code in setting DNS record", "response", dnsResponse)
-		return "", err
+		resp, err := c.CloudflareClient.CreateDNSRecord(ctx, rc, createParams)
+		if err != nil {
+			c.Log.Error(err, "error creating DNS record, check fqdn", "fqdn", fqdn)
+			return "", err
+		}
+		c.Log.Info("DNS record created successfully", "fqdn", fqdn)
+		return resp.Result.ID, nil
 	}
-	c.Log.Info("DNS record set successful", "fqdn", fqdn)
-	return dnsResponse.Result.Id, nil
 }
 
 // DeleteDNSId deletes DNS entry for the given dnsId
