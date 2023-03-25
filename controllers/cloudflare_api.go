@@ -481,46 +481,30 @@ func (c *CloudflareAPI) GetDNSCNameId(fqdn string) (string, error) {
 		return "", err
 	}
 
-	req, _ := http.NewRequest("GET", fmt.Sprintf("%szones/%s/dns_records?type=CNAME&name=%s", CLOUDFLARE_ENDPOINT, c.ValidZoneId, url.QueryEscape(fqdn)), nil)
-	if err := c.addAuthHeader(req, false); err != nil {
-		return "", err
+	ctx := context.Background()
+	rc := cloudflare.ZoneIdentifier(c.ValidZoneId)
+	params := cloudflare.ListDNSRecordsParams{
+		Type: "CNAME",
+		Name: fqdn,
 	}
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	records, _, err := c.CloudflareClient.ListDNSRecords(ctx, rc, params)
 	if err != nil {
-		c.Log.Error(err, "error code in getting DNS record, check fqdn", "fqdn", fqdn)
+		c.Log.Error(err, "error listing DNS records, check fqdn", "fqdn", fqdn)
 		return "", err
 	}
 
-	defer resp.Body.Close()
-	var dnsResponse CloudflareAPIMultiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&dnsResponse); err != nil {
-		c.Log.Error(err, "could not read body in getting CNAME record, check fqdn", "fqdn", fqdn)
-		return "", err
-	} else if !dnsResponse.Success {
-		errs := ""
-		for _, errData := range dnsResponse.Errors {
-			errs += errData.Message
-		}
-		err := fmt.Errorf(errs)
-		c.Log.Error(err, "API returned unsuccessful success code in setting DNS record", "response", dnsResponse)
-		return "", err
-	}
-
-	if len(dnsResponse.Result) == 0 {
+	switch len(records) {
+	case 0:
 		err := fmt.Errorf("no records returned")
 		c.Log.Info("no records returned for fqdn", "fqdn", fqdn)
 		return "", err
-	}
-
-	if len(dnsResponse.Result) > 1 {
+	case 1:
+		return records[0].ID, nil
+	default:
 		err := fmt.Errorf("multiple records returned")
 		c.Log.Error(err, "multiple records returned for fqdn", "fqdn", fqdn)
 		return "", err
 	}
-
-	return dnsResponse.Result[0].Id, nil
 }
 
 // GetManagedDnsTxt gets the TXT record corresponding to the fqdn
