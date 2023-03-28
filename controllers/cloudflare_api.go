@@ -14,9 +14,6 @@ import (
 	"github.com/go-logr/logr"
 )
 
-// CLOUDFLARE_ENDPOINT is the Cloudflare API base URL from https://api.cloudflare.com/#getting-started-endpoints.
-const CLOUDFLARE_ENDPOINT = "https://api.cloudflare.com/client/v4/"
-
 // TXT_PREFIX is the prefix added to TXT records for whom the corresponding DNS records are managed by the operator.
 const TXT_PREFIX = "_managed."
 
@@ -46,59 +43,11 @@ type CloudflareTunnelCredentialsFile struct {
 	TunnelSecret string `json:"TunnelSecret"`
 }
 
-// CloudflareAPIResponse object containing Result with a Name and Id field (includes an optional CredentialsFile for Tunnel responses)
-type CloudflareAPIResponse struct {
-	Result struct {
-		Id              string
-		Name            string
-		CredentialsFile map[string]string `json:"credentials_file"`
-	}
-	Success bool
-	Errors  []struct {
-		Message string
-	}
-}
-
-// CloudflareAPIMultiResponse object containing a slice of Results with a Name and Id field
-type CloudflareAPIMultiResponse struct {
-	Result []struct {
-		Id      string
-		Name    string
-		Content string
-	}
-	Errors []struct {
-		Message string
-	}
-	Success bool
-}
-
-// CloudflareAPITunnelCreate object containing Cloudflare API Input for creating a Tunnel
-type CloudflareAPITunnelCreate struct {
-	Name         string
-	TunnelSecret string `json:"tunnel_secret"`
-}
-
 // DnsManagedRecordTxt object that represents each managed DNS record in a separate TXT record
 type DnsManagedRecordTxt struct {
 	DnsId      string // DnsId of the managed record
 	TunnelName string // TunnelName of the managed record
 	TunnelId   string // TunnelId of the managed record
-}
-
-func (c CloudflareAPI) addAuthHeader(req *http.Request, delete bool) error {
-	if !delete && c.APIToken != "" {
-		req.Header.Add("Authorization", "Bearer "+c.APIToken)
-		return nil
-	}
-	c.Log.Info("No API token, or performing delete operation")
-	if c.APIKey == "" || c.APIEmail == "" {
-		err := fmt.Errorf("apiKey or apiEmail not found")
-		c.Log.Error(err, "Trying to perform Delete request, or any other request with out APIToken, cannot find API Key or Email")
-		return err
-	}
-	req.Header.Add("X-Auth-Key", c.APIKey)
-	req.Header.Add("X-Auth-Email", c.APIEmail)
-	return nil
 }
 
 // CreateCloudflareTunnel creates a Cloudflare Tunnel and returns the tunnel Id and credentials file
