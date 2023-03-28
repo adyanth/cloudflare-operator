@@ -14,6 +14,9 @@ import (
 	"github.com/go-logr/logr"
 )
 
+// TXT_PREFIX is the prefix added to TXT records for whom the corresponding DNS records are managed by the operator.
+const TXT_PREFIX = "_managed."
+
 // CloudflareAPI config object holding all relevant fields to use the API
 type CloudflareAPI struct {
 	Log              logr.Logger
@@ -511,7 +514,7 @@ func (c *CloudflareAPI) InsertOrUpdateTXT(fqdn, txtId, dnsId string) error {
 
 		updateParams := cloudflare.UpdateDNSRecordParams{
 			Type:    "TXT",
-			Name:    fqdn,
+			Name:    fmt.Sprintf("%s%s", TXT_PREFIX, fqdn),
 			Content: string(content),
 			Comment: "Managed by cloudflare-operator",
 			TTL:     1,          // Automatic TTL
@@ -528,13 +531,13 @@ func (c *CloudflareAPI) InsertOrUpdateTXT(fqdn, txtId, dnsId string) error {
 		c.Log.Info("Inserting DNS TXT record", "fqdn", fqdn)
 		createParams := cloudflare.CreateDNSRecordParams{
 			Type:    "TXT",
-			Name:    fqdn,
+			Name:    fmt.Sprintf("%s%s", TXT_PREFIX, fqdn),
 			Content: string(content),
 			Comment: "Managed by cloudflare-operator",
 			TTL:     1,          // Automatic TTL
 			Proxied: ptr(false), // For Cloudflare tunnels
 		}
-		resp, err := c.CloudflareClient.CreateDNSRecord(ctx, rc, createParams)
+		_, err := c.CloudflareClient.CreateDNSRecord(ctx, rc, createParams)
 		if err != nil {
 			c.Log.Error(err, "error creating DNS record, check fqdn", "fqdn", fqdn)
 			return err
