@@ -415,7 +415,6 @@ func ptr[T any](v T) *T {
 
 // InsertOrUpdateCName upsert DNS CNAME record for the given FQDN to point to the tunnel
 func (c *CloudflareAPI) InsertOrUpdateCName(fqdn, dnsId string) (string, error) {
-
 	ctx := context.Background()
 	rc := cloudflare.ZoneIdentifier(c.ValidZoneId)
 	if dnsId != "" {
@@ -549,70 +548,52 @@ func (c *CloudflareAPI) GetManagedDnsTxt(fqdn string) (string, DnsManagedRecordT
 
 // InsertOrUpdateTXT upsert DNS TXT record for the given FQDN to point to the tunnel
 func (c *CloudflareAPI) InsertOrUpdateTXT(fqdn, txtId, dnsId string) error {
-	fqdn = TXT_PREFIX + fqdn
-	method := "POST"
-	subPath := ""
-	if txtId != "" {
-		c.Log.Info("Updating existing TXT record", "fqdn", fqdn, "dnsId", txtId)
-		method = "PUT"
-		subPath = "/" + txtId
-	} else {
-		c.Log.Info("Inserting DNS TXT record", "fqdn", fqdn)
-	}
-
 	content, err := json.Marshal(DnsManagedRecordTxt{
 		DnsId:      dnsId,
 		TunnelId:   c.ValidTunnelId,
 		TunnelName: c.ValidTunnelName,
 	})
 	if err != nil {
-		c.Log.Error(err, "could not marshal TXT record", "fqdn", fqdn)
+		c.Log.Error(err, "error marhsalling txt record json", "fqdn", fqdn)
 		return err
 	}
+	ctx := context.Background()
+	rc := cloudflare.ZoneIdentifier(c.ValidZoneId)
 
-	// Generate body for POST/PUT request
-	body, _ := json.Marshal(struct {
-		Type    string
-		Name    string
-		Content string
-		Ttl     int
-		Proxied bool
-	}{
-		Type:    "TXT",
-		Name:    fqdn,
-		Content: string(content),
-		Ttl:     1,     // Automatic TTL
-		Proxied: false, // TXT cannot be proxied
-	})
-	reqBody := bytes.NewBuffer(body)
+	if txtId != "" {
+		c.Log.Info("Updating existing TXT record", "fqdn", fqdn, "dnsId", dnsId, "txtId", txtId)
 
-	req, _ := http.NewRequest(method, fmt.Sprintf("%szones/%s/dns_records%s", CLOUDFLARE_ENDPOINT, c.ValidZoneId, subPath), reqBody)
-	if err := c.addAuthHeader(req, false); err != nil {
-		return err
-	}
-	req.Header.Add("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		c.Log.Error(err, "error code in setting/updating DNS TXT record, check fqdn", "fqdn", fqdn)
-		return err
-	}
-
-	defer resp.Body.Close()
-	var dnsResponse CloudflareAPIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&dnsResponse); err != nil {
-		c.Log.Error(err, "could not read body in setting DNS TXT record", "response", dnsResponse)
-		return err
-	} else if !dnsResponse.Success {
-		errs := ""
-		for _, errData := range dnsResponse.Errors {
-			errs += errData.Message
+		updateParams := cloudflare.UpdateDNSRecordParams{
+			Type:    "TXT",
+			Name:    fqdn,
+			Content: string(content),
+			Comment: "Managed by cloudflare-operator",
+			TTL:     1,          // Automatic TTL
+			Proxied: ptr(false), // TXT cannot be proxied
 		}
-		err := fmt.Errorf(errs)
-		c.Log.Error(err, "API returned unsuccessful success code in setting DNS TXT record", "response", dnsResponse)
-		return err
+		err := c.CloudflareClient.UpdateDNSRecord(ctx, rc, updateParams)
+		if err != nil {
+			c.Log.Error(err, "error in updating DNS record, check fqdn", "fqdn", fqdn)
+			return err
+		}
+		c.Log.Info("DNS record updated successfully", "fqdn", fqdn)
+		return nil
+	} else {
+		c.Log.Info("Inserting DNS TXT record", "fqdn", fqdn)
+		createParams := cloudflare.CreateDNSRecordParams{
+			Type:    "TXT",
+			Name:    fqdn,
+			Content: string(content),
+			Comment: "Managed by cloudflare-operator",
+			TTL:     1,          // Automatic TTL
+			Proxied: ptr(false), // For Cloudflare tunnels
+		}
+		resp, err := c.CloudflareClient.CreateDNSRecord(ctx, rc, createParams)
+		if err != nil {
+			c.Log.Error(err, "error creating DNS record, check fqdn", "fqdn", fqdn)
+			return err
+		}
+		c.Log.Info("DNS TXT record created successfully", "fqdn", fqdn)
+		return nil
 	}
-	c.Log.Info("DNS TXT record set successful", "fqdn", fqdn)
-	return nil
 }
