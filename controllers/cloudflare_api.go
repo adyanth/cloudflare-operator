@@ -1,14 +1,11 @@
 package controllers
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/url"
 
 	"github.com/cloudflare/cloudflare-go"
 	"github.com/go-logr/logr"
@@ -283,8 +280,8 @@ func (c *CloudflareAPI) getTunnelIdByName() (string, error) {
 		c.Log.Error(err, "found no tunnel, check tunnelName", "tunnelName", c.TunnelName)
 		return "", err
 	case 1:
-		c.ValidTunnelName = tunnel[0].Name
-		return tunnel[0].ID, nil
+		c.ValidTunnelName = tunnels[0].Name
+		return tunnels[0].ID, nil
 	default:
 		err := fmt.Errorf("more than one tunnel in response")
 		c.Log.Error(err, "found more than one tunnel, check tunnelName", "tunnelName", c.TunnelName)
@@ -493,6 +490,7 @@ func (c *CloudflareAPI) GetManagedDnsTxt(fqdn string) (string, DnsManagedRecordT
 		c.Log.Error(err, "multiple TXT records returned for fqdn", "fqdn", fqdn)
 		return "", DnsManagedRecordTxt{}, false, err
 	}
+	return "", DnsManagedRecordTxt{}, false, err
 }
 
 // InsertOrUpdateTXT upsert DNS TXT record for the given FQDN to point to the tunnel
