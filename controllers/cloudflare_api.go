@@ -251,7 +251,7 @@ func (c *CloudflareAPI) validateTunnelId() bool {
 	rc := cloudflare.AccountIdentifier(c.ValidAccountId)
 	tunnel, err := c.CloudflareClient.GetTunnel(ctx, rc, c.TunnelId)
 	if err != nil {
-		c.Log.Error(err, "error retrieving tunnel")
+		c.Log.Error(err, "error retrieving tunnel", "tunnelId", c.TunnelId)
 		return false
 	}
 
