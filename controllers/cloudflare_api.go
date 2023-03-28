@@ -14,9 +14,6 @@ import (
 	"github.com/go-logr/logr"
 )
 
-// TXT_PREFIX is the prefix added to TXT records for whom the corresponding DNS records are managed by the operator.
-const TXT_PREFIX = "_managed."
-
 // CloudflareAPI config object holding all relevant fields to use the API
 type CloudflareAPI struct {
 	Log              logr.Logger
