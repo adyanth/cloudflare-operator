@@ -91,8 +91,8 @@ func (c *CloudflareAPI) CreateCloudflareTunnel() (string, string, error) {
 	}
 
 	// Marshal the tunnel credentials into a string
-	creds, _ := json.Marshal(credentialsFile)
-	return tunnel.ID, string(creds), nil
+	creds, err := json.Marshal(credentialsFile)
+	return tunnel.ID, string(creds), err
 }
 
 // DeleteCloudflareTunnel deletes a Cloudflare Tunnel
