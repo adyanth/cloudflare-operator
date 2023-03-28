@@ -509,60 +509,42 @@ func (c *CloudflareAPI) GetDNSCNameId(fqdn string) (string, error) {
 
 // GetManagedDnsTxt gets the TXT record corresponding to the fqdn
 func (c *CloudflareAPI) GetManagedDnsTxt(fqdn string) (string, DnsManagedRecordTxt, bool, error) {
-	fqdn = TXT_PREFIX + fqdn
 	if _, err := c.GetZoneId(); err != nil {
 		c.Log.Error(err, "error in getting Zone ID")
 		return "", DnsManagedRecordTxt{}, false, err
 	}
 
-	req, _ := http.NewRequest("GET", fmt.Sprintf("%szones/%s/dns_records?type=TXT&name=%s", CLOUDFLARE_ENDPOINT, c.ValidZoneId, url.QueryEscape(fqdn)), nil)
-	if err := c.addAuthHeader(req, false); err != nil {
-		return "", DnsManagedRecordTxt{}, false, err
+	ctx := context.Background()
+	rc := cloudflare.ZoneIdentifier(c.ValidZoneId)
+	params := cloudflare.ListDNSRecordsParams{
+		Type: "TXT",
+		Name: fqdn,
 	}
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	records, _, err := c.CloudflareClient.ListDNSRecords(ctx, rc, params)
 	if err != nil {
-		c.Log.Error(err, "error code in getting TXT DNS record, check fqdn", "fqdn", fqdn)
+		c.Log.Error(err, "error listing DNS records, check fqdn", "fqdn", fqdn)
 		return "", DnsManagedRecordTxt{}, false, err
 	}
 
-	defer resp.Body.Close()
-	var dnsResponse CloudflareAPIMultiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&dnsResponse); err != nil {
-		c.Log.Error(err, "could not read body in getting TXT record, check fqdn", "fqdn", fqdn)
-		return "", DnsManagedRecordTxt{}, false, err
-	} else if !dnsResponse.Success {
-		errs := ""
-		for _, errData := range dnsResponse.Errors {
-			errs += errData.Message
+	switch len(records) {
+	case 0:
+		c.Log.Info("no TXT records returned for fqdn", "fqdn", fqdn)
+		return "", DnsManagedRecordTxt{}, true, nil
+	case 1:
+		var dnsTxtResponse DnsManagedRecordTxt
+		if err := json.Unmarshal([]byte(records[0].Content), &dnsTxtResponse); err != nil {
+			// TXT record exists, but not in JSON
+			c.Log.Error(err, "could not read TXT content in getting zoneId, check domain", "domain", c.Domain)
+			return records[0].ID, dnsTxtResponse, false, err
+		} else if dnsTxtResponse.TunnelId != c.ValidTunnelId {
+			// TXT record exists but not controlled by our tunnel
+			return records[0].ID, dnsTxtResponse, false, nil
 		}
-		err := fmt.Errorf(errs)
-		c.Log.Error(err, "API returned unsuccessful success code in reading DNS TXT record", "response", dnsResponse)
-		return "", DnsManagedRecordTxt{}, false, err
-	}
-
-	if len(dnsResponse.Result) > 1 {
+	default:
 		err := fmt.Errorf("multiple records returned")
 		c.Log.Error(err, "multiple TXT records returned for fqdn", "fqdn", fqdn)
 		return "", DnsManagedRecordTxt{}, false, err
 	}
-
-	if len(dnsResponse.Result) == 0 {
-		c.Log.Info("no TXT records returned for fqdn", "fqdn", fqdn)
-		return "", DnsManagedRecordTxt{}, true, nil
-	}
-
-	var dnsTxtResponse DnsManagedRecordTxt
-	if err := json.Unmarshal([]byte(dnsResponse.Result[0].Content), &dnsTxtResponse); err != nil {
-		// TXT record exists, but not in JSON
-		c.Log.Error(err, "could not read TXT content in getting zoneId, check domain", "domain", c.Domain)
-		return dnsResponse.Result[0].Id, dnsTxtResponse, false, err
-	} else if dnsTxtResponse.TunnelId != c.ValidTunnelId {
-		// TXT record exists but not controlled by our tunnel
-		return dnsResponse.Result[0].Id, dnsTxtResponse, false, nil
-	}
-	return dnsResponse.Result[0].Id, dnsTxtResponse, true, nil
 }
 
 // InsertOrUpdateTXT upsert DNS TXT record for the given FQDN to point to the tunnel
