@@ -97,7 +97,7 @@ func getAPIDetails(ctx context.Context, c client.Client, log logr.Logger, tunnel
 	return cfAPI, cfSecret, nil
 }
 
-//getCloudflareClient returns an initialized *cloudflare.API using either an API Key + Email or an API Token
+// getCloudflareClient returns an initialized *cloudflare.API using either an API Key + Email or an API Token
 func getCloudflareClient(apiKey, apiEmail, apiToken string) (*cloudflare.API, error) {
 	var cloudflareClient *cloudflare.API
 	var err error

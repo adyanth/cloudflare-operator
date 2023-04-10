@@ -366,6 +366,7 @@ func (c *CloudflareAPI) InsertOrUpdateCName(fqdn, dnsId string) (string, error) 
 	if dnsId != "" {
 		c.Log.Info("Updating existing record", "fqdn", fqdn, "dnsId", dnsId)
 		updateParams := cloudflare.UpdateDNSRecordParams{
+			ID:      dnsId,
 			Type:    "CNAME",
 			Name:    fqdn,
 			Content: fmt.Sprintf("%s.cfargotunnel.com", c.ValidTunnelId),
@@ -463,7 +464,7 @@ func (c *CloudflareAPI) GetManagedDnsTxt(fqdn string) (string, DnsManagedRecordT
 	rc := cloudflare.ZoneIdentifier(c.ValidZoneId)
 	params := cloudflare.ListDNSRecordsParams{
 		Type: "TXT",
-		Name: fqdn,
+		Name: fmt.Sprintf("%s%s", TXT_PREFIX, fqdn),
 	}
 	records, _, err := c.CloudflareClient.ListDNSRecords(ctx, rc, params)
 	if err != nil {
@@ -481,9 +482,9 @@ func (c *CloudflareAPI) GetManagedDnsTxt(fqdn string) (string, DnsManagedRecordT
 			// TXT record exists, but not in JSON
 			c.Log.Error(err, "could not read TXT content in getting zoneId, check domain", "domain", c.Domain)
 			return records[0].ID, dnsTxtResponse, false, err
-		} else if dnsTxtResponse.TunnelId != c.ValidTunnelId {
-			// TXT record exists but not controlled by our tunnel
-			return records[0].ID, dnsTxtResponse, false, nil
+		} else if dnsTxtResponse.TunnelId == c.ValidTunnelId {
+			// TXT record exists and controlled by our tunnel
+			return records[0].ID, dnsTxtResponse, true, nil
 		}
 	default:
 		err := fmt.Errorf("multiple records returned")
@@ -511,6 +512,7 @@ func (c *CloudflareAPI) InsertOrUpdateTXT(fqdn, txtId, dnsId string) error {
 		c.Log.Info("Updating existing TXT record", "fqdn", fqdn, "dnsId", dnsId, "txtId", txtId)
 
 		updateParams := cloudflare.UpdateDNSRecordParams{
+			ID:      txtId,
 			Type:    "TXT",
 			Name:    fmt.Sprintf("%s%s", TXT_PREFIX, fqdn),
 			Content: string(content),
