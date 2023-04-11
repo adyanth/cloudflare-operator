@@ -259,7 +259,7 @@ func (r *TunnelBindingReconciler) creationLogic() error {
 
 	// Update TunnelBinding resource
 	if err := r.Update(r.ctx, r.binding); err != nil {
-		r.Recorder.Event(r.binding, corev1.EventTypeWarning, "FailedMetaSet", "Failed to set TunnelBinding Finalizer and Labels")
+		r.Recorder.Event(r.binding, corev1.EventTypeWarning, "FailedMetaSet", "Failed to set Labels")
 		return err
 	}
 
@@ -269,7 +269,15 @@ func (r *TunnelBindingReconciler) creationLogic() error {
 	}
 
 	if !controllerutil.ContainsFinalizer(r.binding, tunnelFinalizer) {
-		controllerutil.AddFinalizer(r.binding, tunnelFinalizer)
+		if !controllerutil.AddFinalizer(r.binding, tunnelFinalizer) {
+			r.Recorder.Event(r.binding, corev1.EventTypeWarning, "FailedMetaSet", "Failed to set Finalizer")
+			return fmt.Errorf("failed to set finalizer, trying again")
+		}
+		// Update TunnelBinding resource
+		if err := r.Update(r.ctx, r.binding); err != nil {
+			r.Recorder.Event(r.binding, corev1.EventTypeWarning, "FailedMetaSet", "Failed to set Finalizer")
+			return err
+		}
 	}
 
 	r.Recorder.Event(r.binding, corev1.EventTypeNormal, "MetaSet", "TunnelBinding Finalizer and Labels added")
