@@ -7,9 +7,24 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/cloudflare/cloudflare-go"
+	cf "github.com/cloudflare/cloudflare-go"
 	"github.com/go-logr/logr"
 )
+
+type CloudflareGoAPI interface {
+	CreateTunnel(ctx context.Context, rc *cf.ResourceContainer, params cf.TunnelCreateParams) (cf.Tunnel, error)
+	CleanupTunnelConnections(ctx context.Context, rc *cf.ResourceContainer, tunnelID string) error
+	DeleteTunnel(ctx context.Context, rc *cf.ResourceContainer, tunnelID string) error
+	Account(ctx context.Context, accountID string) (cf.Account, cf.ResultInfo, error)
+	Accounts(ctx context.Context, params cf.AccountsListParams) ([]cf.Account, cf.ResultInfo, error)
+	GetTunnel(ctx context.Context, rc *cf.ResourceContainer, tunnelID string) (cf.Tunnel, error)
+	ListTunnels(ctx context.Context, rc *cf.ResourceContainer, params cf.TunnelListParams) ([]cf.Tunnel, *cf.ResultInfo, error)
+	ListZones(ctx context.Context, z ...string) ([]cf.Zone, error)
+	UpdateDNSRecord(ctx context.Context, rc *cf.ResourceContainer, params cf.UpdateDNSRecordParams) error
+	CreateDNSRecord(ctx context.Context, rc *cf.ResourceContainer, params cf.CreateDNSRecordParams) (*cf.DNSRecordResponse, error)
+	DeleteDNSRecord(ctx context.Context, rc *cf.ResourceContainer, recordID string) error
+	ListDNSRecords(ctx context.Context, rc *cf.ResourceContainer, params cf.ListDNSRecordsParams) ([]cf.DNSRecord, *cf.ResultInfo, error)
+}
 
 // TXT_PREFIX is the prefix added to TXT records for whom the corresponding DNS records are managed by the operator.
 const TXT_PREFIX = "_managed."
@@ -29,7 +44,7 @@ type CloudflareAPI struct {
 	ValidTunnelId    string
 	ValidTunnelName  string
 	ValidZoneId      string
-	CloudflareClient *cloudflare.API
+	CloudflareClient CloudflareGoAPI
 }
 
 // CloudflareTunnelCredentialsFile object containing the fields that make up a Cloudflare Tunnel's credentials
@@ -61,7 +76,7 @@ func (c *CloudflareAPI) CreateCloudflareTunnel() (string, string, error) {
 	}
 	tunnelSecret := base64.StdEncoding.EncodeToString(randSecret)
 
-	params := cloudflare.TunnelCreateParams{
+	params := cf.TunnelCreateParams{
 		Name:   c.TunnelName,
 		Secret: tunnelSecret,
 		// Indicates if this is a locally or remotely configured tunnel "local" or "cloudflare"
@@ -69,7 +84,7 @@ func (c *CloudflareAPI) CreateCloudflareTunnel() (string, string, error) {
 	}
 
 	ctx := context.Background()
-	rc := cloudflare.AccountIdentifier(c.ValidAccountId)
+	rc := cf.AccountIdentifier(c.ValidAccountId)
 	tunnel, err := c.CloudflareClient.CreateTunnel(ctx, rc, params)
 
 	if err != nil {
@@ -100,7 +115,7 @@ func (c *CloudflareAPI) DeleteCloudflareTunnel() error {
 	}
 
 	ctx := context.Background()
-	rc := cloudflare.AccountIdentifier(c.ValidAccountId)
+	rc := cf.AccountIdentifier(c.ValidAccountId)
 
 	// Deletes any inactive connections on a tunnel
 	err := c.CloudflareClient.CleanupTunnelConnections(ctx, rc, c.ValidTunnelId)
@@ -182,7 +197,7 @@ func (c CloudflareAPI) validateAccountId() bool {
 
 func (c *CloudflareAPI) getAccountIdByName() (string, error) {
 	ctx := context.Background()
-	params := cloudflare.AccountsListParams{
+	params := cf.AccountsListParams{
 		Name: c.AccountName,
 	}
 	accounts, _, err := c.CloudflareClient.Accounts(ctx, params)
@@ -245,7 +260,7 @@ func (c *CloudflareAPI) validateTunnelId() bool {
 	}
 
 	ctx := context.Background()
-	rc := cloudflare.AccountIdentifier(c.ValidAccountId)
+	rc := cf.AccountIdentifier(c.ValidAccountId)
 	tunnel, err := c.CloudflareClient.GetTunnel(ctx, rc, c.TunnelId)
 	if err != nil {
 		c.Log.Error(err, "error retrieving tunnel", "tunnelId", c.TunnelId)
@@ -263,8 +278,8 @@ func (c *CloudflareAPI) getTunnelIdByName() (string, error) {
 	}
 
 	ctx := context.Background()
-	rc := cloudflare.AccountIdentifier(c.ValidAccountId)
-	params := cloudflare.TunnelListParams{
+	rc := cf.AccountIdentifier(c.ValidAccountId)
+	params := cf.TunnelListParams{
 		Name: c.TunnelName,
 	}
 	tunnels, _, err := c.CloudflareClient.ListTunnels(ctx, rc, params)
@@ -362,10 +377,10 @@ func ptr[T any](v T) *T {
 // InsertOrUpdateCName upsert DNS CNAME record for the given FQDN to point to the tunnel
 func (c *CloudflareAPI) InsertOrUpdateCName(fqdn, dnsId string) (string, error) {
 	ctx := context.Background()
-	rc := cloudflare.ZoneIdentifier(c.ValidZoneId)
+	rc := cf.ZoneIdentifier(c.ValidZoneId)
 	if dnsId != "" {
 		c.Log.Info("Updating existing record", "fqdn", fqdn, "dnsId", dnsId)
-		updateParams := cloudflare.UpdateDNSRecordParams{
+		updateParams := cf.UpdateDNSRecordParams{
 			ID:      dnsId,
 			Type:    "CNAME",
 			Name:    fqdn,
@@ -383,7 +398,7 @@ func (c *CloudflareAPI) InsertOrUpdateCName(fqdn, dnsId string) (string, error) 
 		return dnsId, nil
 	} else {
 		c.Log.Info("Inserting DNS record", "fqdn", fqdn)
-		createParams := cloudflare.CreateDNSRecordParams{
+		createParams := cf.CreateDNSRecordParams{
 			Type:    "CNAME",
 			Name:    fqdn,
 			Content: fmt.Sprintf("%s.cfargotunnel.com", c.ValidTunnelId),
@@ -409,7 +424,7 @@ func (c *CloudflareAPI) DeleteDNSId(fqdn, dnsId string, created bool) error {
 	}
 
 	ctx := context.Background()
-	rc := cloudflare.ZoneIdentifier(c.ValidZoneId)
+	rc := cf.ZoneIdentifier(c.ValidZoneId)
 	err := c.CloudflareClient.DeleteDNSRecord(ctx, rc, dnsId)
 
 	if err != nil {
@@ -428,8 +443,8 @@ func (c *CloudflareAPI) GetDNSCNameId(fqdn string) (string, error) {
 	}
 
 	ctx := context.Background()
-	rc := cloudflare.ZoneIdentifier(c.ValidZoneId)
-	params := cloudflare.ListDNSRecordsParams{
+	rc := cf.ZoneIdentifier(c.ValidZoneId)
+	params := cf.ListDNSRecordsParams{
 		Type: "CNAME",
 		Name: fqdn,
 	}
@@ -461,8 +476,8 @@ func (c *CloudflareAPI) GetManagedDnsTxt(fqdn string) (string, DnsManagedRecordT
 	}
 
 	ctx := context.Background()
-	rc := cloudflare.ZoneIdentifier(c.ValidZoneId)
-	params := cloudflare.ListDNSRecordsParams{
+	rc := cf.ZoneIdentifier(c.ValidZoneId)
+	params := cf.ListDNSRecordsParams{
 		Type: "TXT",
 		Name: fmt.Sprintf("%s%s", TXT_PREFIX, fqdn),
 	}
@@ -506,12 +521,12 @@ func (c *CloudflareAPI) InsertOrUpdateTXT(fqdn, txtId, dnsId string) error {
 		return err
 	}
 	ctx := context.Background()
-	rc := cloudflare.ZoneIdentifier(c.ValidZoneId)
+	rc := cf.ZoneIdentifier(c.ValidZoneId)
 
 	if txtId != "" {
 		c.Log.Info("Updating existing TXT record", "fqdn", fqdn, "dnsId", dnsId, "txtId", txtId)
 
-		updateParams := cloudflare.UpdateDNSRecordParams{
+		updateParams := cf.UpdateDNSRecordParams{
 			ID:      txtId,
 			Type:    "TXT",
 			Name:    fmt.Sprintf("%s%s", TXT_PREFIX, fqdn),
@@ -529,7 +544,7 @@ func (c *CloudflareAPI) InsertOrUpdateTXT(fqdn, txtId, dnsId string) error {
 		return nil
 	} else {
 		c.Log.Info("Inserting DNS TXT record", "fqdn", fqdn)
-		createParams := cloudflare.CreateDNSRecordParams{
+		createParams := cf.CreateDNSRecordParams{
 			Type:    "TXT",
 			Name:    fmt.Sprintf("%s%s", TXT_PREFIX, fqdn),
 			Content: string(content),
