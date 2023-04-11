@@ -194,3 +194,11 @@ func TestCreateCloudflareTunnel(t *testing.T) {
 		}
 	}
 }
+
+func TestDeleteCloudflareTunnel(t *testing.T) {
+	c, cc := setup(t)
+	err := c.DeleteCloudflareTunnel()
+	if assert.NoError(t, err, "expected no error") {
+		assert.Equal(t, true, cc.deleted)
+	}
+}
