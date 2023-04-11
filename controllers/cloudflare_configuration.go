@@ -4,6 +4,7 @@ import (
 	"time"
 )
 
+// https://github.com/cloudflare/cloudflared/blob/master/config/configuration.go
 // Configuration is a cloudflared configuration yaml model
 type Configuration struct {
 	TunnelId      string                   `yaml:"tunnel"`

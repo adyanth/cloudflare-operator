@@ -56,11 +56,32 @@ type TunnelBindingSubjectSpec struct {
 	//+kubebuilder:validation:Optional
 	CaPool string `json:"caPool,omitempty"`
 
-	// NoTlsVerify sisables TLS verification for this service.
+	// NoTlsVerify disables TLS verification for this service.
 	// Only useful if the protocol is HTTPS.
 	//+kubebuilder:validation:Optional
 	//+kubebuilder:default:=false
 	NoTlsVerify bool `json:"noTlsVerify"`
+
+	// cloudflared starts a proxy server to translate HTTP traffic into TCP when proxying, for example, SSH or RDP.
+
+	// ProxyAddress configures the listen address for that proxy
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:="127.0.0.1"
+	//+kubebuilder:validation:Pattern="((^((([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]))$)|(^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$))"
+	ProxyAddress string `json:"proxyAddress,omitempty"`
+
+	// ProxyPort configures the listen port for that proxy
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:=0
+	//+kubebuilder:validation:Minimum:=0
+	//+kubebuilder:validation:Maximum:=65535
+	ProxyPort uint `json:"proxyPort,omitempty"`
+
+	// ProxyType configures the proxy type.
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:=""
+	//+kubebuilder:validation:Enum:="";"socks"
+	ProxyType string `json:"proxyType,omitempty"`
 }
 
 // TunnelRef defines the Tunnel TunnelBinding connects to
