@@ -46,6 +46,11 @@ type TunnelBindingSubjectSpec struct {
 	//+kubebuilder:validation:Optional
 	Protocol string `json:"protocol,omitempty"`
 
+	// Path specifies a regular expression for to match on the request for http/https services
+	// If a rule does not specify a path, all paths will be matched.
+	//+kubebuilder:validation:Optional
+	Path string `json:"path,omitempty"`
+
 	// Target specified where the tunnel should proxy to.
 	// Defaults to the form of <protocol>://<service.metadata.name>.<service.metadata.namespace>.svc:<port>
 	//+kubebuilder:validation:Optional

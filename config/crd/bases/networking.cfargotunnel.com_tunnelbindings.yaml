@@ -93,6 +93,11 @@ spec:
                       description: NoTlsVerify disables TLS verification for this
                         service. Only useful if the protocol is HTTPS.
                       type: boolean
+                    path:
+                      description: Path specifies a regular expression for to match
+                        on the request for http/https services If a rule does not
+                        specify a path, all paths will be matched.
+                      type: string
                     protocol:
                       description: Protocol specifies the protocol for the service.
                         Should be one of http, https, tcp, udp, ssh or rdp. Defaults
