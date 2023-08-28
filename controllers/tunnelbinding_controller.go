@@ -574,7 +574,6 @@ func (r *TunnelBindingReconciler) configureCloudflareDaemon() error {
 			} else {
 				targetService = binding.Status.Services[i].Target
 			}
-
 			originRequest := OriginRequestConfig{}
 			originRequest.NoTLSVerify = &subject.Spec.NoTlsVerify
 			originRequest.ProxyAddress = &subject.Spec.ProxyAddress
@@ -588,6 +587,7 @@ func (r *TunnelBindingReconciler) configureCloudflareDaemon() error {
 			finalIngresses = append(finalIngresses, UnvalidatedIngressRule{
 				Hostname:      binding.Status.Services[i].Hostname,
 				Service:       targetService,
+				Path:          subject.Spec.Path,
 				OriginRequest: originRequest,
 			})
 		}
