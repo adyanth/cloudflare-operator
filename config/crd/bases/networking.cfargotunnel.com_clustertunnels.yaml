@@ -1,11 +1,9 @@
-
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.7.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.13.0
   name: clustertunnels.networking.cfargotunnel.com
 spec:
   group: networking.cfargotunnel.com
@@ -124,6 +122,12 @@ spec:
                 description: NoTlsVerify disables origin TLS certificate checks when
                   the endpoint is HTTPS.
                 type: boolean
+              nodeSelectors:
+                additionalProperties:
+                  type: string
+                description: NodeSelectors specifies the nodeSelectors to apply to
+                  the cloudflared tunnel deployment
+                type: object
               originCaPool:
                 description: OriginCaPool speficies the secret with tls.crt (and other
                   certs as needed to be referred in the service annotation) of the
@@ -136,6 +140,47 @@ spec:
                 format: int32
                 minimum: 0
                 type: integer
+              tolerations:
+                description: Tolerations specifies the tolerations to apply to the
+                  cloudflared tunnel deployment
+                items:
+                  description: The pod this Toleration is attached to tolerates any
+                    taint that matches the triple <key,value,effect> using the matching
+                    operator <operator>.
+                  properties:
+                    effect:
+                      description: Effect indicates the taint effect to match. Empty
+                        means match all taint effects. When specified, allowed values
+                        are NoSchedule, PreferNoSchedule and NoExecute.
+                      type: string
+                    key:
+                      description: Key is the taint key that the toleration applies
+                        to. Empty means match all taint keys. If the key is empty,
+                        operator must be Exists; this combination means to match all
+                        values and all keys.
+                      type: string
+                    operator:
+                      description: Operator represents a key's relationship to the
+                        value. Valid operators are Exists and Equal. Defaults to Equal.
+                        Exists is equivalent to wildcard for value, so that a pod
+                        can tolerate all taints of a particular category.
+                      type: string
+                    tolerationSeconds:
+                      description: TolerationSeconds represents the period of time
+                        the toleration (which must be of effect NoExecute, otherwise
+                        this field is ignored) tolerates the taint. By default, it
+                        is not set, which means tolerate the taint forever (do not
+                        evict). Zero and negative values will be treated as 0 (evict
+                        immediately) by the system.
+                      format: int64
+                      type: integer
+                    value:
+                      description: Value is the taint value the toleration matches
+                        to. If the operator is Exists, the value should be empty,
+                        otherwise just a regular string.
+                      type: string
+                  type: object
+                type: array
             type: object
           status:
             description: TunnelStatus defines the observed state of Tunnel
@@ -159,9 +204,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
