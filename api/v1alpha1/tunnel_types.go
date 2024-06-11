@@ -114,6 +114,11 @@ type TunnelSpec struct {
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
 	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:="auto"
+	// Protocol specifies the protocol to use for the tunnel. Defaults to auto. Options are "auto", "quic" and "http2"
+	Protocol string `json:"protocol,omitempty"`
+
+	//+kubebuilder:validation:Optional
 	//+kubebuilder:default:="http_status:404"
 	// FallbackTarget speficies the target for requests that do not match an ingress. Defaults to http_status:404
 	FallbackTarget string `json:"fallbackTarget,omitempty"`
