@@ -49,6 +49,10 @@ func labelsForTunnel(cf Tunnel) map[string]string {
 	}
 }
 
+func nodeSelectorsForTunnel(cf Tunnel) map[string]string {
+	return cf.GetSpec().NodeSelectors
+}
+
 func setupTunnel(r GenericTunnelReconciler) (ctrl.Result, bool, error) {
 	okNewTunnel := r.GetTunnel().GetSpec().NewTunnel != networkingv1alpha1.NewTunnel{}
 	okExistingTunnel := r.GetTunnel().GetSpec().ExistingTunnel != networkingv1alpha1.ExistingTunnel{}
@@ -405,6 +409,8 @@ func secretForTunnel(r GenericTunnelReconciler) *corev1.Secret {
 func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 	ls := labelsForTunnel(r.GetTunnel())
 	replicas := r.GetTunnel().GetSpec().Size
+	nodeSelector := nodeSelectorsForTunnel(r.GetTunnel())
+	tolerations := r.GetTunnel().GetSpec().Tolerations
 
 	args := []string{"tunnel", "--config", "/etc/cloudflared/config/config.yaml", "--metrics", "0.0.0.0:2000", "run"}
 	volumes := []corev1.Volume{{
@@ -491,7 +497,9 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 							Limits:   corev1.ResourceList{"memory": resource.MustParse("256Mi"), "cpu": resource.MustParse("500m")},
 						},
 					}},
-					Volumes: volumes,
+					Volumes:      volumes,
+					NodeSelector: nodeSelector,
+					Tolerations:  tolerations,
 				},
 			},
 		},

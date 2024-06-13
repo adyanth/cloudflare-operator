@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -103,6 +104,14 @@ type TunnelSpec struct {
 	//+kubebuilder:validation:Optional
 	// OriginCaPool speficies the secret with tls.crt (and other certs as needed to be referred in the service annotation) of the Root CA to be trusted when sending traffic to HTTPS endpoints
 	OriginCaPool string `json:"originCaPool,omitempty"`
+
+	//+kubebuilder:validation:Optional
+	// NodeSelectors specifies the nodeSelectors to apply to the cloudflared tunnel deployment
+	NodeSelectors map[string]string `json:"nodeSelectors,omitempty"`
+
+	//+kubebuilder:validation:Optional
+	// Tolerations specifies the tolerations to apply to the cloudflared tunnel deployment
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
 	//+kubebuilder:validation:Optional
 	//+kubebuilder:default:="http_status:404"
