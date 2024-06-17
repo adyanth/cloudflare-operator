@@ -139,6 +139,10 @@ spec:
                 default: auto
                 description: Protocol specifies the protocol to use for the tunnel.
                   Defaults to auto. Options are "auto", "quic" and "http2"
+                enum:
+                - auto
+                - quic
+                - http2
                 type: string
               size:
                 default: 1

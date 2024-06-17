@@ -114,6 +114,7 @@ type TunnelSpec struct {
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
 	//+kubebuilder:validation:Optional
+	//+kubebuilder:validation:Enum={"auto","quic","http2"}
 	//+kubebuilder:default:="auto"
 	// Protocol specifies the protocol to use for the tunnel. Defaults to auto. Options are "auto", "quic" and "http2"
 	Protocol string `json:"protocol,omitempty"`
