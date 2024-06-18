@@ -411,8 +411,9 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 	replicas := r.GetTunnel().GetSpec().Size
 	nodeSelector := nodeSelectorsForTunnel(r.GetTunnel())
 	tolerations := r.GetTunnel().GetSpec().Tolerations
+	protocol := r.GetTunnel().GetSpec().Protocol
 
-	args := []string{"tunnel", "--config", "/etc/cloudflared/config/config.yaml", "--metrics", "0.0.0.0:2000", "run"}
+	args := []string{"tunnel", "--protocol", protocol, "--config", "/etc/cloudflared/config/config.yaml", "--metrics", "0.0.0.0:2000", "run"}
 	volumes := []corev1.Volume{{
 		Name: "creds",
 		VolumeSource: corev1.VolumeSource{
