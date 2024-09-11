@@ -91,7 +91,7 @@ type TunnelSpec struct {
 	// Size defines the number of Daemon pods to run for this tunnel
 	Size int32 `json:"size,omitempty"`
 
-	//+kubebuilder:default:="cloudflare/cloudflared:2022.12.1"
+	//+kubebuilder:default:="cloudflare/cloudflared:2024.9.1"
 	//+kubebuilder:validation:Optional
 	// Image sets the Cloudflared Image to use. Defaults to the image set during the release of the operator.
 	Image string `json:"image,omitempty"`
