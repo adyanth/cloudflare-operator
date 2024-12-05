@@ -568,6 +568,49 @@ func (c *CloudflareAPI) getAccessApplicationIdByName(name string) (exists bool, 
 	return exists, id, nil
 }
 
+func (c *CloudflareAPI) getAccessPolicyIdByName(applicationId string, name string) (exists bool, id string, error error) {
+	ctx := context.Background()
+	accountId := c.ValidAccountId
+
+	policies, _, err := c.CloudflareClient.AccessPolicies(ctx, accountId, applicationId, cloudflare.PaginationOptions{})
+	if err != nil {
+		return false, "", err
+	}
+
+	exists = false
+	for _, policy := range policies {
+		if policy.Name == name {
+			exists = true
+			id = policy.ID
+			break
+		}
+	}
+	return exists, id, nil
+}
+
+func (c *CloudflareAPI) getAccessGroupIdsByNames(names []string) (ids []string, error error) {
+	ctx := context.Background()
+	accountId := c.ValidAccountId
+
+	groups, _, err := c.CloudflareClient.AccessGroups(ctx, accountId, cloudflare.PaginationOptions{})
+	if err != nil {
+		return ids, err
+	}
+
+outerLoop:
+	// Match Access group names to ids
+	for _, group := range groups {
+		for _, name := range names {
+			if group.Name == name {
+				ids = append(ids, group.ID)
+				continue outerLoop // Break inner loop and continue the outer loop
+			}
+		}
+	}
+
+	return ids, nil
+}
+
 func (c *CloudflareAPI) CreateAccessConfig(name string, config networkingv1alpha1.AccessConfig) error {
 	ctx := context.Background()
 	newApp := config.NewAccessApplication(name)
@@ -589,11 +632,20 @@ func (c *CloudflareAPI) CreateAccessConfig(name string, config networkingv1alpha
 	} else {
 		c.Log.Info("creating access application", "name", name)
 		newApp.ID = ""
-		_, err := c.CloudflareClient.CreateAccessApplication(ctx, accountId, newApp)
+		createdApp, err := c.CloudflareClient.CreateAccessApplication(ctx, accountId, newApp)
 		if err != nil {
 			c.Log.Error(err, "error creating access application", "name", name)
 			return err
 		}
+
+		// Set id, so that it can be used in policy creation
+		id = createdApp.ID
+	}
+
+	err = c.createAccessApplicationPolicies(accountId, id, config)
+	if err != nil {
+		c.Log.Error(err, "error creating access application policies", "name", name)
+		return err
 	}
 
 	c.Log.Info("access application reconciled successfully", "name", name, "existing", exists)
@@ -623,4 +675,96 @@ func (c *CloudflareAPI) DeleteAccessConfig(name string, config networkingv1alpha
 
 	c.Log.Info("access application deleted successfully", "name", name, "existing", exists)
 	return nil
+}
+
+func (c *CloudflareAPI) createAccessApplicationPolicies(accountId string, applicationId string, config networkingv1alpha1.AccessConfig) error {
+	ctx := context.Background()
+
+	// If we have policies to apply
+	if len(config.AccessPolicies) > 0 {
+
+		// Process policies
+		for precedence, policy := range config.AccessPolicies {
+
+			// Process include rules
+			if len(policy.Include) > 0 {
+				ids, err := c.getAccessGroupIdsByNames(policy.Include)
+				if err != nil {
+					c.Log.Error(err, "failed retrieving access group ids from names", "type", "include", "groups", policy.Include)
+				}
+				policy.Include = ids
+			}
+
+			// Process exclude rules
+			if len(policy.Exclude) > 0 {
+				ids, err := c.getAccessGroupIdsByNames(policy.Exclude)
+				if err != nil {
+					c.Log.Error(err, "failed retrieving access group ids from names", "type", "exclude", "groups", policy.Include)
+				}
+				policy.Exclude = ids
+			}
+
+			// Process require rules
+			if len(policy.Require) > 0 {
+				ids, err := c.getAccessGroupIdsByNames(policy.Require)
+				if err != nil {
+					c.Log.Error(err, "failed retrieving access group ids from names", "type", "require", "groups", policy.Include)
+				}
+				policy.Require = ids
+			}
+
+			// Check access policy exists
+			name := policy.Name
+			exists, id, err := c.getAccessPolicyIdByName(applicationId, name)
+			if err != nil {
+				c.Log.Error(err, "failed retrieving access policy by name", "policy", name)
+			}
+
+			// Handle policy creation
+			cfPolicy := cloudflare.AccessPolicy{
+				ID:                           applicationId,
+				Precedence:                   precedence,
+				Decision:                     policy.Action,
+				Name:                         policy.Name,
+				PurposeJustificationRequired: &policy.PurposeJustificationRequired,
+				PurposeJustificationPrompt:   &policy.PurposeJustificationPrompt,
+				Include:                      wrapIdsInGroup(policy.Include),
+				Exclude:                      wrapIdsInGroup(policy.Exclude),
+				Require:                      wrapIdsInGroup(policy.Require),
+			}
+
+			if exists {
+				cfPolicy.ID = id
+				c.Log.Info("updating access policy for application", "applicationId", applicationId, "policyId", id)
+				_, err := c.CloudflareClient.UpdateAccessPolicy(ctx, accountId, applicationId, cfPolicy)
+				if err != nil {
+					c.Log.Error(err, "error updating access policy for application", "applicationId", applicationId, "policyId", id)
+					return err
+				}
+			} else {
+				c.Log.Info("creating access policy for application", "applicationId", applicationId, "policyId", id)
+				cfPolicy.ID = ""
+				_, err := c.CloudflareClient.CreateAccessPolicy(ctx, accountId, applicationId, cfPolicy)
+				if err != nil {
+					c.Log.Error(err, "error creating access policy for application", "applicationId", applicationId, "policyId", id)
+					return err
+				}
+			}
+		}
+	}
+	c.Log.Info("access policies reconciled successfully", "applicationId", applicationId)
+
+	return nil
+}
+
+func wrapIdsInGroup(strings []string) []interface{} {
+	interfaces := make([]interface{}, len(strings))
+	for i, s := range strings {
+		interfaces[i] = map[string]interface{}{
+			"group": map[string]interface{}{
+				"id": s,
+			},
+		}
+	}
+	return interfaces
 }

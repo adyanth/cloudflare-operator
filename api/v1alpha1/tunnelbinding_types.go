@@ -205,11 +205,34 @@ type AccessConfigAdditional struct {
 }
 
 type AccessPolicy struct {
-	Name    string   `json:"name"`
-	Action  string   `json:"action"`
+	// The name of the Access policy.
+	//+kubebuilder:validation:Required
+	Name string `json:"name"`
+	// Decision if a policy is met
+	//+kubebuilder:validation:Required
+	//+kubebuilder:validation:Enum:="allow";"deny";"non_identity";"bypass"
+	Action string `json:"action"`
+	// Array of Access group names. Access groups are not managed by this operator
+	//+kubebuilder:validation:Optional
 	Include []string `json:"include"`
+	// Array of Access group names. Access groups are not managed by this operator
+	//+kubebuilder:validation:Optional
 	Exclude []string `json:"exclude"`
+	// Array of Access group names. Access groups are not managed by this operator
+	//+kubebuilder:validation:Optional
 	Require []string `json:"require"`
+	// The amount of time that tokens issued for the application will be valid. Must be in the format 300ms or 2h45m. Valid time units are: ns, us (or µs), ms, s, m, h.
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:="24h"
+	SessionDuration string `json:"sessionDuration"`
+	// Require users to enter a justification when they log in to the application.
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:=false
+	PurposeJustificationRequired bool `json:"purposeJustificationRequired"`
+	// A custom message that will appear on the purpose justification screen.
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:="Please enter a justification for entering this protected domain."
+	PurposeJustificationPrompt string `json:"purposeJustificationPrompt"`
 }
 
 func (c *AccessConfig) NewAccessApplication(hostname string) cloudflare.AccessApplication {

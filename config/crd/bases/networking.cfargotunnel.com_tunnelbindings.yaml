@@ -31,27 +31,54 @@ spec:
                 items:
                   properties:
                     action:
+                      description: Decision if a policy is met
+                      enum:
+                      - allow
+                      - deny
+                      - non_identity
+                      - bypass
                       type: string
                     exclude:
+                      description: Array of Access group names. Access groups are
+                        not managed by this operator
                       items:
                         type: string
                       type: array
                     include:
+                      description: Array of Access group names. Access groups are
+                        not managed by this operator
                       items:
                         type: string
                       type: array
                     name:
+                      description: The name of the Access policy.
                       type: string
+                    purposeJustificationPrompt:
+                      default: Please enter a justification for entering this protected
+                        domain.
+                      description: A custom message that will appear on the purpose
+                        justification screen.
+                      type: string
+                    purposeJustificationRequired:
+                      default: false
+                      description: Require users to enter a justification when they
+                        log in to the application.
+                      type: boolean
                     require:
+                      description: Array of Access group names. Access groups are
+                        not managed by this operator
                       items:
                         type: string
                       type: array
+                    sessionDuration:
+                      default: 24h
+                      description: 'The amount of time that tokens issued for the
+                        application will be valid. Must be in the format 300ms or
+                        2h45m. Valid time units are: ns, us (or µs), ms, s, m, h.'
+                      type: string
                   required:
                   - action
-                  - exclude
-                  - include
                   - name
-                  - require
                   type: object
                 type: array
               enabled:
