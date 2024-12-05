@@ -17,10 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"strconv"
-
 	"github.com/cloudflare/cloudflare-go"
-	"github.com/howeyc/crc16"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -217,7 +214,6 @@ type AccessPolicy struct {
 
 func (c *AccessConfig) NewAccessApplication(hostname string) cloudflare.AccessApplication {
 
-	uid := strconv.FormatInt(int64(crc16.Checksum([]byte(hostname), crc16.CCITTTable)), 16)
 	return cloudflare.AccessApplication{
 		// GatewayRules:            []cloudflare.AccessApplicationGatewayRule{},
 		AllowedIdps:       c.Settings.Authentication.AllowedIdps,
@@ -230,7 +226,6 @@ func (c *AccessConfig) NewAccessApplication(hostname string) cloudflare.AccessAp
 		SameSiteCookieAttribute: c.Settings.Cookies.SameSiteAttribute,
 		CustomDenyURL:           c.Settings.Authentication.CustomDenyUrl,
 		Name:                    hostname,
-		ID:                      uid,
 		// PrivateAddress:          "",
 		// CorsHeaders: &cloudflare.AccessApplicationCorsHeaders{
 		// 	AllowedMethods:   []string{},
