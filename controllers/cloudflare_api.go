@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
 	"github.com/cloudflare/cloudflare-go"
 	"github.com/go-logr/logr"
 )
@@ -545,4 +546,46 @@ func (c *CloudflareAPI) InsertOrUpdateTXT(fqdn, txtId, dnsId string) error {
 		c.Log.Info("DNS TXT record created successfully", "fqdn", fqdn)
 		return nil
 	}
+}
+
+func (c *CloudflareAPI) UpdateAccessConfig(config networkingv1alpha1.AccessConfig) error {
+	ctx := context.Background()
+	newApp := config.NewAccessApplication()
+	accountId := c.ValidAccountId
+
+	existingApps, _, err := c.CloudflareClient.AccessApplications(ctx, accountId, cloudflare.PaginationOptions{})
+	if err != nil {
+		c.Log.Error(err, "failed to retrieve access applications for account", "accountId", accountId)
+		return err
+	}
+
+	exists := false
+	for _, existingApp := range existingApps {
+		if existingApp.ID == newApp.ID {
+			exists = true
+			c.Log.Info("access application already exists, updating", "name", newApp.Name)
+			break
+		}
+	}
+
+	if !exists {
+		c.Log.Info("creating access application", "name", newApp.Name, "id", newApp.ID)
+
+		_, err := c.CloudflareClient.CreateAccessApplication(ctx, accountId, newApp)
+		newApp.ID = ""
+
+		if err != nil {
+			c.Log.Error(err, "error creating access application", "name", newApp.Name)
+			return err
+		}
+	} else {
+		_, err := c.CloudflareClient.UpdateAccessApplication(ctx, accountId, newApp)
+		if err != nil {
+			c.Log.Error(err, "error updating access application", "name", newApp.Name)
+			return err
+		}
+	}
+
+	c.Log.Info("access application created successfully", "name", config.Name)
+	return nil
 }

@@ -295,6 +295,11 @@ func (r *TunnelBindingReconciler) creationLogic() error {
 		r.Recorder.Event(r.binding, corev1.EventTypeWarning, "FailedDNSCreatePartial", "Some DNS entries failed to create")
 		return err
 	}
+
+	// Create AccessApp
+	if r.binding.AccessConfig.Name != "" {
+		r.createAccessConfigLogic(r.binding.AccessConfig)
+	}
 	return nil
 }
 
@@ -384,6 +389,14 @@ func (r *TunnelBindingReconciler) deleteDNSLogic(hostname string) error {
 			r.log.Info("Deleted DNS TXT entry", "Hostname", hostname)
 			r.Recorder.Event(r.binding, corev1.EventTypeNormal, "DeletedTxt", "Deleted DNS TXT entry")
 		}
+	}
+	return nil
+}
+
+func (r *TunnelBindingReconciler) createAccessConfigLogic(config networkingv1alpha1.AccessConfig) error {
+	err := r.cfAPI.UpdateAccessConfig(config)
+	if err != nil {
+		return err
 	}
 	return nil
 }

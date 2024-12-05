@@ -17,6 +17,10 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"strconv"
+
+	"github.com/cloudflare/cloudflare-go"
+	"github.com/howeyc/crc16"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -118,6 +122,139 @@ type TunnelBindingStatus struct {
 	Services  []ServiceInfo `json:"services"`
 }
 
+type AccessConfig struct {
+	// Application name
+	//+kubebuilder:validation:Optional
+	Name string `json:"name"`
+	// Application domain
+	//+kubebuilder:validation:Optional
+	Domain string `json:"domain"`
+	// Application type self_hosted,saas
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:validation:Enum:="";"self_hosted";"saas"
+	Type string `json:"type"`
+	// List of access policies
+	//+kubebuilder:validation:Optional
+	AccessPolicies []AccessPolicy `json:"accessPolicies"`
+	// Application settings
+	//+kubebuilder:validation:Optional
+	Settings AccessConfigSettings `json:"settings"`
+}
+
+type AccessConfigSettings struct {
+	// Authentication settins
+	//+kubebuilder:validation:Optional
+	Authentication AccessConfigAuthentication `json:"authentication"`
+	// Appearance settins
+	//+kubebuilder:validation:Optional
+	Appearance AccessConfigAppearance `json:"appearance"`
+	// Cookie settings
+	//+kubebuilder:validation:Optional
+	Cookies AccessConfigCookies `json:"cookies"`
+	// Additional settings
+	//+kubebuilder:validation:Optional
+	Additional AccessConfigAdditional `json:"additional"`
+}
+
+type AccessConfigAuthentication struct {
+	// The list of identiy providers which application is allowed to use. If empty all idps are allowed
+	//+kubebuilder:validation:Optional
+	AllowedIdps []string `json:"allowedIdps"`
+	// Skip identity provider selection if only one is configured
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:=false
+	InstantAuth bool `json:"instantAuth"`
+	// The amount of time that tokens issued for this application will be valid. Must be in the format 300ms or 2h45m. Valid time units are: ns, us (or µs), ms, s, m, h.
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:="24h"
+	SessionDuration string `json:"sessionDuration"`
+	// The custom URL a user is redirected to when they are denied access to the application.
+	//+kubebuilder:validation:Optional
+	CustomDenyUrl string `json:"customDenyUrl"`
+	// The custom error message shown to a user when they are denied access to the application.
+	//+kubebuilder:validation:Optional
+	CustomDenyMessage string `json:"customDenyMessage"`
+}
+
+type AccessConfigAppearance struct {
+	// Wether to show app in the launcher. Defaults to true.
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:=true
+	AppLauncherVisibility bool `json:"appLauncherVisibility"`
+	// Custom logo url
+	//+kubebuilder:validation:Optional
+	CustomLogo string `json:"customLogo"`
+}
+
+type AccessConfigCookies struct {
+	// Sets the SameSite cookie setting, which provides increased security against CSRF attacks. [none,strict,lax]
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:validation:Enum:="";"none";"strict";"lax"
+	SameSiteAttribute string `json:"sameSiteAttribute"`
+	// Enables the HttpOnly cookie attribute, which increases security against XSS attacks.
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:=true
+	EnableHttpOnly bool `json:"enableHttpOnly"`
+	// Enables the binding cookie, which increases security against compromised authorization tokens and CSRF attacks.
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:=false
+	EnableBindingCookie bool `json:"enableBindingCookie"`
+}
+
+type AccessConfigAdditional struct {
+	// Cloudflare will render an SSH terminal or VNC session for this application in a web browser. [ssh,vnc]
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:validation:Enum:="";"vnc";"ssh"
+	BrowserRendering string `json:"browserRendering"`
+}
+
+type AccessPolicy struct {
+	Name    string   `json:"name"`
+	Action  string   `json:"action"`
+	Include []string `json:"include"`
+	Exclude []string `json:"exclude"`
+	Require []string `json:"require"`
+}
+
+func (c *AccessConfig) NewAccessApplication() cloudflare.AccessApplication {
+
+	uid := strconv.FormatInt(int64(crc16.Checksum([]byte(c.Name), crc16.CCITTTable)), 16)
+	return cloudflare.AccessApplication{
+		// GatewayRules:            []cloudflare.AccessApplicationGatewayRule{},
+		AllowedIdps:       c.Settings.Authentication.AllowedIdps,
+		CustomDenyMessage: c.Settings.Authentication.CustomDenyMessage,
+		LogoURL:           c.Settings.Appearance.CustomLogo,
+		// AUD:                     "",
+		Domain:                  c.Domain,
+		Type:                    cloudflare.AccessApplicationType(c.Type),
+		SessionDuration:         c.Settings.Authentication.SessionDuration,
+		SameSiteCookieAttribute: c.Settings.Cookies.SameSiteAttribute,
+		CustomDenyURL:           c.Settings.Authentication.CustomDenyUrl,
+		Name:                    c.Name,
+		ID:                      uid,
+		// PrivateAddress:          "",
+		// CorsHeaders: &cloudflare.AccessApplicationCorsHeaders{
+		// 	AllowedMethods:   []string{},
+		// 	AllowedOrigins:   []string{},
+		// 	AllowedHeaders:   []string{},
+		// 	AllowAllMethods:  false,
+		// 	AllowAllHeaders:  false,
+		// 	AllowAllOrigins:  false,
+		// 	AllowCredentials: false,
+		// 	MaxAge:           0,
+		// },
+		// CreatedAt:               &time.Time{},
+		// UpdatedAt:               &time.Time{},
+		// SaasApplication:         &cloudflare.SaasApplication{},
+		AutoRedirectToIdentity: &c.Settings.Authentication.InstantAuth,
+		// SkipInterstitial:        new(bool),
+		AppLauncherVisible:      &c.Settings.Appearance.AppLauncherVisibility,
+		EnableBindingCookie:     &c.Settings.Cookies.EnableBindingCookie,
+		HttpOnlyCookieAttribute: &c.Settings.Cookies.EnableHttpOnly,
+		// ServiceAuth401Redirect:  new(bool),
+	}
+}
+
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:printcolumn:name="FQDNs",type=string,JSONPath=`.status.hostnames`
@@ -129,7 +266,9 @@ type TunnelBinding struct {
 
 	Subjects  []TunnelBindingSubject `json:"subjects"`
 	TunnelRef TunnelRef              `json:"tunnelRef"`
-	Status    TunnelBindingStatus    `json:"status,omitempty"`
+	//+kubebuilder:validation:Optional
+	AccessConfig AccessConfig        `json:"accessConfig"`
+	Status       TunnelBindingStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
