@@ -232,6 +232,14 @@ func (r *TunnelBindingReconciler) deletionLogic() error {
 			return err
 		}
 
+		// Remove AccessApp
+		if r.binding.AccessConfig.Name != "" {
+			err := r.deleteAccessConfigLogic(r.binding.AccessConfig)
+			if err != nil {
+				return err
+			}
+		}
+
 		// Remove tunnelFinalizer. Once all finalizers have been
 		// removed, the object will be deleted.
 		controllerutil.RemoveFinalizer(r.binding, tunnelFinalizer)
@@ -298,7 +306,10 @@ func (r *TunnelBindingReconciler) creationLogic() error {
 
 	// Create AccessApp
 	if r.binding.AccessConfig.Name != "" {
-		r.createAccessConfigLogic(r.binding.AccessConfig)
+		err := r.createAccessConfigLogic(r.binding.AccessConfig)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -394,7 +405,15 @@ func (r *TunnelBindingReconciler) deleteDNSLogic(hostname string) error {
 }
 
 func (r *TunnelBindingReconciler) createAccessConfigLogic(config networkingv1alpha1.AccessConfig) error {
-	err := r.cfAPI.UpdateAccessConfig(config)
+	err := r.cfAPI.CreateAccessConfig(config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *TunnelBindingReconciler) deleteAccessConfigLogic(config networkingv1alpha1.AccessConfig) error {
+	err := r.cfAPI.DeleteAccessConfig(config)
 	if err != nil {
 		return err
 	}

@@ -548,44 +548,82 @@ func (c *CloudflareAPI) InsertOrUpdateTXT(fqdn, txtId, dnsId string) error {
 	}
 }
 
-func (c *CloudflareAPI) UpdateAccessConfig(config networkingv1alpha1.AccessConfig) error {
+func (c *CloudflareAPI) getAccessApplicationIdByName(name string) (exists bool, id string, error error) {
 	ctx := context.Background()
-	newApp := config.NewAccessApplication()
 	accountId := c.ValidAccountId
 
-	existingApps, _, err := c.CloudflareClient.AccessApplications(ctx, accountId, cloudflare.PaginationOptions{})
+	apps, _, err := c.CloudflareClient.AccessApplications(ctx, accountId, cloudflare.PaginationOptions{})
 	if err != nil {
-		c.Log.Error(err, "failed to retrieve access applications for account", "accountId", accountId)
-		return err
+		return false, "", err
 	}
 
-	exists := false
-	for _, existingApp := range existingApps {
-		if existingApp.ID == newApp.ID {
+	exists = false
+	for _, app := range apps {
+		if app.Name == name {
 			exists = true
-			c.Log.Info("access application already exists, updating", "name", newApp.Name)
+			id = app.ID
 			break
 		}
 	}
+	return exists, id, nil
+}
 
-	if !exists {
-		c.Log.Info("creating access application", "name", newApp.Name, "id", newApp.ID)
+func (c *CloudflareAPI) CreateAccessConfig(config networkingv1alpha1.AccessConfig) error {
+	ctx := context.Background()
+	newApp := config.NewAccessApplication()
+	accountId := c.ValidAccountId
+	name := newApp.Name
 
-		_, err := c.CloudflareClient.CreateAccessApplication(ctx, accountId, newApp)
-		newApp.ID = ""
+	exists, id, err := c.getAccessApplicationIdByName(name)
+	if err != nil {
+		c.Log.Error(err, "failed retrieving application for account", "accountId", accountId, "app", name)
+	}
 
+	if exists {
+		newApp.ID = id
+		c.Log.Info("updating access application", "name", name, "id", id)
+		_, err := c.CloudflareClient.UpdateAccessApplication(ctx, accountId, newApp)
 		if err != nil {
-			c.Log.Error(err, "error creating access application", "name", newApp.Name)
+			c.Log.Error(err, "error updating access application", "name", name)
 			return err
 		}
 	} else {
-		_, err := c.CloudflareClient.UpdateAccessApplication(ctx, accountId, newApp)
+		c.Log.Info("creating access application", "name", name)
+		newApp.ID = ""
+		_, err := c.CloudflareClient.CreateAccessApplication(ctx, accountId, newApp)
 		if err != nil {
-			c.Log.Error(err, "error updating access application", "name", newApp.Name)
+			c.Log.Error(err, "error creating access application", "name", name)
 			return err
 		}
 	}
 
-	c.Log.Info("access application created successfully", "name", config.Name)
+	c.Log.Info("access application reconciled successfully", "name", name, "existing", exists)
+	return nil
+}
+
+func (c *CloudflareAPI) DeleteAccessConfig(config networkingv1alpha1.AccessConfig) error {
+	ctx := context.Background()
+	newApp := config.NewAccessApplication()
+	accountId := c.ValidAccountId
+	name := newApp.Name
+
+	exists, id, err := c.getAccessApplicationIdByName(name)
+	if err != nil {
+		c.Log.Error(err, "failed retrieving application for account", "accountId", accountId, "app", name)
+	}
+
+	if exists {
+		c.Log.Info("deleting access application", "name", name, "id", id)
+		err := c.CloudflareClient.DeleteAccessApplication(ctx, accountId, id)
+		if err != nil {
+			c.Log.Error(err, "error deleting access application", "name", name)
+			return err
+		}
+	} else {
+		err := fmt.Errorf("application does not exist", "name", newApp.Name, "id", newApp.ID)
+		return err
+	}
+
+	c.Log.Info("access application deleted successfully", "name", config.Name, "existing", exists)
 	return nil
 }
