@@ -568,11 +568,10 @@ func (c *CloudflareAPI) getAccessApplicationIdByName(name string) (exists bool, 
 	return exists, id, nil
 }
 
-func (c *CloudflareAPI) CreateAccessConfig(config networkingv1alpha1.AccessConfig) error {
+func (c *CloudflareAPI) CreateAccessConfig(name string, config networkingv1alpha1.AccessConfig) error {
 	ctx := context.Background()
-	newApp := config.NewAccessApplication()
+	newApp := config.NewAccessApplication(name)
 	accountId := c.ValidAccountId
-	name := newApp.Name
 
 	exists, id, err := c.getAccessApplicationIdByName(name)
 	if err != nil {
@@ -601,11 +600,9 @@ func (c *CloudflareAPI) CreateAccessConfig(config networkingv1alpha1.AccessConfi
 	return nil
 }
 
-func (c *CloudflareAPI) DeleteAccessConfig(config networkingv1alpha1.AccessConfig) error {
+func (c *CloudflareAPI) DeleteAccessConfig(name string, config networkingv1alpha1.AccessConfig) error {
 	ctx := context.Background()
-	newApp := config.NewAccessApplication()
 	accountId := c.ValidAccountId
-	name := newApp.Name
 
 	exists, id, err := c.getAccessApplicationIdByName(name)
 	if err != nil {
@@ -620,10 +617,10 @@ func (c *CloudflareAPI) DeleteAccessConfig(config networkingv1alpha1.AccessConfi
 			return err
 		}
 	} else {
-		err := fmt.Errorf("application does not exist", "name", newApp.Name, "id", newApp.ID)
+		err := fmt.Errorf("application does not exist", "name", name, "id", id)
 		return err
 	}
 
-	c.Log.Info("access application deleted successfully", "name", config.Name, "existing", exists)
+	c.Log.Info("access application deleted successfully", "name", name, "existing", exists)
 	return nil
 }

@@ -123,15 +123,14 @@ type TunnelBindingStatus struct {
 }
 
 type AccessConfig struct {
-	// Application name
+	// Enable handling of access configuration
 	//+kubebuilder:validation:Optional
-	Name string `json:"name"`
-	// Application domain
-	//+kubebuilder:validation:Optional
-	Domain string `json:"domain"`
+	//+kubebuilder:default:=false
+	Enabled bool `json:"enabled"`
 	// Application type self_hosted,saas
 	//+kubebuilder:validation:Optional
 	//+kubebuilder:validation:Enum:="";"self_hosted";"saas"
+	//+kubebuilder:default:="self_hosted"
 	Type string `json:"type"`
 	// List of access policies
 	//+kubebuilder:validation:Optional
@@ -216,21 +215,21 @@ type AccessPolicy struct {
 	Require []string `json:"require"`
 }
 
-func (c *AccessConfig) NewAccessApplication() cloudflare.AccessApplication {
+func (c *AccessConfig) NewAccessApplication(hostname string) cloudflare.AccessApplication {
 
-	uid := strconv.FormatInt(int64(crc16.Checksum([]byte(c.Name), crc16.CCITTTable)), 16)
+	uid := strconv.FormatInt(int64(crc16.Checksum([]byte(hostname), crc16.CCITTTable)), 16)
 	return cloudflare.AccessApplication{
 		// GatewayRules:            []cloudflare.AccessApplicationGatewayRule{},
 		AllowedIdps:       c.Settings.Authentication.AllowedIdps,
 		CustomDenyMessage: c.Settings.Authentication.CustomDenyMessage,
 		LogoURL:           c.Settings.Appearance.CustomLogo,
 		// AUD:                     "",
-		Domain:                  c.Domain,
+		Domain:                  hostname,
 		Type:                    cloudflare.AccessApplicationType(c.Type),
 		SessionDuration:         c.Settings.Authentication.SessionDuration,
 		SameSiteCookieAttribute: c.Settings.Cookies.SameSiteAttribute,
 		CustomDenyURL:           c.Settings.Authentication.CustomDenyUrl,
-		Name:                    c.Name,
+		Name:                    hostname,
 		ID:                      uid,
 		// PrivateAddress:          "",
 		// CorsHeaders: &cloudflare.AccessApplicationCorsHeaders{

@@ -54,12 +54,10 @@ spec:
                   - require
                   type: object
                 type: array
-              domain:
-                description: Application domain
-                type: string
-              name:
-                description: Application name
-                type: string
+              enabled:
+                default: false
+                description: Enable handling of access configuration
+                type: boolean
               settings:
                 description: Application settings
                 properties:
@@ -141,6 +139,7 @@ spec:
                     type: object
                 type: object
               type:
+                default: self_hosted
                 description: Application type self_hosted,saas
                 enum:
                 - ""
