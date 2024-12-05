@@ -290,6 +290,14 @@ func (r *TunnelBindingReconciler) creationLogic() error {
 
 	r.Recorder.Event(r.binding, corev1.EventTypeNormal, "MetaSet", "TunnelBinding Finalizer and Labels added")
 
+	// Create AccessApp
+	if r.binding.AccessConfig.Name != "" {
+		err := r.createAccessConfigLogic(r.binding.AccessConfig)
+		if err != nil {
+			return err
+		}
+	}
+
 	errors := false
 	var err error
 	// Create DNS entries
@@ -304,13 +312,6 @@ func (r *TunnelBindingReconciler) creationLogic() error {
 		return err
 	}
 
-	// Create AccessApp
-	if r.binding.AccessConfig.Name != "" {
-		err := r.createAccessConfigLogic(r.binding.AccessConfig)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -407,16 +408,20 @@ func (r *TunnelBindingReconciler) deleteDNSLogic(hostname string) error {
 func (r *TunnelBindingReconciler) createAccessConfigLogic(config networkingv1alpha1.AccessConfig) error {
 	err := r.cfAPI.CreateAccessConfig(config)
 	if err != nil {
+		r.Recorder.Event(r.binding, corev1.EventTypeWarning, "FailedAccessConfig", "Failed to apply Access Configuration")
 		return err
 	}
+	r.Recorder.Event(r.binding, corev1.EventTypeNormal, "CreateAccessConfig", "Access Configuration applied successfully")
 	return nil
 }
 
 func (r *TunnelBindingReconciler) deleteAccessConfigLogic(config networkingv1alpha1.AccessConfig) error {
 	err := r.cfAPI.DeleteAccessConfig(config)
 	if err != nil {
+		r.Recorder.Event(r.binding, corev1.EventTypeWarning, "FailedAccessConfig", "Failed to delete Access Configuration")
 		return err
 	}
+	r.Recorder.Event(r.binding, corev1.EventTypeNormal, "DeleteAccessConfig", "Access Configuration delleted successfully")
 	return nil
 }
 
