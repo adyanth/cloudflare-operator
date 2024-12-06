@@ -681,6 +681,47 @@ func (c *CloudflareAPI) DeleteAccessConfig(name string, config networkingv1alpha
 func (c *CloudflareAPI) createAccessApplicationPolicies(accountId string, applicationId string, config networkingv1alpha1.AccessConfig) error {
 	ctx := context.Background()
 
+	// Check if there are any policies we need to delete
+	existingPolicies, _, err := c.CloudflareClient.AccessPolicies(ctx, accountId, applicationId, cloudflare.PaginationOptions{})
+	if err != nil {
+		c.Log.Error(err, "failed retrieving existing access policies for application", "applicationId", applicationId)
+	}
+
+	if len(existingPolicies) > 0 {
+		for _, policy := range existingPolicies {
+
+			// We need to delete all existing policies
+			if len(config.AccessPolicies) == 0 {
+				c.Log.Info("deleting access policy for application", "applicationId", applicationId, "policyId", policy.ID)
+
+				err := c.CloudflareClient.DeleteAccessPolicy(ctx, accountId, applicationId, policy.ID)
+				if err != nil {
+					c.Log.Error(err, "error deleting access policy for application", "applicationId", applicationId, "policyId", policy.ID)
+					return err
+				}
+			}
+
+			// Check if the policy is still required
+			required := false
+			for _, configPolicy := range config.AccessPolicies {
+				if configPolicy.Name == policy.Name {
+					required = true
+					break
+				}
+			}
+
+			// Delete since policy is not required
+			if !required {
+				err := c.CloudflareClient.DeleteAccessPolicy(ctx, accountId, applicationId, policy.ID)
+				if err != nil {
+					c.Log.Error(err, "error deleting access policy for application", "applicationId", applicationId, "policyId", policy.ID)
+					return err
+				}
+			}
+
+		}
+	}
+
 	// If we have policies to apply
 	if len(config.AccessPolicies) > 0 {
 
@@ -724,7 +765,7 @@ func (c *CloudflareAPI) createAccessApplicationPolicies(accountId string, applic
 			// Handle policy creation
 			cfPolicy := cloudflare.AccessPolicy{
 				ID:                           applicationId,
-				Precedence:                   precedence,
+				Precedence:                   precedence + 1,
 				Decision:                     policy.Action,
 				Name:                         policy.Name,
 				PurposeJustificationRequired: &policy.PurposeJustificationRequired,
@@ -736,62 +777,21 @@ func (c *CloudflareAPI) createAccessApplicationPolicies(accountId string, applic
 
 			if exists {
 				cfPolicy.ID = id
-				c.Log.Info("updating access policy for application", "applicationId", applicationId, "policyId", id)
+				c.Log.Info("updating access policy for application", "applicationId", applicationId, "policyName", name, "precedence", precedence)
 				_, err := c.CloudflareClient.UpdateAccessPolicy(ctx, accountId, applicationId, cfPolicy)
 				if err != nil {
-					c.Log.Error(err, "error updating access policy for application", "applicationId", applicationId, "policyId", id)
+					c.Log.Error(err, "error updating access policy for application", "applicationId", applicationId, "policyName", name, "precedence", precedence)
 					return err
 				}
 			} else {
-				c.Log.Info("creating access policy for application", "applicationId", applicationId, "policyId", id)
+				c.Log.Info("creating access policy for application", "applicationId", applicationId, "policyName", name, "precedence", precedence)
 				cfPolicy.ID = ""
 				_, err := c.CloudflareClient.CreateAccessPolicy(ctx, accountId, applicationId, cfPolicy)
 				if err != nil {
-					c.Log.Error(err, "error creating access policy for application", "applicationId", applicationId, "policyId", id)
+					c.Log.Error(err, "error creating access policy for application", "applicationId", applicationId, "policyName", name, "precedence", precedence)
 					return err
 				}
 			}
-		}
-	}
-
-	// Check if there are any policies we need to delete
-	existingPolicies, _, err := c.CloudflareClient.AccessPolicies(ctx, accountId, applicationId, cloudflare.PaginationOptions{})
-	if err != nil {
-		c.Log.Error(err, "failed retrieving existing access policies for application", "applicationId", applicationId)
-	}
-
-	if len(existingPolicies) > 0 {
-		for _, policy := range existingPolicies {
-
-			// We need to delete all existing policies
-			if len(config.AccessPolicies) == 0 {
-				c.Log.Info("deleting access policy for application", "applicationId", applicationId, "policyId", policy.ID)
-
-				err := c.CloudflareClient.DeleteAccessPolicy(ctx, accountId, applicationId, policy.ID)
-				if err != nil {
-					c.Log.Error(err, "error deleting access policy for application", "applicationId", applicationId, "policyId", policy.ID)
-					return err
-				}
-			}
-
-			// Check if the policy is still required
-			required := false
-			for _, configPolicy := range config.AccessPolicies {
-				if configPolicy.Name == policy.Name {
-					required = true
-					break
-				}
-			}
-
-			// Delete since policy is not required
-			if !required {
-				err := c.CloudflareClient.DeleteAccessPolicy(ctx, accountId, applicationId, policy.ID)
-				if err != nil {
-					c.Log.Error(err, "error deleting access policy for application", "applicationId", applicationId, "policyId", policy.ID)
-					return err
-				}
-			}
-
 		}
 	}
 
