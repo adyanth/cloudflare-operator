@@ -224,7 +224,7 @@ type AccessPolicy struct {
 	// The amount of time that tokens issued for the application will be valid. Must be in the format 300ms or 2h45m. Valid time units are: ns, us (or µs), ms, s, m, h.
 	//+kubebuilder:validation:Optional
 	//+kubebuilder:default:="24h"
-	SessionDuration string `json:"sessionDuration"`
+	// SessionDuration string `json:"sessionDuration"`
 	// Require users to enter a justification when they log in to the application.
 	//+kubebuilder:validation:Optional
 	//+kubebuilder:default:=false
@@ -238,37 +238,19 @@ type AccessPolicy struct {
 func (c *AccessConfig) NewAccessApplication(hostname string) cloudflare.AccessApplication {
 
 	return cloudflare.AccessApplication{
-		// GatewayRules:            []cloudflare.AccessApplicationGatewayRule{},
-		AllowedIdps:       c.Settings.Authentication.AllowedIdps,
-		CustomDenyMessage: c.Settings.Authentication.CustomDenyMessage,
-		LogoURL:           c.Settings.Appearance.CustomLogo,
-		// AUD:                     "",
+		AllowedIdps:             c.Settings.Authentication.AllowedIdps,
+		CustomDenyMessage:       c.Settings.Authentication.CustomDenyMessage,
+		LogoURL:                 c.Settings.Appearance.CustomLogo,
 		Domain:                  hostname,
 		Type:                    cloudflare.AccessApplicationType(c.Type),
 		SessionDuration:         c.Settings.Authentication.SessionDuration,
 		SameSiteCookieAttribute: c.Settings.Cookies.SameSiteAttribute,
 		CustomDenyURL:           c.Settings.Authentication.CustomDenyUrl,
 		Name:                    hostname,
-		// PrivateAddress:          "",
-		// CorsHeaders: &cloudflare.AccessApplicationCorsHeaders{
-		// 	AllowedMethods:   []string{},
-		// 	AllowedOrigins:   []string{},
-		// 	AllowedHeaders:   []string{},
-		// 	AllowAllMethods:  false,
-		// 	AllowAllHeaders:  false,
-		// 	AllowAllOrigins:  false,
-		// 	AllowCredentials: false,
-		// 	MaxAge:           0,
-		// },
-		// CreatedAt:               &time.Time{},
-		// UpdatedAt:               &time.Time{},
-		// SaasApplication:         &cloudflare.SaasApplication{},
-		AutoRedirectToIdentity: &c.Settings.Authentication.InstantAuth,
-		// SkipInterstitial:        new(bool),
+		AutoRedirectToIdentity:  &c.Settings.Authentication.InstantAuth,
 		AppLauncherVisible:      &c.Settings.Appearance.AppLauncherVisibility,
 		EnableBindingCookie:     &c.Settings.Cookies.EnableBindingCookie,
 		HttpOnlyCookieAttribute: &c.Settings.Cookies.EnableHttpOnly,
-		// ServiceAuth401Redirect:  new(bool),
 	}
 }
 
