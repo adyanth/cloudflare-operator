@@ -56,6 +56,7 @@ type TunnelBindingReconciler struct {
 	configmap      *corev1.ConfigMap
 	fallbackTarget string
 	cfAPI          *CloudflareAPI
+	domain         string
 }
 
 // labelsForBinding returns the labels for selecting the Bindings served by a Tunnel.
@@ -222,10 +223,23 @@ func (r *TunnelBindingReconciler) deletionLogic() error {
 
 		errors := false
 		var err error
+
+		// Iterate over healthy services
 		for _, info := range r.binding.Status.Services {
+
+			// Delete DNS records
 			if err = r.deleteDNSLogic(info.Hostname); err != nil {
 				errors = true
 			}
+
+			// Remove AccessApp
+			if r.binding.AccessConfig.Enabled {
+				err := r.deleteAccessConfigLogic(info.Hostname, r.binding.AccessConfig)
+				if err != nil {
+					return err
+				}
+			}
+
 		}
 		if errors {
 			r.Recorder.Event(r.binding, corev1.EventTypeWarning, "FinalizerNotUnset", "Not removing Finalizer due to errors")
@@ -284,8 +298,19 @@ func (r *TunnelBindingReconciler) creationLogic() error {
 
 	errors := false
 	var err error
-	// Create DNS entries
+
+	// Iterate over healthy services
 	for _, info := range r.binding.Status.Services {
+
+		// Create AccessApp
+		if r.binding.AccessConfig.Enabled {
+			err := r.createAccessConfigLogic(info.Hostname, r.binding.AccessConfig)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Create DNS entries
 		err = r.createDNSLogic(info.Hostname)
 		if err != nil {
 			errors = true
@@ -295,6 +320,7 @@ func (r *TunnelBindingReconciler) creationLogic() error {
 		r.Recorder.Event(r.binding, corev1.EventTypeWarning, "FailedDNSCreatePartial", "Some DNS entries failed to create")
 		return err
 	}
+
 	return nil
 }
 
@@ -385,6 +411,26 @@ func (r *TunnelBindingReconciler) deleteDNSLogic(hostname string) error {
 			r.Recorder.Event(r.binding, corev1.EventTypeNormal, "DeletedTxt", "Deleted DNS TXT entry")
 		}
 	}
+	return nil
+}
+
+func (r *TunnelBindingReconciler) createAccessConfigLogic(name string, config networkingv1alpha1.AccessConfig) error {
+	err := r.cfAPI.CreateAccessConfig(name, config)
+	if err != nil {
+		r.Recorder.Event(r.binding, corev1.EventTypeWarning, "FailedAccessConfig", "Failed to apply Access Configuration")
+		return err
+	}
+	r.Recorder.Event(r.binding, corev1.EventTypeNormal, "CreateAccessConfig", "Access Configuration applied successfully")
+	return nil
+}
+
+func (r *TunnelBindingReconciler) deleteAccessConfigLogic(name string, config networkingv1alpha1.AccessConfig) error {
+	err := r.cfAPI.DeleteAccessConfig(name, config)
+	if err != nil {
+		r.Recorder.Event(r.binding, corev1.EventTypeWarning, "FailedAccessConfig", "Failed to delete Access Configuration")
+		return err
+	}
+	r.Recorder.Event(r.binding, corev1.EventTypeNormal, "DeleteAccessConfig", "Access Configuration deleted successfully")
 	return nil
 }
 

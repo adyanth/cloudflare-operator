@@ -1,10 +1,9 @@
-
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.7.0
+    controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
   name: tunnelbindings.networking.cfargotunnel.com
 spec:
@@ -25,6 +24,156 @@ spec:
       openAPIV3Schema:
         description: TunnelBinding is the Schema for the tunnelbindings API
         properties:
+          accessConfig:
+            properties:
+              accessPolicies:
+                description: List of access policies
+                items:
+                  properties:
+                    action:
+                      description: Decision if a policy is met
+                      enum:
+                      - allow
+                      - deny
+                      - non_identity
+                      - bypass
+                      type: string
+                    exclude:
+                      description: Array of Access group names. Access groups are
+                        not managed by this operator
+                      items:
+                        type: string
+                      type: array
+                    include:
+                      description: Array of Access group names. Access groups are
+                        not managed by this operator
+                      items:
+                        type: string
+                      type: array
+                    name:
+                      description: The name of the Access policy.
+                      type: string
+                    purposeJustificationPrompt:
+                      default: Please enter a justification for entering this protected
+                        domain.
+                      description: A custom message that will appear on the purpose
+                        justification screen.
+                      type: string
+                    purposeJustificationRequired:
+                      default: false
+                      description: Require users to enter a justification when they
+                        log in to the application.
+                      type: boolean
+                    require:
+                      description: Array of Access group names. Access groups are
+                        not managed by this operator
+                      items:
+                        type: string
+                      type: array
+                    sessionDuration:
+                      default: 24h
+                      description: 'The amount of time that tokens issued for the
+                        application will be valid. Must be in the format 300ms or
+                        2h45m. Valid time units are: ns, us (or µs), ms, s, m, h.'
+                      type: string
+                  required:
+                  - action
+                  - name
+                  type: object
+                type: array
+              enabled:
+                default: false
+                description: Enable handling of access configuration
+                type: boolean
+              settings:
+                description: Application settings
+                properties:
+                  additional:
+                    description: Additional settings
+                    properties:
+                      browserRendering:
+                        description: Cloudflare will render an SSH terminal or VNC
+                          session for this application in a web browser. [ssh,vnc]
+                        enum:
+                        - ""
+                        - vnc
+                        - ssh
+                        type: string
+                    type: object
+                  appearance:
+                    description: Appearance settins
+                    properties:
+                      appLauncherVisibility:
+                        default: true
+                        description: Wether to show app in the launcher. Defaults
+                          to true.
+                        type: boolean
+                      customLogo:
+                        description: Custom logo url
+                        type: string
+                    type: object
+                  authentication:
+                    description: Authentication settins
+                    properties:
+                      allowedIdps:
+                        description: The list of identiy providers which application
+                          is allowed to use. If empty all idps are allowed
+                        items:
+                          type: string
+                        type: array
+                      customDenyMessage:
+                        description: The custom error message shown to a user when
+                          they are denied access to the application.
+                        type: string
+                      customDenyUrl:
+                        description: The custom URL a user is redirected to when they
+                          are denied access to the application.
+                        type: string
+                      instantAuth:
+                        default: false
+                        description: Skip identity provider selection if only one
+                          is configured
+                        type: boolean
+                      sessionDuration:
+                        default: 24h
+                        description: 'The amount of time that tokens issued for this
+                          application will be valid. Must be in the format 300ms or
+                          2h45m. Valid time units are: ns, us (or µs), ms, s, m, h.'
+                        type: string
+                    type: object
+                  cookies:
+                    description: Cookie settings
+                    properties:
+                      enableBindingCookie:
+                        default: false
+                        description: Enables the binding cookie, which increases security
+                          against compromised authorization tokens and CSRF attacks.
+                        type: boolean
+                      enableHttpOnly:
+                        default: true
+                        description: Enables the HttpOnly cookie attribute, which
+                          increases security against XSS attacks.
+                        type: boolean
+                      sameSiteAttribute:
+                        description: Sets the SameSite cookie setting, which provides
+                          increased security against CSRF attacks. [none,strict,lax]
+                        enum:
+                        - ""
+                        - none
+                        - strict
+                        - lax
+                        type: string
+                    type: object
+                type: object
+              type:
+                default: self_hosted
+                description: Application type self_hosted,saas
+                enum:
+                - ""
+                - self_hosted
+                - saas
+                type: string
+            type: object
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
               of an object. Servers should convert recognized schemas to the latest
