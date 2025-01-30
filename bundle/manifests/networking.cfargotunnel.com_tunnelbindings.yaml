@@ -86,6 +86,11 @@ spec:
                         If specifying this, make sure to use the same domain that
                         the tunnel belongs to. This is not validated and used as provided
                       type: string
+                    http2Origin:
+                      default: false
+                      description: Http2Origin makes the service attempt to connect to origin
+                        using HTTP2. Origin must be configured as https.
+                      type: boolean
                     noTlsVerify:
                       default: false
                       description: NoTlsVerify sisables TLS verification for this
