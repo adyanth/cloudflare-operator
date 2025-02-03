@@ -576,6 +576,7 @@ func (r *TunnelBindingReconciler) configureCloudflareDaemon() error {
 			}
 			originRequest := OriginRequestConfig{}
 			originRequest.NoTLSVerify = &subject.Spec.NoTlsVerify
+			originRequest.Http2Origin = &subject.Spec.Http2Origin
 			originRequest.ProxyAddress = &subject.Spec.ProxyAddress
 			originRequest.ProxyPort = &subject.Spec.ProxyPort
 			originRequest.ProxyType = &subject.Spec.ProxyType

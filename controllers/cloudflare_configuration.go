@@ -54,6 +54,8 @@ type OriginRequestConfig struct {
 	// Will allow any certificate from the origin to be accepted.
 	// Note: The connection from your machine to Cloudflare's Edge is still encrypted.
 	NoTLSVerify *bool `yaml:"noTLSVerify,omitempty"`
+	// Attempt to connect to origin using HTTP2. Origin must be configured as https.
+	Http2Origin *bool `yaml:"http2Origin,omitempty"`
 	// Disables chunked transfer encoding.
 	// Useful if you are running a WSGI server.
 	DisableChunkedEncoding *bool `yaml:"disableChunkedEncoding,omitempty"`

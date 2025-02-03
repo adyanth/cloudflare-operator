@@ -67,6 +67,12 @@ type TunnelBindingSubjectSpec struct {
 	//+kubebuilder:default:=false
 	NoTlsVerify bool `json:"noTlsVerify"`
 
+	// Http2Origin makes the service attempt to connect to origin using HTTP2.
+	// Origin must be configured as https.
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:=false
+	Http2Origin bool `json:"http2Origin"`
+
 	// cloudflared starts a proxy server to translate HTTP traffic into TCP when proxying, for example, SSH or RDP.
 
 	// ProxyAddress configures the listen address for that proxy
