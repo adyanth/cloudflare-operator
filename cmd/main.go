@@ -1,5 +1,5 @@
 /*
-Copyright 2022.
+Copyright 2025 Adyanth H.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@ limitations under the License.
 package main
 
 import (
+	"crypto/tls"
 	"flag"
-	"go.uber.org/zap/zapcore"
 	"os"
 	"time"
 
@@ -26,15 +26,18 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
-	"github.com/adyanth/cloudflare-operator/controllers"
+	"github.com/adyanth/cloudflare-operator/internal/controller"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -56,13 +59,18 @@ func main() {
 	var probeAddr string
 	var clusterResourceNamespace string
 	var overwriteUnmanaged bool
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
+	var secureMetrics bool
+	var tlsOpts []func(*tls.Config)
+	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
+		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.StringVar(&clusterResourceNamespace, "cluster-resource-namespace", "cloudflare-operator-system", "The default namespace for cluster scoped resources.")
 	flag.BoolVar(&overwriteUnmanaged, "overwrite-unmanaged-dns", false, "Overwrite DNS records that do not have a corresponding managed TXT record, defaults to false.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", true,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.BoolVar(&secureMetrics, "metrics-secure", true,
+		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	opts := zap.Options{
 		Development: true,
 		TimeEncoder: zapcore.TimeEncoderOfLayout(time.RFC3339),
@@ -72,10 +80,19 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	metricsServerOptions := metricsserver.Options{
+		BindAddress:   metricsAddr,
+		SecureServing: secureMetrics,
+		TLSOpts:       tlsOpts,
+	}
+
+	if secureMetrics {
+		metricsServerOptions.FilterProvider = filters.WithAuthenticationAndAuthorization
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                  scheme,
-		MetricsBindAddress:      metricsAddr,
-		Port:                    9443,
+		Metrics:                 metricsServerOptions,
 		HealthProbeBindAddress:  probeAddr,
 		LeaderElection:          enableLeaderElection,
 		LeaderElectionID:        "9f193cf8.cfargotunnel.com",
@@ -86,7 +103,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.TunnelBindingReconciler{
+	if err = (&controller.TunnelBindingReconciler{
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),
 		Namespace:          clusterResourceNamespace,
@@ -95,14 +112,14 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "TunnelBinding")
 		os.Exit(1)
 	}
-	if err = (&controllers.TunnelReconciler{
+	if err = (&controller.TunnelReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Tunnel")
 		os.Exit(1)
 	}
-	if err = (&controllers.ClusterTunnelReconciler{
+	if err = (&controller.ClusterTunnelReconciler{
 		Client:    mgr.GetClient(),
 		Scheme:    mgr.GetScheme(),
 		Namespace: clusterResourceNamespace,

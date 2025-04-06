@@ -69,8 +69,9 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    operators.operatorframework.io/builder: operator-sdk-v1.25.2
-    operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    createdAt: "2025-04-05T23:59:10Z"
+    operators.operatorframework.io/builder: operator-sdk-v1.39.2
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: cloudflare-operator.v0.10.4
   namespace: placeholder
 spec:
@@ -124,17 +125,6 @@ spec:
           - ""
           resources:
           - configmaps
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - ""
-          resources:
           - secrets
           verbs:
           - create
@@ -156,57 +146,7 @@ spec:
           - networking.cfargotunnel.com
           resources:
           - clustertunnels
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - networking.cfargotunnel.com
-          resources:
-          - clustertunnels/finalizers
-          verbs:
-          - update
-        - apiGroups:
-          - networking.cfargotunnel.com
-          resources:
-          - clustertunnels/status
-          verbs:
-          - get
-          - patch
-          - update
-        - apiGroups:
-          - networking.cfargotunnel.com
-          resources:
           - tunnelbindings
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - networking.cfargotunnel.com
-          resources:
-          - tunnelbindings/finalizers
-          verbs:
-          - update
-        - apiGroups:
-          - networking.cfargotunnel.com
-          resources:
-          - tunnelbindings/status
-          verbs:
-          - get
-          - patch
-          - update
-        - apiGroups:
-          - networking.cfargotunnel.com
-          resources:
           - tunnels
           verbs:
           - create
@@ -219,12 +159,16 @@ spec:
         - apiGroups:
           - networking.cfargotunnel.com
           resources:
+          - clustertunnels/finalizers
+          - tunnelbindings/finalizers
           - tunnels/finalizers
           verbs:
           - update
         - apiGroups:
           - networking.cfargotunnel.com
           resources:
+          - clustertunnels/status
+          - tunnelbindings/status
           - tunnels/status
           verbs:
           - get
@@ -260,21 +204,9 @@ spec:
             spec:
               containers:
               - args:
-                - --secure-listen-address=0.0.0.0:8443
-                - --upstream=http://127.0.0.1:8080/
-                - --logtostderr=true
-                - --v=10
-                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.8.0
-                name: kube-rbac-proxy
-                ports:
-                - containerPort: 8443
-                  name: https
-                  protocol: TCP
-                resources: {}
-              - args:
-                - --health-probe-bind-address=:8081
-                - --metrics-bind-address=127.0.0.1:8080
+                - --metrics-bind-address=:8443
                 - --leader-elect
+                - --health-probe-bind-address=:8081
                 command:
                 - /manager
                 image: adyanth/cloudflare-operator:0.10.4
@@ -294,10 +226,10 @@ spec:
                 resources:
                   limits:
                     cpu: 200m
-                    memory: 100Mi
+                    memory: 200Mi
                   requests:
                     cpu: 100m
-                    memory: 20Mi
+                    memory: 100Mi
                 securityContext:
                   allowPrivilegeEscalation: false
               securityContext:

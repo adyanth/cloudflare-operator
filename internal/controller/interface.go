@@ -1,4 +1,4 @@
-package controllers
+package controller
 
 import (
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"

@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.7.0
+    controller-gen.kubebuilder.io/version: v0.16.1
   creationTimestamp: null
   name: clustertunnels.networking.cfargotunnel.com
 spec:
@@ -24,14 +24,19 @@ spec:
         description: ClusterTunnel is the Schema for the clustertunnels API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -43,10 +48,9 @@ spec:
                 properties:
                   CLOUDFLARE_API_KEY:
                     default: CLOUDFLARE_API_KEY
-                    description: Key in the secret to use for Cloudflare API Key,
-                      defaults to CLOUDFLARE_API_KEY. Needs Email also to be provided.
-                      For Delete operations for new tunnels only, or as an alternate
-                      to API Token
+                    description: |-
+                      Key in the secret to use for Cloudflare API Key, defaults to CLOUDFLARE_API_KEY. Needs Email also to be provided.
+                      For Delete operations for new tunnels only, or as an alternate to API Token
                     type: string
                   CLOUDFLARE_API_TOKEN:
                     default: CLOUDFLARE_API_TOKEN
@@ -83,10 +87,14 @@ spec:
                   secret:
                     description: Secret containing Cloudflare API key/token
                     type: string
+                required:
+                - domain
+                - secret
                 type: object
               existingTunnel:
-                description: Existing tunnel object. ExistingTunnel and NewTunnel
-                  cannot be both empty and are mutually exclusive.
+                description: |-
+                  Existing tunnel object.
+                  ExistingTunnel and NewTunnel cannot be both empty and are mutually exclusive.
                 properties:
                   id:
                     description: Existing Tunnel ID to run on. Tunnel ID and Tunnel
@@ -105,27 +113,45 @@ spec:
                   do not match an ingress. Defaults to http_status:404
                 type: string
               image:
-                default: cloudflare/cloudflared:2024.9.1
+                default: cloudflare/cloudflared:2025.4.0
                 description: Image sets the Cloudflared Image to use. Defaults to
                   the image set during the release of the operator.
                 type: string
               newTunnel:
-                description: New tunnel object. NewTunnel and ExistingTunnel cannot
-                  be both empty and are mutually exclusive.
+                description: |-
+                  New tunnel object.
+                  NewTunnel and ExistingTunnel cannot be both empty and are mutually exclusive.
                 properties:
                   name:
                     description: Tunnel name to create on Cloudflare.
                     type: string
+                required:
+                - name
                 type: object
               noTlsVerify:
                 default: false
                 description: NoTlsVerify disables origin TLS certificate checks when
                   the endpoint is HTTPS.
                 type: boolean
+              nodeSelectors:
+                additionalProperties:
+                  type: string
+                description: NodeSelectors specifies the nodeSelectors to apply to
+                  the cloudflared tunnel deployment
+                type: object
               originCaPool:
                 description: OriginCaPool speficies the secret with tls.crt (and other
                   certs as needed to be referred in the service annotation) of the
                   Root CA to be trusted when sending traffic to HTTPS endpoints
+                type: string
+              protocol:
+                default: auto
+                description: Protocol specifies the protocol to use for the tunnel.
+                  Defaults to auto. Options are "auto", "quic" and "http2"
+                enum:
+                - auto
+                - quic
+                - http2
                 type: string
               size:
                 default: 1
@@ -134,6 +160,48 @@ spec:
                 format: int32
                 minimum: 0
                 type: integer
+              tolerations:
+                description: Tolerations specifies the tolerations to apply to the
+                  cloudflared tunnel deployment
+                items:
+                  description: |-
+                    The pod this Toleration is attached to tolerates any taint that matches
+                    the triple <key,value,effect> using the matching operator <operator>.
+                  properties:
+                    effect:
+                      description: |-
+                        Effect indicates the taint effect to match. Empty means match all taint effects.
+                        When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
+                      type: string
+                    key:
+                      description: |-
+                        Key is the taint key that the toleration applies to. Empty means match all taint keys.
+                        If the key is empty, operator must be Exists; this combination means to match all values and all keys.
+                      type: string
+                    operator:
+                      description: |-
+                        Operator represents a key's relationship to the value.
+                        Valid operators are Exists and Equal. Defaults to Equal.
+                        Exists is equivalent to wildcard for value, so that a pod can
+                        tolerate all taints of a particular category.
+                      type: string
+                    tolerationSeconds:
+                      description: |-
+                        TolerationSeconds represents the period of time the toleration (which must be
+                        of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+                        it is not set, which means tolerate the taint forever (do not evict). Zero and
+                        negative values will be treated as 0 (evict immediately) by the system.
+                      format: int64
+                      type: integer
+                    value:
+                      description: |-
+                        Value is the taint value the toleration matches to.
+                        If the operator is Exists, the value should be empty, otherwise just a regular string.
+                      type: string
+                  type: object
+                type: array
+            required:
+            - cloudflare
             type: object
           status:
             description: TunnelStatus defines the observed state of Tunnel
@@ -161,5 +229,5 @@ status:
   acceptedNames:
     kind: ""
     plural: ""
-  conditions: []
-  storedVersions: []
+  conditions: null
+  storedVersions: null

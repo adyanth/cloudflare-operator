@@ -19,7 +19,7 @@ For the `CLOUDFLARE_API_TOKEN`, create a new "custom" token with the following:
 
 ![Sample API Token Configuration](../images/api-token-config.png)
 
-Usage of these tokens can be validated from the source code of [cloudflare_api.go](../controllers/cloudflare_api.go).
+Usage of these tokens can be validated from the source code of [cloudflare_api.go](../internal/controllers/cloudflare_api.go).
 
 ## Prerequisites
 

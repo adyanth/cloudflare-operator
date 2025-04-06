@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.7.0
+    controller-gen.kubebuilder.io/version: v0.16.1
   creationTimestamp: null
   name: tunnelbindings.networking.cfargotunnel.com
 spec:
@@ -24,14 +24,19 @@ spec:
         description: TunnelBinding is the Schema for the tunnelbindings API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -75,38 +80,63 @@ spec:
                 spec:
                   properties:
                     caPool:
-                      description: CaPool trusts the CA certificate referenced by
-                        the key in the secret specified in tunnel.spec.originCaPool.
-                        tls.crt is trusted globally and does not need to be specified.
-                        Only useful if the protocol is HTTPS.
+                      description: |-
+                        CaPool trusts the CA certificate referenced by the key in the secret specified in tunnel.spec.originCaPool.
+                        tls.crt is trusted globally and does not need to be specified. Only useful if the protocol is HTTPS.
                       type: string
                     fqdn:
-                      description: Fqdn specifies the DNS name to access this service
-                        from. Defaults to the service.metadata.name + tunnel.spec.domain.
-                        If specifying this, make sure to use the same domain that
-                        the tunnel belongs to. This is not validated and used as provided
+                      description: |-
+                        Fqdn specifies the DNS name to access this service from.
+                        Defaults to the service.metadata.name + tunnel.spec.domain.
+                        If specifying this, make sure to use the same domain that the tunnel belongs to.
+                        This is not validated and used as provided
                       type: string
                     http2Origin:
                       default: false
-                      description: Http2Origin makes the service attempt to connect to origin
-                        using HTTP2. Origin must be configured as https.
+                      description: |-
+                        Http2Origin makes the service attempt to connect to origin using HTTP2.
+                        Origin must be configured as https.
                       type: boolean
                     noTlsVerify:
                       default: false
-                      description: NoTlsVerify sisables TLS verification for this
-                        service. Only useful if the protocol is HTTPS.
+                      description: |-
+                        NoTlsVerify disables TLS verification for this service.
+                        Only useful if the protocol is HTTPS.
                       type: boolean
+                    path:
+                      description: |-
+                        Path specifies a regular expression for to match on the request for http/https services
+                        If a rule does not specify a path, all paths will be matched.
+                      type: string
                     protocol:
-                      description: Protocol specifies the protocol for the service.
-                        Should be one of http, https, tcp, udp, ssh or rdp. Defaults
-                        to http, with the exceptions of https for 443, smb for 139
-                        and 445, rdp for 3389 and ssh for 22 if the service has a
-                        TCP port. The only available option for a UDP port is udp,
-                        which is default.
+                      description: |-
+                        Protocol specifies the protocol for the service. Should be one of http, https, tcp, udp, ssh or rdp.
+                        Defaults to http, with the exceptions of https for 443, smb for 139 and 445, rdp for 3389 and ssh for 22 if the service has a TCP port.
+                        The only available option for a UDP port is udp, which is default.
+                      type: string
+                    proxyAddress:
+                      default: 127.0.0.1
+                      description: ProxyAddress configures the listen address for
+                        that proxy
+                      pattern: ((^((([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]))$)|(^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$))
+                      type: string
+                    proxyPort:
+                      default: 0
+                      description: ProxyPort configures the listen port for that proxy
+                      maximum: 65535
+                      minimum: 0
+                      type: integer
+                    proxyType:
+                      default: ""
+                      description: ProxyType configures the proxy type.
+                      enum:
+                      - ""
+                      - socks
                       type: string
                     target:
-                      description: Target specified where the tunnel should proxy
-                        to. Defaults to the form of <protocol>://<service.metadata.name>.<service.metadata.namespace>.svc:<port>
+                      description: |-
+                        Target specified where the tunnel should proxy to.
+                        Defaults to the form of <protocol>://<service.metadata.name>.<service.metadata.namespace>.svc:<port>
                       type: string
                   type: object
               required:
@@ -143,5 +173,5 @@ status:
   acceptedNames:
     kind: ""
     plural: ""
-  conditions: []
-  storedVersions: []
+  conditions: null
+  storedVersions: null

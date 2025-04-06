@@ -1,34 +1,31 @@
-package controllers
+package controller
 
 import (
 	"context"
 
+	"github.com/cloudflare/cloudflare-go"
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
-	"github.com/cloudflare/cloudflare-go"
-	"github.com/go-logr/logr"
 )
 
 const (
-	// Protocol to use between cloudflared and the Service.
-	tunnelProtoAnnotation = "cfargotunnel.com/proto"
-	tunnelProtoHTTP       = "http"
-	tunnelProtoHTTPS      = "https"
-	tunnelProtoRDP        = "rdp"
-	tunnelProtoSMB        = "smb"
-	tunnelProtoSSH        = "ssh"
-	tunnelProtoTCP        = "tcp"
-	tunnelProtoUDP        = "udp"
+	tunnelProtoHTTP  = "http"
+	tunnelProtoHTTPS = "https"
+	tunnelProtoRDP   = "rdp"
+	tunnelProtoSMB   = "smb"
+	tunnelProtoSSH   = "ssh"
+	tunnelProtoTCP   = "tcp"
+	tunnelProtoUDP   = "udp"
 
 	// Checksum of the config, used to restart pods in the deployment
 	tunnelConfigChecksum = "cfargotunnel.com/checksum"
 
 	// Tunnel properties labels
 	tunnelLabel          = "cfargotunnel.com/tunnel"
-	clusterTunnelLabel   = "cfargotunnel.com/cluster-tunnel"
 	isClusterTunnelLabel = "cfargotunnel.com/is-cluster-tunnel"
 	tunnelIdLabel        = "cfargotunnel.com/id"
 	tunnelNameLabel      = "cfargotunnel.com/name"

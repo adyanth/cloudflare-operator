@@ -1,5 +1,5 @@
 /*
-Copyright 2022.
+Copyright 2025 Adyanth H.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -91,7 +91,7 @@ type TunnelSpec struct {
 	// Size defines the number of Daemon pods to run for this tunnel
 	Size int32 `json:"size,omitempty"`
 
-	//+kubebuilder:default:="cloudflare/cloudflared:2024.9.1"
+	//+kubebuilder:default:="cloudflare/cloudflared:2025.4.0"
 	//+kubebuilder:validation:Optional
 	// Image sets the Cloudflared Image to use. Defaults to the image set during the release of the operator.
 	Image string `json:"image,omitempty"`

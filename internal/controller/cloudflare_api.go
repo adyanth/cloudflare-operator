@@ -1,4 +1,4 @@
-package controllers
+package controller
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 
 	"github.com/cloudflare/cloudflare-go"
 	"github.com/go-logr/logr"
+
+	"github.com/adyanth/cloudflare-operator/internal/utils/pointer"
 )
 
 // TXT_PREFIX is the prefix added to TXT records for whom the corresponding DNS records are managed by the operator.
@@ -354,11 +356,6 @@ func (c *CloudflareAPI) getZoneIdByName() (string, error) {
 	}
 }
 
-// Been a while writing Go... returns a pointer to a type
-func ptr[T any](v T) *T {
-	return &v
-}
-
 // InsertOrUpdateCName upsert DNS CNAME record for the given FQDN to point to the tunnel
 func (c *CloudflareAPI) InsertOrUpdateCName(fqdn, dnsId string) (string, error) {
 	ctx := context.Background()
@@ -370,11 +367,11 @@ func (c *CloudflareAPI) InsertOrUpdateCName(fqdn, dnsId string) (string, error) 
 			Type:    "CNAME",
 			Name:    fqdn,
 			Content: fmt.Sprintf("%s.cfargotunnel.com", c.ValidTunnelId),
-			Comment: "Managed by cloudflare-operator",
-			TTL:     1,         // Automatic TTL
-			Proxied: ptr(true), // For Cloudflare tunnels
+			Comment: pointer.To("Managed by cloudflare-operator"),
+			TTL:     1,                // Automatic TTL
+			Proxied: pointer.To(true), // For Cloudflare tunnels
 		}
-		err := c.CloudflareClient.UpdateDNSRecord(ctx, rc, updateParams)
+		_, err := c.CloudflareClient.UpdateDNSRecord(ctx, rc, updateParams)
 		if err != nil {
 			c.Log.Error(err, "error code in setting/updating DNS record, check fqdn", "fqdn", fqdn)
 			return "", err
@@ -388,8 +385,8 @@ func (c *CloudflareAPI) InsertOrUpdateCName(fqdn, dnsId string) (string, error) 
 			Name:    fqdn,
 			Content: fmt.Sprintf("%s.cfargotunnel.com", c.ValidTunnelId),
 			Comment: "Managed by cloudflare-operator",
-			TTL:     1,         // Automatic TTL
-			Proxied: ptr(true), // For Cloudflare tunnels
+			TTL:     1,                // Automatic TTL
+			Proxied: pointer.To(true), // For Cloudflare tunnels
 		}
 		resp, err := c.CloudflareClient.CreateDNSRecord(ctx, rc, createParams)
 		if err != nil {
@@ -397,7 +394,7 @@ func (c *CloudflareAPI) InsertOrUpdateCName(fqdn, dnsId string) (string, error) 
 			return "", err
 		}
 		c.Log.Info("DNS record created successfully", "fqdn", fqdn)
-		return resp.Result.ID, nil
+		return resp.ID, nil
 	}
 }
 
@@ -516,11 +513,11 @@ func (c *CloudflareAPI) InsertOrUpdateTXT(fqdn, txtId, dnsId string) error {
 			Type:    "TXT",
 			Name:    fmt.Sprintf("%s%s", TXT_PREFIX, fqdn),
 			Content: string(content),
-			Comment: "Managed by cloudflare-operator",
-			TTL:     1,          // Automatic TTL
-			Proxied: ptr(false), // TXT cannot be proxied
+			Comment: pointer.To("Managed by cloudflare-operator"),
+			TTL:     1,                 // Automatic TTL
+			Proxied: pointer.To(false), // TXT cannot be proxied
 		}
-		err := c.CloudflareClient.UpdateDNSRecord(ctx, rc, updateParams)
+		_, err := c.CloudflareClient.UpdateDNSRecord(ctx, rc, updateParams)
 		if err != nil {
 			c.Log.Error(err, "error in updating DNS record, check fqdn", "fqdn", fqdn)
 			return err
@@ -534,8 +531,8 @@ func (c *CloudflareAPI) InsertOrUpdateTXT(fqdn, txtId, dnsId string) error {
 			Name:    fmt.Sprintf("%s%s", TXT_PREFIX, fqdn),
 			Content: string(content),
 			Comment: "Managed by cloudflare-operator",
-			TTL:     1,          // Automatic TTL
-			Proxied: ptr(false), // For Cloudflare tunnels
+			TTL:     1,                 // Automatic TTL
+			Proxied: pointer.To(false), // For Cloudflare tunnels
 		}
 		_, err := c.CloudflareClient.CreateDNSRecord(ctx, rc, createParams)
 		if err != nil {
