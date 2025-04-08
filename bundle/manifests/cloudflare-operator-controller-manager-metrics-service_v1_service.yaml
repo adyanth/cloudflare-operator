@@ -3,6 +3,8 @@ kind: Service
 metadata:
   creationTimestamp: null
   labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: cloudflare-operator
     control-plane: controller-manager
   name: cloudflare-operator-controller-manager-metrics-service
 spec:
@@ -10,7 +12,7 @@ spec:
   - name: https
     port: 8443
     protocol: TCP
-    targetPort: https
+    targetPort: 8443
   selector:
     control-plane: controller-manager
 status:

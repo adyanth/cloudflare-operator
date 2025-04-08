@@ -1,11 +1,11 @@
-package controllers
+package controller
 
 import (
 	"time"
 )
 
-// https://github.com/cloudflare/cloudflared/blob/master/config/configuration.go
 // Configuration is a cloudflared configuration yaml model
+// https://github.com/cloudflare/cloudflared/blob/master/config/configuration.go
 type Configuration struct {
 	TunnelId      string                   `yaml:"tunnel"`
 	Ingress       []UnvalidatedIngressRule `yaml:"ingress,omitempty"`

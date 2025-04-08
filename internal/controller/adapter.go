@@ -1,4 +1,4 @@
-package controllers
+package controller
 
 import (
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
@@ -6,7 +6,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// TunnelAdapater implementation
+// TunnelAdapter implementation
 type TunnelAdapter struct {
 	Tunnel *networkingv1alpha1.Tunnel
 }
