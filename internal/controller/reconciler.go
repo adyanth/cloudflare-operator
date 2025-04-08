@@ -6,8 +6,9 @@ import (
 	"time"
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
+	"github.com/adyanth/cloudflare-operator/internal/utils/pointer"
 	"github.com/go-logr/logr"
-	yaml "gopkg.in/yaml.v3"
+	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -346,7 +347,7 @@ func createManagedResources(r GenericTunnelReconciler) (ctrl.Result, bool, error
 		return ctrl.Result{}, false, err
 	}
 
-	// Create Deployment if does not exist and scale it
+	// Create Deployment if it does not exist and scale it
 	if res, ok, err := createOrScaleManagedDeployment(r); !ok {
 		return res, false, err
 	}
@@ -470,6 +471,12 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 					Labels: ls,
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsNonRoot: pointer.To(true),
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 					Containers: []corev1.Container{{
 						Image: r.GetTunnel().GetSpec().Image,
 						Name:  "cloudflared",
@@ -497,10 +504,47 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 							Requests: corev1.ResourceList{"memory": resource.MustParse("30Mi"), "cpu": resource.MustParse("10m")},
 							Limits:   corev1.ResourceList{"memory": resource.MustParse("256Mi"), "cpu": resource.MustParse("500m")},
 						},
+						SecurityContext: &corev1.SecurityContext{
+							AllowPrivilegeEscalation: pointer.To(false),
+							ReadOnlyRootFilesystem:   pointer.To(true),
+							RunAsUser:                pointer.To(int64(1002)),
+							Capabilities: &corev1.Capabilities{
+								Drop: []corev1.Capability{
+									"ALL",
+								},
+							},
+						},
 					}},
 					Volumes:      volumes,
 					NodeSelector: nodeSelector,
 					Tolerations:  tolerations,
+					Affinity: &corev1.Affinity{
+						NodeAffinity: &corev1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+								NodeSelectorTerms: []corev1.NodeSelectorTerm{
+									{
+										MatchExpressions: []corev1.NodeSelectorRequirement{
+											{
+												Key:      "kubernetes.io/arch",
+												Operator: corev1.NodeSelectorOpIn,
+												Values: []string{
+													"amd64",
+													"arm64",
+												},
+											},
+											{
+												Key:      "kubernetes.io/os",
+												Operator: corev1.NodeSelectorOpIn,
+												Values: []string{
+													"linux",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
