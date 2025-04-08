@@ -72,7 +72,7 @@ metadata:
     createdAt: "2025-04-05T23:59:10Z"
     operators.operatorframework.io/builder: operator-sdk-v1.39.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
-  name: cloudflare-operator.v0.10.4
+  name: cloudflare-operator.v0.11.1
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -209,7 +209,7 @@ spec:
                 - --health-probe-bind-address=:8081
                 command:
                 - /manager
-                image: adyanth/cloudflare-operator:0.10.4
+                image: adyanth/cloudflare-operator:0.11.1
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -317,4 +317,4 @@ spec:
   provider:
     name: adyanth.dev
     url: https://github.com/adyanth/cloudflare-operator
-  version: 0.10.4
+  version: 0.11.1
