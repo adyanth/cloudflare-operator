@@ -36,7 +36,7 @@ const (
 	configmapKey         = "config.yaml"
 )
 
-var tunnelValidProtoMap map[string]bool = map[string]bool{
+var tunnelValidProtoMap = map[string]bool{
 	tunnelProtoHTTP:  true,
 	tunnelProtoHTTPS: true,
 	tunnelProtoRDP:   true,

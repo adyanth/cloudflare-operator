@@ -499,7 +499,7 @@ func (c *CloudflareAPI) InsertOrUpdateTXT(fqdn, txtId, dnsId string) error {
 		TunnelName: c.ValidTunnelName,
 	})
 	if err != nil {
-		c.Log.Error(err, "error marhsalling txt record json", "fqdn", fqdn)
+		c.Log.Error(err, "error marshalling txt record json", "fqdn", fqdn)
 		return err
 	}
 	ctx := context.Background()

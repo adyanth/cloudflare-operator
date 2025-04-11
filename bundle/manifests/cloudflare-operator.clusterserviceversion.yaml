@@ -69,7 +69,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-04-05T23:59:10Z"
+    createdAt: "2025-04-08T23:52:30Z"
     operators.operatorframework.io/builder: operator-sdk-v1.39.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: cloudflare-operator.v0.11.1
@@ -189,6 +189,8 @@ spec:
         serviceAccountName: cloudflare-operator-controller-manager
       deployments:
       - label:
+          app.kubernetes.io/managed-by: kustomize
+          app.kubernetes.io/name: cloudflare-operator
           control-plane: controller-manager
         name: cloudflare-operator-controller-manager
         spec:
@@ -199,9 +201,25 @@ spec:
           strategy: {}
           template:
             metadata:
+              annotations:
+                kubectl.kubernetes.io/default-container: manager
               labels:
                 control-plane: controller-manager
             spec:
+              affinity:
+                nodeAffinity:
+                  requiredDuringSchedulingIgnoredDuringExecution:
+                    nodeSelectorTerms:
+                    - matchExpressions:
+                      - key: kubernetes.io/arch
+                        operator: In
+                        values:
+                        - amd64
+                        - arm64
+                      - key: kubernetes.io/os
+                        operator: In
+                        values:
+                        - linux
               containers:
               - args:
                 - --metrics-bind-address=:8443
@@ -232,8 +250,14 @@ spec:
                     memory: 100Mi
                 securityContext:
                   allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+                  readOnlyRootFilesystem: true
               securityContext:
                 runAsNonRoot: true
+                seccompProfile:
+                  type: RuntimeDefault
               serviceAccountName: cloudflare-operator-controller-manager
               terminationGracePeriodSeconds: 10
       - name: whoami
