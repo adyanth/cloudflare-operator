@@ -31,7 +31,11 @@ func (in *Access) DeepCopyInto(out *Access) {
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	out.Target = in.Target
-	out.ServiceToken = in.ServiceToken
+	if in.ServiceToken != nil {
+		in, out := &in.ServiceToken, &out.ServiceToken
+		*out = new(AccessServiceToken)
+		**out = **in
+	}
 	out.Status = in.Status
 }
 

@@ -52,16 +52,25 @@ type AccessReconciler struct {
 
 func cloudflaredDeploymentService(access *networkingv1alpha1.Access) (*appsv1.Deployment, *corev1.Service) {
 	name := access.GetName()
-	namespace := access.GetNamespace()
-	fqdn := access.Target.Fqdn
+	if access.Target.Svc.Name != "" {
+		name = access.Target.Svc.Name
+	}
 	port := access.Target.Svc.Port
+	namespace := access.GetNamespace()
 	image := access.Target.Image
+	fqdn := access.Target.Fqdn
 	protocol := access.Target.Protocol
 	corev1Protocol := corev1.ProtocolTCP
 	if protocol == "udp" {
 		corev1Protocol = corev1.ProtocolUDP
 	}
-	args := []string{}
+
+	// Args for cloudflared
+	args := []string{"access", protocol, "--listener", fmt.Sprintf("0.0.0.0:%d", port), "--hostname", fqdn}
+	if access.ServiceToken != nil {
+		args = append(args, "--id", access.ServiceToken.Id, "--token", access.ServiceToken.Token)
+	}
+
 	ls := map[string]string{"app": "cloudflared", "name": name, "fqdn": fqdn, "port": fmt.Sprint(port)}
 	return &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{

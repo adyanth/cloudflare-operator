@@ -84,9 +84,9 @@ type Access struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Target       AccessTarget       `json:"target,omitempty"`
-	ServiceToken AccessServiceToken `json:"serviceToken,omitempty"`
-	Status       AccessStatus       `json:"status,omitempty"`
+	Target       AccessTarget        `json:"target,omitempty"`
+	ServiceToken *AccessServiceToken `json:"serviceToken,omitempty"`
+	Status       AccessStatus        `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
