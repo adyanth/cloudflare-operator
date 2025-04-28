@@ -64,6 +64,10 @@ spec:
                   Fqdn specifies the DNS name to access
                   This is not validated and used as provided
                 type: string
+              image:
+                default: cloudflare/cloudflared:2025.4.0
+                description: cloudflared image to use
+                type: string
               protocol:
                 default: tcp
                 description: Protocol to forward, better to use TCP?
@@ -86,6 +90,7 @@ spec:
                     description: |-
                       Service port to expose with
                       Defaults to 8000
+                    format: int32
                     maximum: 65535
                     minimum: 0
                     type: integer

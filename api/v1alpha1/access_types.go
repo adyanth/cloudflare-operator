@@ -33,11 +33,16 @@ type AccessServiceConfig struct {
 	// +kubebuilder:default:=8000
 	// +kubebuilder:validation:Minimum:=0
 	// +kubebuilder:validation:Maximum:=65535
-	Port uint `json:"port,omitempty"`
+	Port int32 `json:"port,omitempty"`
 }
 
 // AccessTarget defines the desired state of Access
 type AccessTarget struct {
+	// cloudflared image to use
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="cloudflare/cloudflared:2025.4.0"
+	Image string `json:"image,omitempty"`
+
 	// Fqdn specifies the DNS name to access
 	// This is not validated and used as provided
 	// +kubebuilder:validation:Required
