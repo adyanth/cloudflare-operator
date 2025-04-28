@@ -50,7 +50,7 @@ rules:
 - apiGroups:
   - networking.cfargotunnel.com
   resources:
-  - accesses
+  - accesstunnels
   - clustertunnels
   - tunnelbindings
   - tunnels
@@ -65,7 +65,7 @@ rules:
 - apiGroups:
   - networking.cfargotunnel.com
   resources:
-  - accesses/status
+  - accesstunnels/status
   - clustertunnels/status
   - tunnelbindings/status
   - tunnels/status
