@@ -20,8 +20,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// AccessServiceConfig defines the Service created to Access
-type AccessServiceConfig struct {
+// AccessTunnelServiceConfig defines the Service created to Access
+type AccessTunnelServiceConfig struct {
 	// Name of the new service to create
 	// Defaults to the name of the Access object
 	// +kubebuilder:validation:Optional
@@ -36,8 +36,8 @@ type AccessServiceConfig struct {
 	Port int32 `json:"port,omitempty"`
 }
 
-// AccessTarget defines the desired state of Access
-type AccessTarget struct {
+// AccessTunnelTarget defines the desired state of Access
+type AccessTunnelTarget struct {
 	// cloudflared image to use
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="cloudflare/cloudflared:2025.4.0"
@@ -56,11 +56,11 @@ type AccessTarget struct {
 
 	// Service Config
 	// +kubebuilder:validation:Optional
-	Svc AccessServiceConfig `json:"svc,omitempty"`
+	Svc AccessTunnelServiceConfig `json:"svc,omitempty"`
 }
 
-// AccessServiceToken defines the access auth if needed
-type AccessServiceToken struct {
+// AccessTunnelServiceToken defines the access auth if needed
+type AccessTunnelServiceToken struct {
 	// Access Service Token ID
 	// +kubebuilder:validation:Required
 	Id string `json:"id,omitempty"`
@@ -69,8 +69,8 @@ type AccessServiceToken struct {
 	Token string `json:"token,omitempty"`
 }
 
-// AccessStatus defines the observed state of Access
-type AccessStatus struct {
+// AccessTunnelStatus defines the observed state of Access
+type AccessTunnelStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -79,25 +79,25 @@ type AccessStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Target",type=string,JSONPath=`.target.fqdn`
 
-// Access is the Schema for the accesses API
-type Access struct {
+// AccessTunnel is the Schema for the accesstunnels API
+type AccessTunnel struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Target       AccessTarget        `json:"target,omitempty"`
-	ServiceToken *AccessServiceToken `json:"serviceToken,omitempty"`
-	Status       AccessStatus        `json:"status,omitempty"`
+	Target       AccessTunnelTarget        `json:"target,omitempty"`
+	ServiceToken *AccessTunnelServiceToken `json:"serviceToken,omitempty"`
+	Status       AccessTunnelStatus        `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// AccessList contains a list of Access
-type AccessList struct {
+// AccessTunnelList contains a list of AccessTunnel
+type AccessTunnelList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Access `json:"items"`
+	Items           []AccessTunnel `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Access{}, &AccessList{})
+	SchemeBuilder.Register(&AccessTunnel{}, &AccessTunnelList{})
 }

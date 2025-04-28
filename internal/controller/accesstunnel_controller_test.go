@@ -30,7 +30,7 @@ import (
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
 )
 
-var _ = Describe("Access Controller", func() {
+var _ = Describe("AccessTunnel Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
@@ -40,13 +40,13 @@ var _ = Describe("Access Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		access := &networkingv1alpha1.Access{}
+		accesstunnel := &networkingv1alpha1.AccessTunnel{}
 
 		BeforeEach(func() {
-			By("creating the custom resource for the Kind Access")
-			err := k8sClient.Get(ctx, typeNamespacedName, access)
+			By("creating the custom resource for the Kind AccessTunnel")
+			err := k8sClient.Get(ctx, typeNamespacedName, accesstunnel)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &networkingv1alpha1.Access{
+				resource := &networkingv1alpha1.AccessTunnel{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -59,16 +59,16 @@ var _ = Describe("Access Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &networkingv1alpha1.Access{}
+			resource := &networkingv1alpha1.AccessTunnel{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Cleanup the specific resource instance Access")
+			By("Cleanup the specific resource instance AccessTunnel")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &AccessReconciler{
+			controllerReconciler := &AccessTunnelReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}

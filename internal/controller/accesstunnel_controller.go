@@ -37,8 +37,8 @@ import (
 	"github.com/go-logr/logr"
 )
 
-// AccessReconciler reconciles a Access object
-type AccessReconciler struct {
+// AccessTunnelReconciler reconciles a Access object
+type AccessTunnelReconciler struct {
 	client.Client
 	Recorder record.EventRecorder
 	Scheme   *runtime.Scheme
@@ -47,19 +47,19 @@ type AccessReconciler struct {
 
 	ctx    context.Context
 	log    logr.Logger
-	access *networkingv1alpha1.Access
+	access *networkingv1alpha1.AccessTunnel
 }
 
-func cloudflaredDeploymentService(access *networkingv1alpha1.Access) (*appsv1.Deployment, *corev1.Service) {
-	name := access.GetName()
-	if access.Target.Svc.Name != "" {
-		name = access.Target.Svc.Name
+func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel) (*appsv1.Deployment, *corev1.Service) {
+	name := accessTunnel.GetName()
+	if accessTunnel.Target.Svc.Name != "" {
+		name = accessTunnel.Target.Svc.Name
 	}
-	port := access.Target.Svc.Port
-	namespace := access.GetNamespace()
-	image := access.Target.Image
-	fqdn := access.Target.Fqdn
-	protocol := access.Target.Protocol
+	port := accessTunnel.Target.Svc.Port
+	namespace := accessTunnel.GetNamespace()
+	image := accessTunnel.Target.Image
+	fqdn := accessTunnel.Target.Fqdn
+	protocol := accessTunnel.Target.Protocol
 	corev1Protocol := corev1.ProtocolTCP
 	if protocol == "udp" {
 		corev1Protocol = corev1.ProtocolUDP
@@ -67,8 +67,8 @@ func cloudflaredDeploymentService(access *networkingv1alpha1.Access) (*appsv1.De
 
 	// Args for cloudflared
 	args := []string{"access", protocol, "--listener", fmt.Sprintf("0.0.0.0:%d", port), "--hostname", fqdn}
-	if access.ServiceToken != nil {
-		args = append(args, "--id", access.ServiceToken.Id, "--token", access.ServiceToken.Token)
+	if accessTunnel.ServiceToken != nil {
+		args = append(args, "--id", accessTunnel.ServiceToken.Id, "--token", accessTunnel.ServiceToken.Token)
 	}
 
 	ls := map[string]string{"app": "cloudflared", "name": name, "fqdn": fqdn, "port": fmt.Sprint(port)}
@@ -177,11 +177,11 @@ func cloudflaredDeploymentService(access *networkingv1alpha1.Access) (*appsv1.De
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile the access object
-func (r *AccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *AccessTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.log = ctrllog.FromContext(ctx)
 
 	// Fetch Access from API
-	access := &networkingv1alpha1.Access{}
+	access := &networkingv1alpha1.AccessTunnel{}
 	if err := r.Get(ctx, req.NamespacedName, access); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Access object not found, could have been deleted after reconcile request.
@@ -222,8 +222,8 @@ func (r *AccessReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *AccessReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *AccessTunnelReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&networkingv1alpha1.Access{}).
+		For(&networkingv1alpha1.AccessTunnel{}).
 		Complete(r)
 }

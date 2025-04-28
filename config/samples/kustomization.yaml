@@ -8,4 +8,5 @@ resources:
 - networking_v1alpha1_clustertunnel.yaml
 - networking_v1alpha1_tunnelbinding.yaml
 - networking_v1alpha1_access.yaml
+- networking_v1alpha1_accesstunnel.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

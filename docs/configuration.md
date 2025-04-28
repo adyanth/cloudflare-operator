@@ -91,7 +91,7 @@ tunnelRef:
   disableDNSUpdates: false
 ```
 
-### Arbitrary TCP Access
+### AccessTunnel
 [Arbitrary TCP Access](https://developers.cloudflare.com/cloudflare-one/applications/non-http/cloudflared-authentication/arbitrary-tcp/) allows you to share a workload running on one cluster to be accessed by a service in another cluster that do not have local/tunnel connectivity between them. For example, a database running on cluster A exposed on port 5432 to be accessed by an application running on cluster B. The service to be published can be HTTP as well, but needs to be exposed as a TCP tunnel. This would be accomplished in two parts. 
 
 #### Expose the service as a tunnel
@@ -119,11 +119,11 @@ tunnelRef:
   name: k3s-tunnel
 ```
 
-Now, on the client cluster, create an `Access` object.
+Now, on the client cluster, create an `AccessTunnel` object.
 
 ```yaml
 apiVersion: networking.cfargotunnel.com/v1alpha1
-kind: Access
+kind: AccessTunnel
 metadata:
   name: postgres
 target:

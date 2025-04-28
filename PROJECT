@@ -40,7 +40,7 @@ resources:
   controller: true
   domain: cfargotunnel.com
   group: networking
-  kind: Access
+  kind: AccessTunnel
   path: github.com/adyanth/cloudflare-operator/api/v1alpha1
   version: v1alpha1
 version: "3"
