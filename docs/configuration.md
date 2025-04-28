@@ -132,8 +132,9 @@ target:
   svc:
     port: 5432
 # serviceToken: # Optional, needed if tunnel is secured using Cloudflare Access
-#   id:
-#   token:
+#   secretRef: nameOfSecret
+#   CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID # Optional to remap keys in secret
+#   CLOUDFLARE_ACCESS_SERVICE_TOKEN_TOKEN: CLOUDFLARE_ACCESS_SERVICE_TOKEN_TOKEN # Optional to remap keys in secret
 ```
 
 The client cluster should now be able to connect to `postgres.default.svc:5432` and be able to connect to the source cluster's DB.

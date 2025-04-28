@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -50,7 +51,7 @@ type AccessTunnelReconciler struct {
 	access *networkingv1alpha1.AccessTunnel
 }
 
-func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel) (*appsv1.Deployment, *corev1.Service) {
+func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel, secret *corev1.Secret) (*appsv1.Deployment, *corev1.Service) {
 	name := accessTunnel.GetName()
 	if accessTunnel.Target.Svc.Name != "" {
 		name = accessTunnel.Target.Svc.Name
@@ -67,8 +68,10 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel)
 
 	// Args for cloudflared
 	args := []string{"access", protocol, "--listener", fmt.Sprintf("0.0.0.0:%d", port), "--hostname", fqdn}
-	if accessTunnel.ServiceToken != nil {
-		args = append(args, "--id", accessTunnel.ServiceToken.Id, "--token", accessTunnel.ServiceToken.Token)
+	if accessTunnel.ServiceToken != nil && secret != nil {
+		id := secret.Data[accessTunnel.ServiceToken.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID]
+		token := secret.Data[accessTunnel.ServiceToken.CLOUDFLARE_ACCESS_SERVICE_TOKEN_TOKEN]
+		args = append(args, "--id", string(id), "--token", string(token))
 	}
 
 	ls := map[string]string{"app": "cloudflared", "name": name, "fqdn": fqdn, "port": fmt.Sprint(port)}
@@ -174,6 +177,7 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel)
 // +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=accesstunnels/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;create;update;patch
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;create;update;patch
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile the access object
@@ -181,42 +185,62 @@ func (r *AccessTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	r.log = ctrllog.FromContext(ctx)
 
 	// Fetch Access from API
-	access := &networkingv1alpha1.AccessTunnel{}
-	if err := r.Get(ctx, req.NamespacedName, access); err != nil {
+	accessTunnel := &networkingv1alpha1.AccessTunnel{}
+	if err := r.Get(ctx, req.NamespacedName, accessTunnel); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Access object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			r.log.Info("Access deleted, nothing to do")
+			r.log.Info("AccessTunnel deleted, nothing to do")
 			return ctrl.Result{}, nil
 		}
-		r.log.Error(err, "unable to fetch Access")
+		r.log.Error(err, "unable to fetch AccessTunnel")
 		return ctrl.Result{Requeue: true}, err
 	}
-	r.access = access
+
+	// Fetch secret if needed
+	secret := &corev1.Secret{}
+	if accessTunnel.ServiceToken != nil {
+		if err := r.Get(ctx, types.NamespacedName{Namespace: accessTunnel.Namespace, Name: accessTunnel.ServiceToken.SecretRef}, secret); err != nil {
+			r.log.Error(err, "unable to fetch Secret")
+			return ctrl.Result{Requeue: true}, err
+		}
+		if _, ok := secret.Data[accessTunnel.ServiceToken.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID]; !ok {
+			err := fmt.Errorf("secret does not contain the token ID key %s", accessTunnel.ServiceToken.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID)
+			r.log.Error(err, "invalid secret")
+			r.Recorder.Event(accessTunnel, corev1.EventTypeWarning, "InvalidSecret", "Secret Invalid, no token ID key")
+			return ctrl.Result{}, err
+		}
+		if _, ok := secret.Data[accessTunnel.ServiceToken.CLOUDFLARE_ACCESS_SERVICE_TOKEN_TOKEN]; !ok {
+			err := fmt.Errorf("secret does not contain the token token key %s", accessTunnel.ServiceToken.CLOUDFLARE_ACCESS_SERVICE_TOKEN_TOKEN)
+			r.log.Error(err, "invalid secret")
+			r.Recorder.Event(accessTunnel, corev1.EventTypeWarning, "InvalidSecret", "Secret Invalid, no token token key")
+			return ctrl.Result{}, err
+		}
+	}
 
 	// Create/Update deployment
-	dep, svc := cloudflaredDeploymentService(r.access)
+	dep, svc := cloudflaredDeploymentService(accessTunnel, secret)
 	r.log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-	r.Recorder.Event(r.access, corev1.EventTypeNormal, "Deploying", "Creating Access Deployment")
+	r.Recorder.Event(accessTunnel, corev1.EventTypeNormal, "Deploying", "Creating AccessTunnel Deployment")
 	if err := r.Client.Update(ctx, dep); err != nil {
 		r.log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-		r.Recorder.Event(r.access, corev1.EventTypeWarning, "FailedDeploying", "Creating Access Deployment failed")
+		r.Recorder.Event(accessTunnel, corev1.EventTypeWarning, "FailedDeploying", "Creating AccessTunnel Deployment failed")
 		return ctrl.Result{}, err
 	}
 	r.log.Info("Deployment created", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-	r.Recorder.Event(r.access, corev1.EventTypeNormal, "Deployed", "Created Access Deployment")
+	r.Recorder.Event(accessTunnel, corev1.EventTypeNormal, "Deployed", "Created AccessTunnel Deployment")
 
 	// Create/Update service
 	r.log.Info("Creating a new Service", "Service.Namespace", svc.Namespace, "Service.Name", svc.Name)
-	r.Recorder.Event(r.access, corev1.EventTypeNormal, "Deploying", "Creating Access Service")
+	r.Recorder.Event(accessTunnel, corev1.EventTypeNormal, "Deploying", "Creating AccessTunnel Service")
 	if err := r.Client.Update(ctx, svc); err != nil {
 		r.log.Error(err, "Failed to create new Service", "Service.Namespace", svc.Namespace, "Service.Name", svc.Name)
-		r.Recorder.Event(r.access, corev1.EventTypeWarning, "FailedDeploying", "Creating Access Service failed")
+		r.Recorder.Event(accessTunnel, corev1.EventTypeWarning, "FailedDeploying", "Creating AccessTunnel Service failed")
 		return ctrl.Result{}, err
 	}
 	r.log.Info("Service created", "Service.Namespace", svc.Namespace, "Service.Name", svc.Name)
-	r.Recorder.Event(r.access, corev1.EventTypeNormal, "Deployed", "Created Access Service")
+	r.Recorder.Event(accessTunnel, corev1.EventTypeNormal, "Deployed", "Created AccessTunnel Service")
 
 	return ctrl.Result{}, nil
 }

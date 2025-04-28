@@ -61,12 +61,18 @@ type AccessTunnelTarget struct {
 
 // AccessTunnelServiceToken defines the access auth if needed
 type AccessTunnelServiceToken struct {
-	// Access Service Token ID
+	// Access Service Token Secret
 	// +kubebuilder:validation:Required
-	Id string `json:"id,omitempty"`
-	// Access Service Token
-	// +kubebuilder:validation:Required
-	Token string `json:"token,omitempty"`
+	SecretRef string `json:"secretRef,omitempty"`
+
+	// Key in the secret to use for Access Service Token ID, defaults to CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID
+	CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID string `json:"id,omitempty"`
+	// Key in the secret to use for Access Service Token Token, defaults to CLOUDFLARE_ACCESS_SERVICE_TOKEN_TOKEN
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=CLOUDFLARE_ACCESS_SERVICE_TOKEN_TOKEN
+	CLOUDFLARE_ACCESS_SERVICE_TOKEN_TOKEN string `json:"token,omitempty"`
 }
 
 // AccessTunnelStatus defines the observed state of Access
