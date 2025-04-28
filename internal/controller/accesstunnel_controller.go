@@ -46,9 +46,9 @@ type AccessTunnelReconciler struct {
 
 	// Custom data for ease of (re)use
 
-	ctx    context.Context
-	log    logr.Logger
-	access *networkingv1alpha1.AccessTunnel
+	ctx          context.Context
+	log          logr.Logger
+	accessTunnel *networkingv1alpha1.AccessTunnel
 }
 
 func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel, secret *corev1.Secret) (*appsv1.Deployment, *corev1.Service) {
@@ -173,6 +173,29 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 		}
 }
 
+func (r *AccessTunnelReconciler) createOrUpdate(object client.Object, objectName string) (ctrl.Result, error) {
+	namespaceString := fmt.Sprintf("%s.Namespace", objectName)
+	nameString := fmt.Sprintf("%s.Name", objectName)
+	r.log.Info(fmt.Sprintf("Creating a new %s", objectName), namespaceString, object.GetNamespace(), nameString, object.GetName())
+	r.Recorder.Event(r.accessTunnel, corev1.EventTypeNormal, "Deploying", fmt.Sprintf("Creating AccessTunnel %s", objectName))
+	if err := r.Client.Create(r.ctx, object); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			if err = r.Client.Update(r.ctx, object); err != nil {
+				r.log.Error(err, fmt.Sprintf("Failed to update new %s", objectName), namespaceString, object.GetNamespace(), nameString, object.GetName())
+				r.Recorder.Event(r.accessTunnel, corev1.EventTypeWarning, "FailedDeploying", fmt.Sprintf("Updating AccessTunnel %s failed", objectName))
+				return ctrl.Result{}, err
+			}
+		} else {
+			r.log.Error(err, fmt.Sprintf("Failed to create new %s", objectName), namespaceString, object.GetNamespace(), nameString, object.GetName())
+			r.Recorder.Event(r.accessTunnel, corev1.EventTypeWarning, "FailedDeploying", fmt.Sprintf("Creating AccessTunnel %s failed", objectName))
+			return ctrl.Result{}, err
+		}
+	}
+	r.log.Info(fmt.Sprintf("%s created", objectName), namespaceString, object.GetNamespace(), nameString, object.GetName())
+	r.Recorder.Event(r.accessTunnel, corev1.EventTypeNormal, "Deployed", fmt.Sprintf("Created AccessTunnel %s", objectName))
+	return ctrl.Result{}, nil
+}
+
 // +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=accesstunnels,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=accesstunnels/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;create;update;patch
@@ -182,6 +205,7 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 
 // Reconcile the access object
 func (r *AccessTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	r.ctx = ctx
 	r.log = ctrllog.FromContext(ctx)
 
 	// Fetch Access from API
@@ -197,6 +221,7 @@ func (r *AccessTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		r.log.Error(err, "unable to fetch AccessTunnel")
 		return ctrl.Result{Requeue: true}, err
 	}
+	r.accessTunnel = accessTunnel
 
 	// Fetch secret if needed
 	secret := &corev1.Secret{}
@@ -221,26 +246,13 @@ func (r *AccessTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Create/Update deployment
 	dep, svc := cloudflaredDeploymentService(accessTunnel, secret)
-	r.log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-	r.Recorder.Event(accessTunnel, corev1.EventTypeNormal, "Deploying", "Creating AccessTunnel Deployment")
-	if err := r.Client.Update(ctx, dep); err != nil {
-		r.log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-		r.Recorder.Event(accessTunnel, corev1.EventTypeWarning, "FailedDeploying", "Creating AccessTunnel Deployment failed")
-		return ctrl.Result{}, err
-	}
-	r.log.Info("Deployment created", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-	r.Recorder.Event(accessTunnel, corev1.EventTypeNormal, "Deployed", "Created AccessTunnel Deployment")
 
-	// Create/Update service
-	r.log.Info("Creating a new Service", "Service.Namespace", svc.Namespace, "Service.Name", svc.Name)
-	r.Recorder.Event(accessTunnel, corev1.EventTypeNormal, "Deploying", "Creating AccessTunnel Service")
-	if err := r.Client.Update(ctx, svc); err != nil {
-		r.log.Error(err, "Failed to create new Service", "Service.Namespace", svc.Namespace, "Service.Name", svc.Name)
-		r.Recorder.Event(accessTunnel, corev1.EventTypeWarning, "FailedDeploying", "Creating AccessTunnel Service failed")
-		return ctrl.Result{}, err
+	if res, err := r.createOrUpdate(dep, "Deployment"); err != nil {
+		return res, err
 	}
-	r.log.Info("Service created", "Service.Namespace", svc.Namespace, "Service.Name", svc.Name)
-	r.Recorder.Event(accessTunnel, corev1.EventTypeNormal, "Deployed", "Created AccessTunnel Service")
+	if res, err := r.createOrUpdate(svc, "Service"); err != nil {
+		return res, err
+	}
 
 	return ctrl.Result{}, nil
 }
