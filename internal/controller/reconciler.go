@@ -284,9 +284,11 @@ func createOrScaleManagedDeployment(r GenericTunnelReconciler) (ctrl.Result, boo
 		return res, false, err
 	}
 
-	// Ensure the Deployment size is the same as the spec
-	if res, err := scaleManagedDeployment(r, cfDeployment); err != nil || (res != ctrl.Result{}) {
-		return res, false, err
+	desiredDeployment := deploymentForTunnel(r)
+	if cfDeployment != desiredDeployment {
+		if res, err := updateManagedDeployment(r, desiredDeployment); err != nil || (res != ctrl.Result{}) {
+			return res, false, err
+		}
 	}
 
 	return ctrl.Result{}, true, nil
@@ -315,25 +317,21 @@ func createManagedDeployment(r GenericTunnelReconciler, cfDeployment *appsv1.Dep
 	return ctrl.Result{}, nil
 }
 
-func scaleManagedDeployment(r GenericTunnelReconciler, cfDeployment *appsv1.Deployment) (ctrl.Result, error) {
-	size := r.GetTunnel().GetSpec().Size
-	if *cfDeployment.Spec.Replicas != size {
-		r.GetLog().Info("Updating deployment", "currentReplica", *cfDeployment.Spec.Replicas, "desiredSize", size)
-		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Scaling", "Scaling Tunnel Deployment")
-		cfDeployment.Spec.Replicas = &size
-		if err := r.GetClient().Update(r.GetContext(), cfDeployment); err != nil {
-			r.GetLog().Error(err, "Failed to update Deployment", "Deployment.Namespace", cfDeployment.Namespace, "Deployment.Name", cfDeployment.Name)
-			r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedScaling", "Failed to scale Tunnel Deployment")
-			return ctrl.Result{}, err
-		}
-		r.GetLog().Info("Deployment updated")
-		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Scaled", "Scaled Tunnel Deployment")
-		// Ask to requeue after 1 minute in order to give enough time for the
-		// pods be created on the cluster side and the operand be able
-		// to do the next update step accurately.
-		return ctrl.Result{RequeueAfter: time.Minute}, nil
+func updateManagedDeployment(r GenericTunnelReconciler, cfDeployment *appsv1.Deployment) (ctrl.Result, error) {
+	r.GetLog().Info("Updating deployment")
+	r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Updating", "Updating Tunnel Deployment")
+
+	if err := r.GetClient().Update(r.GetContext(), cfDeployment); err != nil {
+		r.GetLog().Error(err, "Failed to update Deployment", "Deployment.Namespace", cfDeployment.Namespace, "Deployment.Name", cfDeployment.Name)
+		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedScaling", "Failed to scale Tunnel Deployment")
+		return ctrl.Result{}, err
 	}
-	return ctrl.Result{}, nil
+	r.GetLog().Info("Deployment updated")
+	r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Updated", "Updated Tunnel Deployment")
+	// Ask to requeue after 1 minute in order to give enough time for the
+	// pods be updated on the cluster side and the operand be able
+	// to do the next update step accurately.
+	return ctrl.Result{RequeueAfter: time.Minute}, nil
 }
 
 func createManagedResources(r GenericTunnelReconciler) (ctrl.Result, bool, error) {
