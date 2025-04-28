@@ -11,6 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -277,7 +278,7 @@ func createManagedConfigMap(r GenericTunnelReconciler) error {
 	return nil
 }
 
-func createOrScaleManagedDeployment(r GenericTunnelReconciler) (ctrl.Result, bool, error) {
+func createOrUpdateManagedDeployment(r GenericTunnelReconciler) (ctrl.Result, bool, error) {
 	// Check if Deployment already exists, else create it
 	cfDeployment := &appsv1.Deployment{}
 	if res, err := createManagedDeployment(r, cfDeployment); err != nil || (res != ctrl.Result{}) {
@@ -285,7 +286,7 @@ func createOrScaleManagedDeployment(r GenericTunnelReconciler) (ctrl.Result, boo
 	}
 
 	desiredDeployment := deploymentForTunnel(r)
-	if cfDeployment != desiredDeployment {
+	if !apiequality.Semantic.DeepEqual(cfDeployment.Spec, desiredDeployment.Spec) {
 		if res, err := updateManagedDeployment(r, desiredDeployment); err != nil || (res != ctrl.Result{}) {
 			return res, false, err
 		}
@@ -346,7 +347,7 @@ func createManagedResources(r GenericTunnelReconciler) (ctrl.Result, bool, error
 	}
 
 	// Create Deployment if it does not exist and scale it
-	if res, ok, err := createOrScaleManagedDeployment(r); !ok {
+	if res, ok, err := createOrUpdateManagedDeployment(r); !ok {
 		return res, false, err
 	}
 
