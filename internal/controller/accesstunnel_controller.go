@@ -77,12 +77,20 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 		args = append(args, "--id", string(id), "--token", string(token))
 	}
 
+	ownerRefs := []metav1.OwnerReference{{
+		APIVersion: accessTunnel.APIVersion,
+		Kind:       accessTunnel.Kind,
+		Name:       accessTunnel.Name,
+		UID:        accessTunnel.UID,
+		Controller: pointer.To(true),
+	}}
 	ls := map[string]string{"app": "cloudflared", "name": name, "fqdn": fqdn, "port": fmt.Sprint(port)}
 	return &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: namespace,
-				Labels:    ls,
+				Name:            name,
+				Namespace:       namespace,
+				Labels:          ls,
+				OwnerReferences: ownerRefs,
 			},
 			Spec: appsv1.DeploymentSpec{
 				Replicas: pointer.To(int32(1)),
@@ -158,9 +166,10 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 			},
 		}, &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: namespace,
-				Labels:    ls,
+				Name:            name,
+				Namespace:       namespace,
+				Labels:          ls,
+				OwnerReferences: ownerRefs,
 			},
 			Spec: corev1.ServiceSpec{
 				Selector: ls,
