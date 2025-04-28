@@ -76,7 +76,7 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 	if accessTunnel.ServiceToken != nil && secret != nil {
 		id := secret.Data[accessTunnel.ServiceToken.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID]
 		token := secret.Data[accessTunnel.ServiceToken.CLOUDFLARE_ACCESS_SERVICE_TOKEN_TOKEN]
-		args = append(args, "--id", string(id), "--token", string(token))
+		args = append(args, "--service-token-id", string(id), "--service-token-secret", string(token))
 	}
 
 	ownerRefs := []metav1.OwnerReference{{
