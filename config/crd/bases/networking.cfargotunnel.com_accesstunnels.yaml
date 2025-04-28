@@ -43,18 +43,18 @@ spec:
           serviceToken:
             description: AccessTunnelServiceToken defines the access auth if needed
             properties:
-              id:
+              CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID:
                 default: CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID
                 description: Key in the secret to use for Access Service Token ID,
                   defaults to CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID
                 type: string
-              secretRef:
-                description: Access Service Token Secret
-                type: string
-              token:
+              CLOUDFLARE_ACCESS_SERVICE_TOKEN_TOKEN:
                 default: CLOUDFLARE_ACCESS_SERVICE_TOKEN_TOKEN
                 description: Key in the secret to use for Access Service Token Token,
                   defaults to CLOUDFLARE_ACCESS_SERVICE_TOKEN_TOKEN
+                type: string
+              secretRef:
+                description: Access Service Token Secret
                 type: string
             required:
             - secretRef

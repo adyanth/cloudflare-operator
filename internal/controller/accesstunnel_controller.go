@@ -38,6 +38,8 @@ import (
 	"github.com/go-logr/logr"
 )
 
+const CONTAINER_PORT int32 = 8000
+
 // AccessTunnelReconciler reconciles a Access object
 type AccessTunnelReconciler struct {
 	client.Client
@@ -52,13 +54,13 @@ type AccessTunnelReconciler struct {
 }
 
 func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel, secret *corev1.Secret) (*appsv1.Deployment, *corev1.Service) {
-	name := accessTunnel.GetName()
+	svcName := accessTunnel.GetName()
 	if accessTunnel.Target.Svc.Name != "" {
-		name = accessTunnel.Target.Svc.Name
+		svcName = accessTunnel.Target.Svc.Name
 	}
 	port := accessTunnel.Target.Svc.Port
 	if port == 0 {
-		port = 8000
+		port = CONTAINER_PORT
 	}
 	namespace := accessTunnel.GetNamespace()
 	image := accessTunnel.Target.Image
@@ -70,7 +72,7 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 	}
 
 	// Args for cloudflared
-	args := []string{"access", protocol, "--listener", fmt.Sprintf("0.0.0.0:%d", port), "--hostname", fqdn}
+	args := []string{"access", protocol, "--listener", fmt.Sprintf("0.0.0.0:%d", CONTAINER_PORT), "--hostname", fqdn}
 	if accessTunnel.ServiceToken != nil && secret != nil {
 		id := secret.Data[accessTunnel.ServiceToken.CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID]
 		token := secret.Data[accessTunnel.ServiceToken.CLOUDFLARE_ACCESS_SERVICE_TOKEN_TOKEN]
@@ -84,10 +86,10 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 		UID:        accessTunnel.UID,
 		Controller: pointer.To(true),
 	}}
-	ls := map[string]string{"app": "cloudflared", "name": name, "fqdn": fqdn, "port": fmt.Sprint(port)}
+	ls := map[string]string{"app": "cloudflared", "name": accessTunnel.Name}
 	return &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:            name,
+				Name:            accessTunnel.Name,
 				Namespace:       namespace,
 				Labels:          ls,
 				OwnerReferences: ownerRefs,
@@ -114,8 +116,8 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 							Args:  args,
 							Ports: []corev1.ContainerPort{
 								{
-									Name:          protocol,
-									ContainerPort: port,
+									Name:          accessTunnel.Name,
+									ContainerPort: CONTAINER_PORT,
 									Protocol:      corev1Protocol,
 								},
 							},
@@ -166,7 +168,7 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 			},
 		}, &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:            name,
+				Name:            svcName,
 				Namespace:       namespace,
 				Labels:          ls,
 				OwnerReferences: ownerRefs,
@@ -176,7 +178,7 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 				Ports: []corev1.ServicePort{{
 					Name:       protocol,
 					Protocol:   corev1Protocol,
-					TargetPort: intstr.FromInt32(port),
+					TargetPort: intstr.FromInt32(CONTAINER_PORT),
 					Port:       port,
 				}},
 			},
