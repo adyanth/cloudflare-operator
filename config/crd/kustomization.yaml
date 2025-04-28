@@ -5,6 +5,7 @@ resources:
 - bases/networking.cfargotunnel.com_tunnels.yaml
 - bases/networking.cfargotunnel.com_clustertunnels.yaml
 - bases/networking.cfargotunnel.com_tunnelbindings.yaml
+- bases/networking.cfargotunnel.com_accesses.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patches:
@@ -20,6 +21,7 @@ patches:
 #- patches/cainjection_in_tunnels.yaml
 #- patches/cainjection_in_clustertunnels.yaml
 #- patches/cainjection_in_tunnelbindings.yaml
+#- path: patches/cainjection_in_accesses.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # the following config is for teaching kustomize how to do kustomization for CRDs.
