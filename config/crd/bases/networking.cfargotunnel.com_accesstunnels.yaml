@@ -98,7 +98,7 @@ spec:
                       Defaults to 8000
                     format: int32
                     maximum: 65535
-                    minimum: 0
+                    minimum: 1
                     type: integer
                 type: object
             required:

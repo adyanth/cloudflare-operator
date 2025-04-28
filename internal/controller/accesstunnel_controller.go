@@ -57,6 +57,9 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 		name = accessTunnel.Target.Svc.Name
 	}
 	port := accessTunnel.Target.Svc.Port
+	if port == 0 {
+		port = 8000
+	}
 	namespace := accessTunnel.GetNamespace()
 	image := accessTunnel.Target.Image
 	fqdn := accessTunnel.Target.Fqdn
@@ -161,14 +164,12 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 			},
 			Spec: corev1.ServiceSpec{
 				Selector: ls,
-				Ports: []corev1.ServicePort{
-					corev1.ServicePort{
-						Name:       protocol,
-						Protocol:   corev1Protocol,
-						TargetPort: intstr.IntOrString{IntVal: port},
-						Port:       port,
-					},
-				},
+				Ports: []corev1.ServicePort{{
+					Name:       protocol,
+					Protocol:   corev1Protocol,
+					TargetPort: intstr.FromInt32(port),
+					Port:       port,
+				}},
 			},
 		}
 }
