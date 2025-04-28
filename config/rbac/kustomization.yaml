@@ -25,5 +25,3 @@ resources:
 # if you do not want those helpers be installed with your Project.
 - accesstunnel_editor_role.yaml
 - accesstunnel_viewer_role.yaml
-- access_editor_role.yaml
-- access_viewer_role.yaml

@@ -5,7 +5,6 @@ resources:
 - bases/networking.cfargotunnel.com_tunnels.yaml
 - bases/networking.cfargotunnel.com_clustertunnels.yaml
 - bases/networking.cfargotunnel.com_tunnelbindings.yaml
-- bases/networking.cfargotunnel.com_accesses.yaml
 - bases/networking.cfargotunnel.com_accesstunnels.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
@@ -22,7 +21,6 @@ patches:
 #- patches/cainjection_in_tunnels.yaml
 #- patches/cainjection_in_clustertunnels.yaml
 #- patches/cainjection_in_tunnelbindings.yaml
-#- path: patches/cainjection_in_accesses.yaml
 #- path: patches/cainjection_in_accesstunnels.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 
