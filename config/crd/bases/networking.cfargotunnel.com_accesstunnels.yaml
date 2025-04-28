@@ -1,0 +1,111 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.1
+  name: accesstunnels.networking.cfargotunnel.com
+spec:
+  group: networking.cfargotunnel.com
+  names:
+    kind: AccessTunnel
+    listKind: AccessTunnelList
+    plural: accesstunnels
+    singular: accesstunnel
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .target.fqdn
+      name: Target
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: AccessTunnel is the Schema for the accesstunnels API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          serviceToken:
+            description: AccessTunnelServiceToken defines the access auth if needed
+            properties:
+              CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID:
+                default: CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID
+                description: Key in the secret to use for Access Service Token ID,
+                  defaults to CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID
+                type: string
+              CLOUDFLARE_ACCESS_SERVICE_TOKEN_TOKEN:
+                default: CLOUDFLARE_ACCESS_SERVICE_TOKEN_TOKEN
+                description: Key in the secret to use for Access Service Token Token,
+                  defaults to CLOUDFLARE_ACCESS_SERVICE_TOKEN_TOKEN
+                type: string
+              secretRef:
+                description: Access Service Token Secret
+                type: string
+            required:
+            - secretRef
+            type: object
+          status:
+            description: AccessTunnelStatus defines the observed state of Access
+            type: object
+          target:
+            description: AccessTunnelTarget defines the desired state of Access
+            properties:
+              fqdn:
+                description: |-
+                  Fqdn specifies the DNS name to access
+                  This is not validated and used as provided
+                type: string
+              image:
+                default: cloudflare/cloudflared:2025.4.0
+                description: cloudflared image to use
+                type: string
+              protocol:
+                default: tcp
+                description: Protocol to forward, better to use TCP?
+                enum:
+                - tcp
+                - rdp
+                - smb
+                - ssh
+                type: string
+              svc:
+                description: Service Config
+                properties:
+                  name:
+                    description: |-
+                      Name of the new service to create
+                      Defaults to the name of the Access object
+                    type: string
+                  port:
+                    default: 8000
+                    description: |-
+                      Service port to expose with
+                      Defaults to 8000
+                    format: int32
+                    maximum: 65535
+                    minimum: 1
+                    type: integer
+                type: object
+            required:
+            - fqdn
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

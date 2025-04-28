@@ -1,0 +1,17 @@
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: AccessTunnel
+metadata:
+  labels:
+    app.kubernetes.io/name: cloudflare-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: accesstunnel-sample
+target:
+  fqdn: sample.domain.com
+  protocol: tcp
+  svc:
+    name: sample
+    port: 8080
+# serviceToken:
+#   secretRef: mysecret
+#   CLOUDFLARE_ACCESS_SERVICE_TOKEN_ID: id
+#   CLOUDFLARE_ACCESS_SERVICE_TOKEN_TOKEN: token

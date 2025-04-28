@@ -41,12 +41,16 @@ rules:
   resources:
   - services
   verbs:
+  - create
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - networking.cfargotunnel.com
   resources:
+  - accesstunnels
   - clustertunnels
   - tunnelbindings
   - tunnels
@@ -61,18 +65,19 @@ rules:
 - apiGroups:
   - networking.cfargotunnel.com
   resources:
-  - clustertunnels/finalizers
-  - tunnelbindings/finalizers
-  - tunnels/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - networking.cfargotunnel.com
-  resources:
+  - accesstunnels/status
   - clustertunnels/status
   - tunnelbindings/status
   - tunnels/status
   verbs:
   - get
   - patch
+  - update
+- apiGroups:
+  - networking.cfargotunnel.com
+  resources:
+  - clustertunnels/finalizers
+  - tunnelbindings/finalizers
+  - tunnels/finalizers
+  verbs:
   - update
