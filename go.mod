@@ -1,6 +1,6 @@
 module github.com/adyanth/cloudflare-operator
 
-go 1.22.0
+go 1.24
 
 require (
 	github.com/cloudflare/cloudflare-go v0.115.0
