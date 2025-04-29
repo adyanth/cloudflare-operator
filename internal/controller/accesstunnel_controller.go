@@ -88,6 +88,10 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 	}}
 	ls := map[string]string{"app": "cloudflared", "name": accessTunnel.Name}
 	return &appsv1.Deployment{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: appsv1.SchemeGroupVersion.String(),
+				Kind:       "Deployment",
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:            accessTunnel.Name,
 				Namespace:       namespace,
@@ -167,6 +171,10 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 				},
 			},
 		}, &corev1.Service{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: corev1.SchemeGroupVersion.String(),
+				Kind:       "Service",
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:            svcName,
 				Namespace:       namespace,
@@ -185,26 +193,21 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 		}
 }
 
-func (r *AccessTunnelReconciler) createOrUpdate(object client.Object, objectName string) (ctrl.Result, error) {
-	namespaceString := fmt.Sprintf("%s.Namespace", objectName)
-	nameString := fmt.Sprintf("%s.Name", objectName)
-	r.log.Info(fmt.Sprintf("Creating a new %s", objectName), namespaceString, object.GetNamespace(), nameString, object.GetName())
-	r.Recorder.Event(r.accessTunnel, corev1.EventTypeNormal, "Deploying", fmt.Sprintf("Creating AccessTunnel %s", objectName))
-	if err := r.Client.Create(r.ctx, object); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			if err = r.Client.Update(r.ctx, object); err != nil {
-				r.log.Error(err, fmt.Sprintf("Failed to update new %s", objectName), namespaceString, object.GetNamespace(), nameString, object.GetName())
-				r.Recorder.Event(r.accessTunnel, corev1.EventTypeWarning, "FailedDeploying", fmt.Sprintf("Updating AccessTunnel %s failed", objectName))
-				return ctrl.Result{}, err
-			}
-		} else {
-			r.log.Error(err, fmt.Sprintf("Failed to create new %s", objectName), namespaceString, object.GetNamespace(), nameString, object.GetName())
-			r.Recorder.Event(r.accessTunnel, corev1.EventTypeWarning, "FailedDeploying", fmt.Sprintf("Creating AccessTunnel %s failed", objectName))
-			return ctrl.Result{}, err
-		}
+func (r *AccessTunnelReconciler) apply(object client.Object) (ctrl.Result, error) {
+	objectKind := object.GetObjectKind().GroupVersionKind().Kind
+	namespaceString := fmt.Sprintf("%s.Namespace", objectKind)
+	nameString := fmt.Sprintf("%s.Name", objectKind)
+	r.log.Info(fmt.Sprintf("Applying AccessTunnel %s", objectKind), namespaceString, object.GetNamespace(), nameString, object.GetName())
+	r.Recorder.Event(r.accessTunnel, corev1.EventTypeNormal, "Applying", fmt.Sprintf("Creating AccessTunnel %s", objectKind))
+
+	if err := r.Client.Patch(r.ctx, object, client.Apply, client.ForceOwnership, client.FieldOwner("cloudflare-operator")); err != nil {
+		r.log.Error(err, fmt.Sprintf("Failed to apply new %s", objectKind), namespaceString, object.GetNamespace(), nameString, object.GetName())
+		r.Recorder.Event(r.accessTunnel, corev1.EventTypeWarning, "FailedApplying", fmt.Sprintf("Applying AccessTunnel %s failed", objectKind))
+		return ctrl.Result{}, err
 	}
-	r.log.Info(fmt.Sprintf("%s created", objectName), namespaceString, object.GetNamespace(), nameString, object.GetName())
-	r.Recorder.Event(r.accessTunnel, corev1.EventTypeNormal, "Deployed", fmt.Sprintf("Created AccessTunnel %s", objectName))
+
+	r.log.Info(fmt.Sprintf("%s applied", objectKind), namespaceString, object.GetNamespace(), nameString, object.GetName())
+	r.Recorder.Event(r.accessTunnel, corev1.EventTypeNormal, "Applied", fmt.Sprintf("Applied AccessTunnel %s", objectKind))
 	return ctrl.Result{}, nil
 }
 
@@ -259,10 +262,10 @@ func (r *AccessTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Create/Update deployment
 	dep, svc := cloudflaredDeploymentService(accessTunnel, secret)
 
-	if res, err := r.createOrUpdate(dep, "Deployment"); err != nil {
+	if res, err := r.apply(dep); err != nil {
 		return res, err
 	}
-	if res, err := r.createOrUpdate(svc, "Service"); err != nil {
+	if res, err := r.apply(svc); err != nil {
 		return res, err
 	}
 
@@ -274,5 +277,7 @@ func (r *AccessTunnelReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.Recorder = mgr.GetEventRecorderFor("cloudflare-operator")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&networkingv1alpha1.AccessTunnel{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&corev1.Secret{}).
 		Complete(r)
 }
