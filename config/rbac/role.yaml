@@ -66,9 +66,7 @@ rules:
   - networking.cfargotunnel.com
   resources:
   - accesstunnels/status
-  - clustertunnels/status
   - tunnelbindings/status
-  - tunnels/status
   verbs:
   - get
   - patch
@@ -81,3 +79,14 @@ rules:
   - tunnels/finalizers
   verbs:
   - update
+- apiGroups:
+  - networking.cfargotunnel.com
+  resources:
+  - clustertunnels/status
+  - tunnels/status
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch

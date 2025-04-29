@@ -121,6 +121,7 @@ func (r *ClusterTunnelReconciler) initStruct(ctx context.Context, tunnel Tunnel)
 //+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels/finalizers,verbs=update
+//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnelbindings,verbs=create;update;patch
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
@@ -178,6 +179,7 @@ func (r *ClusterTunnelReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.Recorder = mgr.GetEventRecorderFor("cloudflare-operator")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&networkingv1alpha1.ClusterTunnel{}).
+		Owns(&networkingv1alpha1.TunnelBinding{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.Secret{}).
 		Owns(&appsv1.Deployment{}).
