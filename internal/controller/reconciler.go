@@ -298,9 +298,7 @@ func createOrUpdateManagedDeployment(r GenericTunnelReconciler) (ctrl.Result, er
 	// update if not created
 	// diffing deployments is quite a lot more involved than diffing pods
 	// so pods are diffed until there's time for a full solution
-	existingPodSpec := existingDeployment.Spec.Template.Spec
-	desiredPodSpec := desiredDeployment.Spec.Template.Spec
-	if !apiequality.Semantic.DeepEqual(existingPodSpec, desiredPodSpec) {
+	if !apiequality.Semantic.DeepEqual(existingDeployment.Spec, desiredDeployment.Spec) {
 		if res, err := updateManagedDeployment(r, desiredDeployment); err != nil || (res != ctrl.Result{}) {
 			return res, err
 		}
@@ -340,9 +338,9 @@ func updateManagedDeployment(r GenericTunnelReconciler, cfDeployment *appsv1.Dep
 	r.GetLog().Info("Updating deployment")
 	r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Updating", "Updating Tunnel Deployment")
 
-	if err := r.GetClient().Update(r.GetContext(), cfDeployment); err != nil {
+	if err := r.GetClient().Patch(r.GetContext(), cfDeployment, client.Apply, client.ForceOwnership, client.FieldOwner("cloudflare-operator")); err != nil {
 		r.GetLog().Error(err, "Failed to update Deployment", "Deployment.Namespace", cfDeployment.Namespace, "Deployment.Name", cfDeployment.Name)
-		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedScaling", "Failed to scale Tunnel Deployment")
+		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedUpdate", "Failed to update Tunnel Deployment")
 		return ctrl.Result{}, err
 	}
 	r.GetLog().Info("Deployment updated")
