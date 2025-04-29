@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"time"
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
@@ -334,15 +335,23 @@ func createManagedDeployment(r GenericTunnelReconciler, cfDeployment *appsv1.Dep
 	return ctrl.Result{Requeue: true}, nil
 }
 
-func updateManagedDeployment(r GenericTunnelReconciler, cfDeployment *appsv1.Deployment) (ctrl.Result, error) {
-	r.GetLog().Info("Updating deployment")
-	r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Updating", "Updating Tunnel Deployment")
+func updateManagedDeployment(r GenericTunnelReconciler, cfDeployment client.Object) (ctrl.Result, error) {
+	//r.GetLog().Info("Updating deployment")
+	//r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Updating", "Updating Tunnel Deployment")
 
+	objectKind := cfDeployment.GetObjectKind().GroupVersionKind().Kind
+	namespaceString := fmt.Sprintf("%s.Namespace", objectKind)
+	nameString := fmt.Sprintf("%s.Name", objectKind)
 	if err := r.GetClient().Patch(r.GetContext(), cfDeployment, client.Apply, client.ForceOwnership, client.FieldOwner("cloudflare-operator")); err != nil {
-		r.GetLog().Error(err, "Failed to update Deployment", "Deployment.Namespace", cfDeployment.Namespace, "Deployment.Name", cfDeployment.Name)
-		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedUpdate", "Failed to update Tunnel Deployment")
+		r.GetLog().Error(err, fmt.Sprintf("Failed to apply new %s", objectKind), namespaceString, cfDeployment.GetNamespace(), nameString, cfDeployment.GetName())
+		r.GetRecorder().Event(cfDeployment, corev1.EventTypeWarning, "FailedApplying", fmt.Sprintf("Applying AccessTunnel %s failed", objectKind))
 		return ctrl.Result{}, err
 	}
+	//if err := r.GetClient().Patch(r.GetContext(), cfDeployment, client.Apply, client.ForceOwnership, client.FieldOwner("cloudflare-operator")); err != nil {
+	//	r.GetLog().Error(err, "Failed to update Deployment", "Deployment.Namespace", cfDeployment.Namespace, "Deployment.Name", cfDeployment.Name)
+	//	r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedUpdate", "Failed to update Tunnel Deployment")
+	//	return ctrl.Result{}, err
+	//}
 	r.GetLog().Info("Deployment updated")
 	r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Updated", "Updated Tunnel Deployment")
 	// Ask to requeue after 1 minute in order to give enough time for the
@@ -588,6 +597,11 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 			},
 		},
 	}
+	dep.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "apps",
+		Version: "v1",
+		Kind:    "Deployment",
+	})
 	// Set Tunnel instance as the owner and controller
 	ctrl.SetControllerReference(r.GetTunnel().GetObject(), dep, r.GetScheme())
 	return dep
