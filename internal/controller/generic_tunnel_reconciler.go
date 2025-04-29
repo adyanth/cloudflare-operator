@@ -233,12 +233,12 @@ func createManagedResources(r GenericTunnelReconciler) (ctrl.Result, error) {
 	}
 
 	// Check if ConfigMap already exists, else create it
-	if err := apply(r, configMapForTunnel(r)); err != nil {
+	if err := mergeOrApply(r, configMapForTunnel(r)); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Create Deployment if it does not exist and scale it
-	if err := apply(r, deploymentForTunnel(r)); err != nil {
+	if err := mergeOrApply(r, deploymentForTunnel(r)); err != nil {
 		return ctrl.Result{}, err
 	}
 

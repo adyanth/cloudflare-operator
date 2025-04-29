@@ -59,10 +59,10 @@ type TunnelBindingReconciler struct {
 }
 
 // labelsForBinding returns the labels for selecting the Bindings served by a Tunnel.
-func (r TunnelBindingReconciler) labelsForBinding() map[string]string {
+func labelsForBinding(binding networkingv1alpha1.TunnelBinding) map[string]string {
 	labels := map[string]string{
-		tunnelNameLabel: r.binding.TunnelRef.Name,
-		tunnelKindLabel: r.binding.Kind,
+		tunnelNameLabel: binding.TunnelRef.Name,
+		tunnelKindLabel: binding.Kind,
 	}
 
 	return labels
@@ -253,7 +253,7 @@ func (r *TunnelBindingReconciler) creationLogic() error {
 	if r.binding.Labels == nil {
 		r.binding.Labels = make(map[string]string)
 	}
-	for k, v := range r.labelsForBinding() {
+	for k, v := range labelsForBinding(*r.binding) {
 		r.binding.Labels[k] = v
 	}
 
