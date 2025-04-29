@@ -23,3 +23,6 @@ testbin/*
 *.swp
 *.swo
 *~
+
+# used for development
+secrets
