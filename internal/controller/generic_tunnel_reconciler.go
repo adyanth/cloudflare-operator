@@ -238,7 +238,7 @@ func createManagedResources(r GenericTunnelReconciler) (ctrl.Result, error) {
 	}
 
 	// Create Deployment if it does not exist and scale it
-	if err := mergeOrApply(r, deploymentForTunnel(r)); err != nil {
+	if err := apply(r, deploymentForTunnel(r)); err != nil {
 		return ctrl.Result{}, err
 	}
 
