@@ -99,6 +99,7 @@ type TunnelBindingSubjectSpec struct {
 type TunnelRef struct {
 	// Kind can be Tunnel or ClusterTunnel
 	//+kubebuilder:validation:Required
+	//+kubebuilder:validation:Enum:="ClusterTunnel";"Tunnel"
 	Kind string `json:"kind"`
 	// Name of the tunnel resource
 	//+kubebuilder:validation:Required
