@@ -1,0 +1,26 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: cloudflare-operator
+  name: cloudflare-operator-accesstunnel-editor-role
+rules:
+- apiGroups:
+  - networking.cfargotunnel.com
+  resources:
+  - accesstunnels
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - networking.cfargotunnel.com
+  resources:
+  - accesstunnels/status
+  verbs:
+  - get

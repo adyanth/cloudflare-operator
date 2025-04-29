@@ -1,0 +1,22 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: cloudflare-operator
+  name: cloudflare-operator-accesstunnel-viewer-role
+rules:
+  - apiGroups:
+      - networking.cfargotunnel.com
+    resources:
+      - accesstunnels
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - networking.cfargotunnel.com
+    resources:
+      - accesstunnels/status
+    verbs:
+      - get

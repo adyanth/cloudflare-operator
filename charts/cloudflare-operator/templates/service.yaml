@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cloudflare-operator.fullname" . }}
+  labels:
+    {{- include "cloudflare-operator.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: 8443
+      protocol: TCP
+      name: https
+  selector:
+    {{- include "cloudflare-operator.selectorLabels" . | nindent 4 }}

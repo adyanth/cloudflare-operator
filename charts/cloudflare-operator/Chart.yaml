@@ -1,0 +1,7 @@
+apiVersion: v2
+name: cloudflare-operator
+description: A kubernetes controller for clouflare resource
+type: application
+
+appVersion: 0.12.0
+version: 0.0.1
