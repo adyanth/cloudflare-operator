@@ -7,7 +7,6 @@ import (
 	"time"
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
-	"github.com/adyanth/cloudflare-operator/internal/utils/pointer"
 	"github.com/go-logr/logr"
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
@@ -20,6 +19,7 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -513,7 +513,7 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 					RestartPolicy:                 corev1.RestartPolicyAlways,
 					TerminationGracePeriodSeconds: pointer.To(int64(30)),
 					SecurityContext: &corev1.PodSecurityContext{
-						RunAsNonRoot: pointer.To(true),
+						RunAsNonRoot: ptr.To(true),
 						SeccompProfile: &corev1.SeccompProfile{
 							Type: corev1.SeccompProfileTypeRuntimeDefault,
 						},
@@ -552,9 +552,9 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 							Limits:   corev1.ResourceList{"memory": resource.MustParse("256Mi"), "cpu": resource.MustParse("500m")},
 						},
 						SecurityContext: &corev1.SecurityContext{
-							AllowPrivilegeEscalation: pointer.To(false),
-							ReadOnlyRootFilesystem:   pointer.To(true),
-							RunAsUser:                pointer.To(int64(1002)),
+							AllowPrivilegeEscalation: ptr.To(false),
+							ReadOnlyRootFilesystem:   ptr.To(true),
+							RunAsUser:                ptr.To(int64(1002)),
 							Capabilities: &corev1.Capabilities{
 								Drop: []corev1.Capability{
 									"ALL",

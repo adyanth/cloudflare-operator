@@ -29,12 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
-	"github.com/adyanth/cloudflare-operator/internal/utils/pointer"
 	"github.com/go-logr/logr"
 )
 
@@ -79,12 +79,14 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 		args = append(args, "--service-token-id", string(id), "--service-token-secret", string(token))
 	}
 
+	// Instead of using: ctrl.SetControllerReference(accessTunnel, &appsv1.Deployment{}, scheme)
 	ownerRefs := []metav1.OwnerReference{{
-		APIVersion: accessTunnel.APIVersion,
-		Kind:       accessTunnel.Kind,
-		Name:       accessTunnel.Name,
-		UID:        accessTunnel.UID,
-		Controller: pointer.To(true),
+		APIVersion:         accessTunnel.APIVersion,
+		Kind:               accessTunnel.Kind,
+		Name:               accessTunnel.Name,
+		UID:                accessTunnel.UID,
+		Controller:         ptr.To(true),
+		BlockOwnerDeletion: ptr.To(true),
 	}}
 	ls := map[string]string{"app": "cloudflared", "name": accessTunnel.Name}
 	return &appsv1.Deployment{
@@ -99,7 +101,7 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 				OwnerReferences: ownerRefs,
 			},
 			Spec: appsv1.DeploymentSpec{
-				Replicas: pointer.To(int32(1)),
+				Replicas: ptr.To(int32(1)),
 				Selector: &metav1.LabelSelector{
 					MatchLabels: ls,
 				},
@@ -109,7 +111,7 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 					},
 					Spec: corev1.PodSpec{
 						SecurityContext: &corev1.PodSecurityContext{
-							RunAsNonRoot: pointer.To(true),
+							RunAsNonRoot: ptr.To(true),
 							SeccompProfile: &corev1.SeccompProfile{
 								Type: corev1.SeccompProfileTypeRuntimeDefault,
 							},
@@ -130,9 +132,9 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 								Limits:   corev1.ResourceList{"memory": resource.MustParse("256Mi"), "cpu": resource.MustParse("500m")},
 							},
 							SecurityContext: &corev1.SecurityContext{
-								AllowPrivilegeEscalation: pointer.To(false),
-								ReadOnlyRootFilesystem:   pointer.To(true),
-								RunAsUser:                pointer.To(int64(1002)),
+								AllowPrivilegeEscalation: ptr.To(false),
+								ReadOnlyRootFilesystem:   ptr.To(true),
+								RunAsUser:                ptr.To(int64(1002)),
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{
 										"ALL",
@@ -193,7 +195,7 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 		}
 }
 
-func (r *AccessTunnelReconciler) apply(object client.Object) (ctrl.Result, error) {
+func (r *AccessTunnelReconciler) apply(object client.Object) error {
 	objectKind := object.GetObjectKind().GroupVersionKind().Kind
 	namespaceString := fmt.Sprintf("%s.Namespace", objectKind)
 	nameString := fmt.Sprintf("%s.Name", objectKind)
@@ -203,12 +205,12 @@ func (r *AccessTunnelReconciler) apply(object client.Object) (ctrl.Result, error
 	if err := r.Client.Patch(r.ctx, object, client.Apply, client.ForceOwnership, client.FieldOwner("cloudflare-operator")); err != nil {
 		r.log.Error(err, fmt.Sprintf("Failed to apply new %s", objectKind), namespaceString, object.GetNamespace(), nameString, object.GetName())
 		r.Recorder.Event(r.accessTunnel, corev1.EventTypeWarning, "FailedApplying", fmt.Sprintf("Applying AccessTunnel %s failed", objectKind))
-		return ctrl.Result{}, err
+		return err
 	}
 
 	r.log.Info(fmt.Sprintf("%s applied", objectKind), namespaceString, object.GetNamespace(), nameString, object.GetName())
 	r.Recorder.Event(r.accessTunnel, corev1.EventTypeNormal, "Applied", fmt.Sprintf("Applied AccessTunnel %s", objectKind))
-	return ctrl.Result{}, nil
+	return nil
 }
 
 // +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=accesstunnels,verbs=get;list;watch;create;update;patch;delete
@@ -262,11 +264,11 @@ func (r *AccessTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Create/Update deployment
 	dep, svc := cloudflaredDeploymentService(accessTunnel, secret)
 
-	if res, err := r.apply(dep); err != nil {
-		return res, err
+	if err := r.apply(dep); err != nil {
+		return ctrl.Result{}, err
 	}
-	if res, err := r.apply(svc); err != nil {
-		return res, err
+	if err := r.apply(svc); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
