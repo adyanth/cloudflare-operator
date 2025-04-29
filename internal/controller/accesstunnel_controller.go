@@ -53,6 +53,27 @@ type AccessTunnelReconciler struct {
 	accessTunnel *networkingv1alpha1.AccessTunnel
 }
 
+func (r *AccessTunnelReconciler) GetLog() logr.Logger {
+	return r.log
+}
+func (r *AccessTunnelReconciler) GetRecorder() record.EventRecorder {
+	return r.Recorder
+}
+func (r *AccessTunnelReconciler) GetClient() client.Client {
+	return r.Client
+}
+func (r *AccessTunnelReconciler) GetReconciledObject() client.Object {
+	return r.accessTunnel
+}
+func (r *AccessTunnelReconciler) GetContext() context.Context {
+	return r.ctx
+}
+func (r *AccessTunnelReconciler) GetReconcilerName() string {
+	return "AccessTunnel"
+}
+
+var _ GenericReconciler = &AccessTunnelReconciler{}
+
 func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel, secret *corev1.Secret) (*appsv1.Deployment, *corev1.Service) {
 	svcName := accessTunnel.GetName()
 	if accessTunnel.Target.Svc.Name != "" {
@@ -195,24 +216,6 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 		}
 }
 
-func (r *AccessTunnelReconciler) apply(object client.Object) error {
-	objectKind := object.GetObjectKind().GroupVersionKind().Kind
-	namespaceString := fmt.Sprintf("%s.Namespace", objectKind)
-	nameString := fmt.Sprintf("%s.Name", objectKind)
-	r.log.Info(fmt.Sprintf("Applying AccessTunnel %s", objectKind), namespaceString, object.GetNamespace(), nameString, object.GetName())
-	r.Recorder.Event(r.accessTunnel, corev1.EventTypeNormal, "Applying", fmt.Sprintf("Creating AccessTunnel %s", objectKind))
-
-	if err := r.Client.Patch(r.ctx, object, client.Apply, client.ForceOwnership, client.FieldOwner("cloudflare-operator")); err != nil {
-		r.log.Error(err, fmt.Sprintf("Failed to apply new %s", objectKind), namespaceString, object.GetNamespace(), nameString, object.GetName())
-		r.Recorder.Event(r.accessTunnel, corev1.EventTypeWarning, "FailedApplying", fmt.Sprintf("Applying AccessTunnel %s failed", objectKind))
-		return err
-	}
-
-	r.log.Info(fmt.Sprintf("%s applied", objectKind), namespaceString, object.GetNamespace(), nameString, object.GetName())
-	r.Recorder.Event(r.accessTunnel, corev1.EventTypeNormal, "Applied", fmt.Sprintf("Applied AccessTunnel %s", objectKind))
-	return nil
-}
-
 // +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=accesstunnels,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=accesstunnels/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;create;update;patch
@@ -264,10 +267,10 @@ func (r *AccessTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Create/Update deployment
 	dep, svc := cloudflaredDeploymentService(accessTunnel, secret)
 
-	if err := r.apply(dep); err != nil {
+	if err := apply(r, dep); err != nil {
 		return ctrl.Result{}, err
 	}
-	if err := r.apply(svc); err != nil {
+	if err := apply(r, svc); err != nil {
 		return ctrl.Result{}, err
 	}
 
