@@ -15,6 +15,27 @@ This configuration has a few use cases:
 - You want to keep your reverse proxy configuration modular, so that you can use any load balancer implementation
 - you use a service mesh with its own ingress implementation
 
+```
++----------------------+
+|   internet users     |
++----------------------+
+           |
+           v
++----------------------+
+|  cloudflare tunnel   |
++----------------------+
+           |
+           v
++----------------------+
+|    reverse proxy     |
++----------------------+
+     |           |
+     v           v
++---------+ +----------+
+| App #1  | |  App #2  |
++---------+ +----------+
+```
+
 ## What have we got here
 
 In this example we will:
