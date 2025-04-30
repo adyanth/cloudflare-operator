@@ -139,8 +139,9 @@ apiVersion: networking.cfargotunnel.com/v1alpha1
 kind: TunnelBinding
 metadata:
   name: authelia
+  namespace: authelia
 subjects:
-  - name: authelia # maps to the fqdn authelia.<domain>
+  - name: authelia # the fqdn authelia.<domain> maps to this service
 tunnelRef:
   kind: ClusterTunnel
   name: example-tunnel
