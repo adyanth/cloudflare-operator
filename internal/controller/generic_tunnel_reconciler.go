@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -133,6 +134,7 @@ func setupNewTunnel(r GenericTunnelReconciler) error {
 		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Created", "Tunnel created successfully on Cloudflare")
 		r.SetTunnelCreds(creds)
 	} else {
+		// Read existing secret into tunnelCreds
 		secret := &corev1.Secret{}
 		if err := r.GetClient().Get(r.GetContext(), TunnelNamespacedName(r), secret); err != nil {
 			r.GetLog().Error(err, "Error in getting existing secret, tunnel restart will crash, please recreate tunnel")
@@ -238,8 +240,13 @@ func updateTunnelStatus(r GenericTunnelReconciler) error {
 
 func createManagedResources(r GenericTunnelReconciler) (ctrl.Result, error) {
 	// Check if Secret already exists, else create it
-	if err := k8s.Apply(r, secretForTunnel(r)); err != nil {
-		return ctrl.Result{}, err
+	// Skip breaking secret if tunnel creds is empty, something went wrong
+	if r.GetTunnelCreds() != "" {
+		if err := k8s.Apply(r, secretForTunnel(r)); err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		r.GetLog().Error(errors.New("empty tunnel creds"), "skipping updating the tunnel secret")
 	}
 
 	// Check if ConfigMap already exists, else create it
