@@ -13,8 +13,8 @@ This configuration has a few use cases:
   This configuration allows additional routes to be added with a tunnel binding to use this reverse proxy in combination with other routes.
 - You require reverse proxy functionality that cloudflared does not have
 - You want to keep your reverse proxy configuration modular, so that you can use any load balancer implementation
-- you use a service mesh with its own ingress implementation
-
+- You use a service mesh with its own ingress implementation
+- You have multiple load balancers pointing at your ingress. For example a lab might include metallb + DNS entries so that you are not traversing the internet when on the same network as your cluster
 ```
 +----------------------+
 |   internet users     |
