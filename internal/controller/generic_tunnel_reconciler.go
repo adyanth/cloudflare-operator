@@ -11,7 +11,6 @@ import (
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -239,18 +238,7 @@ func createManagedResources(r GenericTunnelReconciler) (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
-	// Create Deployment if it does not exist and update it.
-	// Copy over annotations if any set by tunnelBindings
-	dep := deploymentForTunnel(r)
-	existingDep := &appsv1.Deployment{}
-	if err := r.GetClient().Get(r.GetContext(), apitypes.NamespacedName{Name: dep.Name, Namespace: dep.Namespace}, existingDep); err != nil {
-		if !apierrors.IsNotFound(err) {
-			r.GetLog().Error(err, "unable to fetch dep, skipping")
-		}
-	}
-	dep.SetAnnotations(existingDep.Annotations)
-
-	if err := k8s.Apply(r, dep); err != nil {
+	if err := k8s.Apply(r, deploymentForTunnel(r)); err != nil {
 		return ctrl.Result{}, err
 	}
 
