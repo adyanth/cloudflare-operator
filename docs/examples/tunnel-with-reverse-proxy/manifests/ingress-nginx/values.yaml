@@ -5,11 +5,11 @@ controller:
   service:
     type: ClusterIP
 
-  # this config allows your services to read the IP address from connecting clients
-  config:
-    enable-real-ip: "true"                     # tell nginx to trust the header we pick up from Cloudflare
-    forwarded-for-header: "CF-Connecting-IP"   # remap this header (from CF tunnel) to x-forwarded-for
-    use-forwarded-headers: "true"              # keep/pass X-Forwarded-*
-    # trust setting the x-forwarded-for header from all pods in k8s.
-    # Ideally this would be only the CF tunnel pods.
-    proxy-real-ip-cidr: <your-cluster-pod-cidr>
+#   # this config allows your services to read the IP address from connecting clients
+#   config:
+#     enable-real-ip: "true"                     # tell nginx to trust the header we pick up from Cloudflare
+#     forwarded-for-header: "CF-Connecting-IP"   # remap this header (from CF tunnel) to x-forwarded-for
+#     use-forwarded-headers: "true"              # keep/pass X-Forwarded-*
+#     # trust setting the x-forwarded-for header from all pods in k8s.
+#     # Ideally this would be only the CF tunnel pods.
+#     proxy-real-ip-cidr: <your-cluster-pod-cidr>
