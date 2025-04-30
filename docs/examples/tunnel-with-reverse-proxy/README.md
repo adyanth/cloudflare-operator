@@ -6,7 +6,7 @@
 
 Cloudflare tunnels can be used as a reverse proxy, or can forward traffic to an existing reverse proxy.
 This example shows how to configure cloudflared using the cloudflare-operator to front a reverse proxy. 
-In effect, we are using it as a layer 7 or layer 4 load balancer depending on whether we forward TCP/UDP or HTTP/HTTPS traffic.
+In effect, we are using it as a layer 4 or 7 load balancer depending on whether we forward TCP/UDP or HTTP/HTTPS traffic respectively.
 
 This configuration has a few use cases:
 - You have significant existing reverse proxy configuration, which you may or may not want to migrate to cloudflared.
