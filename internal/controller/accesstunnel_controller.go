@@ -35,6 +35,7 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
+	"github.com/adyanth/cloudflare-operator/internal/k8s"
 	"github.com/go-logr/logr"
 )
 
@@ -72,7 +73,7 @@ func (r *AccessTunnelReconciler) GetReconcilerName() string {
 	return "AccessTunnel"
 }
 
-var _ GenericReconciler = &AccessTunnelReconciler{}
+var _ k8s.GenericReconciler = &AccessTunnelReconciler{}
 
 func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel, secret *corev1.Secret) (*appsv1.Deployment, *corev1.Service) {
 	svcName := accessTunnel.GetName()
@@ -267,10 +268,10 @@ func (r *AccessTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Create/Update deployment
 	dep, svc := cloudflaredDeploymentService(accessTunnel, secret)
 
-	if err := apply(r, dep); err != nil {
+	if err := k8s.Apply(r, dep); err != nil {
 		return ctrl.Result{}, err
 	}
-	if err := apply(r, svc); err != nil {
+	if err := k8s.Apply(r, svc); err != nil {
 		return ctrl.Result{}, err
 	}
 

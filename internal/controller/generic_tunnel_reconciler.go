@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
+	"github.com/adyanth/cloudflare-operator/internal/k8s"
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -22,7 +23,7 @@ import (
 )
 
 type GenericTunnelReconciler interface {
-	GenericReconciler
+	k8s.GenericReconciler
 
 	GetScheme() *runtime.Scheme
 	GetTunnel() Tunnel
@@ -229,12 +230,12 @@ func updateTunnelStatus(r GenericTunnelReconciler) error {
 
 func createManagedResources(r GenericTunnelReconciler) (ctrl.Result, error) {
 	// Check if Secret already exists, else create it
-	if err := apply(r, secretForTunnel(r)); err != nil {
+	if err := k8s.Apply(r, secretForTunnel(r)); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Check if ConfigMap already exists, else create it
-	if err := mergeOrApply(r, configMapForTunnel(r)); err != nil {
+	if err := k8s.MergeOrApply(r, configMapForTunnel(r)); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -249,7 +250,7 @@ func createManagedResources(r GenericTunnelReconciler) (ctrl.Result, error) {
 	}
 	dep.SetAnnotations(existingDep.Annotations)
 
-	if err := apply(r, dep); err != nil {
+	if err := k8s.Apply(r, dep); err != nil {
 		return ctrl.Result{}, err
 	}
 

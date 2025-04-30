@@ -1,4 +1,4 @@
-package controller
+package k8s
 
 import (
 	"context"
@@ -42,17 +42,17 @@ func patch(r GenericReconciler, object client.Object, patch client.Patch) error 
 	return nil
 }
 
-func apply(r GenericReconciler, object client.Object) error {
+func Apply(r GenericReconciler, object client.Object) error {
 	return patch(r, object, client.Apply)
 }
 
-func merge(r GenericReconciler, object client.Object) error {
+func Merge(r GenericReconciler, object client.Object) error {
 	return patch(r, object, client.StrategicMergeFrom(object))
 }
 
-func mergeOrApply(r GenericReconciler, object client.Object) (err error) {
-	if err = merge(r, object); errors.IsNotFound(err) {
-		return apply(r, object)
+func MergeOrApply(r GenericReconciler, object client.Object) (err error) {
+	if err = Merge(r, object); errors.IsNotFound(err) {
+		return Apply(r, object)
 	}
 	return
 }
