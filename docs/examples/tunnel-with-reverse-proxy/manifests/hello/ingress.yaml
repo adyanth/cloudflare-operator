@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hello-demo
+  annotations: {}
+#    # uncomment if you are using cert-manager for TLS
+#    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: hello.<domain>
+      http:
+        paths:
+          - path: /(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: hello-svc
+                port:
+                  number: 80
+#  # optional: enable if you have cert manager or TLS secret
+#  tls:
+#    - hosts:
+#        - hello.example.com
+#      secretName: hello-tls
