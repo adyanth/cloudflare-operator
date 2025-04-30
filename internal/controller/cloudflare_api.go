@@ -24,9 +24,6 @@ type CloudflareAPI struct {
 	AccountName      string
 	AccountId        string
 	Domain           string
-	APIToken         string
-	APIKey           string
-	APIEmail         string
 	ValidAccountId   string
 	ValidTunnelId    string
 	ValidTunnelName  string
@@ -136,7 +133,7 @@ func (c *CloudflareAPI) ValidateAll() error {
 		return err
 	}
 
-	c.Log.Info("Validation successful")
+	c.Log.V(5).Info("Validation successful")
 	return nil
 }
 
