@@ -256,6 +256,8 @@ func createManagedResources(r GenericTunnelReconciler) (ctrl.Result, error) {
 	// Apply patch to deployment
 	dep := deploymentForTunnel(r)
 	if err := k8s.StrategicPatch(dep, r.GetTunnel().GetSpec().DeployPatch, dep); err != nil {
+		r.GetLog().Error(err, "unable to patch deployment, check patch")
+		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedPatch", "Failed to patch deployment, check patch")
 		return ctrl.Result{}, err
 	}
 
