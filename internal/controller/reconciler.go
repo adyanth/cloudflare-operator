@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"time"
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
@@ -11,6 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -277,63 +279,85 @@ func createManagedConfigMap(r GenericTunnelReconciler) error {
 	return nil
 }
 
-func createOrScaleManagedDeployment(r GenericTunnelReconciler) (ctrl.Result, bool, error) {
+func createOrUpdateManagedDeployment(r GenericTunnelReconciler) (ctrl.Result, error) {
 	// Check if Deployment already exists, else create it
-	cfDeployment := &appsv1.Deployment{}
-	if res, err := createManagedDeployment(r, cfDeployment); err != nil || (res != ctrl.Result{}) {
-		return res, false, err
+	existingDeployment := &appsv1.Deployment{}
+	exists, err := managedDeploymentExists(r, existingDeployment)
+	if err != nil {
+		r.GetLog().Error(err, "Failed to get existing Deployment")
+		return ctrl.Result{}, err
 	}
 
-	// Ensure the Deployment size is the same as the spec
-	if res, err := scaleManagedDeployment(r, cfDeployment); err != nil || (res != ctrl.Result{}) {
-		return res, false, err
+	desiredDeployment := deploymentForTunnel(r)
+	if !exists {
+		if res, err := createManagedDeployment(r, desiredDeployment); err != nil || (res != ctrl.Result{}) {
+			return res, err
+		}
+		return ctrl.Result{}, nil
 	}
 
-	return ctrl.Result{}, true, nil
+	// update if not created
+	// diffing deployments is quite a lot more involved than diffing pods
+	// so pods are diffed until there's time for a full solution
+	if !apiequality.Semantic.DeepEqual(existingDeployment.Spec, desiredDeployment.Spec) {
+		if res, err := updateManagedDeployment(r, desiredDeployment); err != nil || (res != ctrl.Result{}) {
+			return res, err
+		}
+	}
+
+	return ctrl.Result{}, nil
 }
 
-func createManagedDeployment(r GenericTunnelReconciler, cfDeployment *appsv1.Deployment) (ctrl.Result, error) {
+func managedDeploymentExists(r GenericTunnelReconciler, cfDeployment *appsv1.Deployment) (bool, error) {
 	if err := r.GetClient().Get(r.GetContext(), apitypes.NamespacedName{Name: r.GetTunnel().GetName(), Namespace: r.GetTunnel().GetNamespace()}, cfDeployment); err != nil && apierrors.IsNotFound(err) {
-		// Define a new deployment
-		dep := deploymentForTunnel(r)
-		r.GetLog().Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Deploying", "Creating Tunnel Deployment")
-		err = r.GetClient().Create(r.GetContext(), dep)
-		if err != nil {
-			r.GetLog().Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-			r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedDeploying", "Creating Tunnel Deployment failed")
-			return ctrl.Result{}, err
-		}
-		r.GetLog().Info("Deployment created", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Deployed", "Created Tunnel Deployment")
-		return ctrl.Result{Requeue: true}, nil
+		return false, nil
 	} else if err != nil {
 		r.GetLog().Error(err, "Failed to get Deployment")
 		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedDeployed", "Reading Tunnel Deployment failed")
-		return ctrl.Result{}, err
+		return false, err
 	}
-	return ctrl.Result{}, nil
+	return true, nil
 }
 
-func scaleManagedDeployment(r GenericTunnelReconciler, cfDeployment *appsv1.Deployment) (ctrl.Result, error) {
-	size := r.GetTunnel().GetSpec().Size
-	if *cfDeployment.Spec.Replicas != size {
-		r.GetLog().Info("Updating deployment", "currentReplica", *cfDeployment.Spec.Replicas, "desiredSize", size)
-		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Scaling", "Scaling Tunnel Deployment")
-		cfDeployment.Spec.Replicas = &size
-		if err := r.GetClient().Update(r.GetContext(), cfDeployment); err != nil {
-			r.GetLog().Error(err, "Failed to update Deployment", "Deployment.Namespace", cfDeployment.Namespace, "Deployment.Name", cfDeployment.Name)
-			r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedScaling", "Failed to scale Tunnel Deployment")
-			return ctrl.Result{}, err
-		}
-		r.GetLog().Info("Deployment updated")
-		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Scaled", "Scaled Tunnel Deployment")
-		// Ask to requeue after 1 minute in order to give enough time for the
-		// pods be created on the cluster side and the operand be able
-		// to do the next update step accurately.
-		return ctrl.Result{RequeueAfter: time.Minute}, nil
+func createManagedDeployment(r GenericTunnelReconciler, cfDeployment *appsv1.Deployment) (ctrl.Result, error) {
+	// Define a new deployment
+	dep := deploymentForTunnel(r)
+	r.GetLog().Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+	r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Deploying", "Creating Tunnel Deployment")
+	err := r.GetClient().Create(r.GetContext(), dep)
+	if err != nil {
+		r.GetLog().Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedDeploying", "Creating Tunnel Deployment failed")
+		return ctrl.Result{}, err
 	}
-	return ctrl.Result{}, nil
+	r.GetLog().Info("Deployment created", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+	r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Deployed", "Created Tunnel Deployment")
+	return ctrl.Result{Requeue: true}, nil
+}
+
+func updateManagedDeployment(r GenericTunnelReconciler, cfDeployment client.Object) (ctrl.Result, error) {
+	//r.GetLog().Info("Updating deployment")
+	//r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Updating", "Updating Tunnel Deployment")
+
+	objectKind := cfDeployment.GetObjectKind().GroupVersionKind().Kind
+	namespaceString := fmt.Sprintf("%s.Namespace", objectKind)
+	nameString := fmt.Sprintf("%s.Name", objectKind)
+	if err := r.GetClient().Patch(r.GetContext(), cfDeployment, client.Apply, client.ForceOwnership, client.FieldOwner("cloudflare-operator")); err != nil {
+		r.GetLog().Error(err, fmt.Sprintf("Failed to apply new %s", objectKind), namespaceString, cfDeployment.GetNamespace(), nameString, cfDeployment.GetName())
+		r.GetRecorder().Event(cfDeployment, corev1.EventTypeWarning, "FailedApplying", fmt.Sprintf("Applying AccessTunnel %s failed", objectKind))
+		return ctrl.Result{}, err
+	}
+	//if err := r.GetClient().Patch(r.GetContext(), cfDeployment, client.Apply, client.ForceOwnership, client.FieldOwner("cloudflare-operator")); err != nil {
+	//	r.GetLog().Error(err, "Failed to update Deployment", "Deployment.Namespace", cfDeployment.Namespace, "Deployment.Name", cfDeployment.Name)
+	//	r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedUpdate", "Failed to update Tunnel Deployment")
+	//	return ctrl.Result{}, err
+	//}
+	r.GetLog().Info("Deployment updated")
+	r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Updated", "Updated Tunnel Deployment")
+	// Ask to requeue after 1 minute in order to give enough time for the
+	// pods be updated on the cluster side and the operand be able
+	// to do the next update step accurately.
+	return ctrl.Result{RequeueAfter: time.Minute}, nil
 }
 
 func createManagedResources(r GenericTunnelReconciler) (ctrl.Result, bool, error) {
@@ -348,7 +372,7 @@ func createManagedResources(r GenericTunnelReconciler) (ctrl.Result, bool, error
 	}
 
 	// Create Deployment if it does not exist and scale it
-	if res, ok, err := createOrScaleManagedDeployment(r); !ok {
+	if res, err := createOrUpdateManagedDeployment(r); err != nil {
 		return res, false, err
 	}
 
@@ -418,7 +442,10 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 	volumes := []corev1.Volume{{
 		Name: "creds",
 		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{SecretName: r.GetTunnel().GetName()},
+			Secret: &corev1.SecretVolumeSource{
+				SecretName:  r.GetTunnel().GetName(),
+				DefaultMode: pointer.To(int32(420)),
+			},
 		},
 	}, {
 		Name: "config",
@@ -429,6 +456,7 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 					Key:  "config.yaml",
 					Path: "config.yaml",
 				}},
+				DefaultMode: pointer.To(int32(420)),
 			},
 		},
 	}}
@@ -466,11 +494,24 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: ls,
 			},
+			ProgressDeadlineSeconds: pointer.To(int32(600)),
+			RevisionHistoryLimit:    pointer.To(int32(10)),
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDeployment{
+					MaxUnavailable: pointer.To(intstr.IntOrString{Type: intstr.String, StrVal: "25%"}),
+					MaxSurge:       pointer.To(intstr.IntOrString{Type: intstr.String, StrVal: "25%"}),
+				},
+			},
+
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: ls,
 				},
 				Spec: corev1.PodSpec{
+					SchedulerName:                 corev1.DefaultSchedulerName,
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					TerminationGracePeriodSeconds: pointer.To(int64(30)),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsNonRoot: pointer.To(true),
 						SeccompProfile: &corev1.SeccompProfile{
@@ -478,19 +519,25 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 						},
 					},
 					Containers: []corev1.Container{{
-						Image: r.GetTunnel().GetSpec().Image,
-						Name:  "cloudflared",
-						Args:  args,
+						Image:                    r.GetTunnel().GetSpec().Image,
+						ImagePullPolicy:          corev1.PullIfNotPresent,
+						Name:                     "cloudflared",
+						Args:                     args,
+						TerminationMessagePolicy: "File",
+						TerminationMessagePath:   "/dev/termination-log",
 						LivenessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								HTTPGet: &corev1.HTTPGetAction{
-									Path: "/ready",
-									Port: intstr.IntOrString{IntVal: 2000},
+									Path:   "/ready",
+									Port:   intstr.IntOrString{IntVal: 2000},
+									Scheme: corev1.URISchemeHTTP,
 								},
 							},
 							FailureThreshold:    1,
 							InitialDelaySeconds: 10,
 							PeriodSeconds:       10,
+							TimeoutSeconds:      1,
+							SuccessThreshold:    1,
 						},
 						Ports: []corev1.ContainerPort{
 							{
@@ -518,6 +565,7 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 					Volumes:      volumes,
 					NodeSelector: nodeSelector,
 					Tolerations:  tolerations,
+					DNSPolicy:    corev1.DNSClusterFirst,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
@@ -549,6 +597,11 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 			},
 		},
 	}
+	dep.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "apps",
+		Version: "v1",
+		Kind:    "Deployment",
+	})
 	// Set Tunnel instance as the owner and controller
 	ctrl.SetControllerReference(r.GetTunnel().GetObject(), dep, r.GetScheme())
 	return dep
