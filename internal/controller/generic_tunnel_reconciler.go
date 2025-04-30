@@ -18,6 +18,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+const CREDENTIALS_JSON_FILENAME string = "credentials.json"
+
 type GenericTunnelReconciler interface {
 	k8s.GenericReconciler
 
@@ -28,6 +30,10 @@ type GenericTunnelReconciler interface {
 	GetCfSecret() *corev1.Secret
 	GetTunnelCreds() string
 	SetTunnelCreds(string)
+}
+
+func TunnelNamespacedName(r GenericTunnelReconciler) apitypes.NamespacedName {
+	return apitypes.NamespacedName{Name: r.GetTunnel().GetName(), Namespace: r.GetTunnel().GetNamespace()}
 }
 
 // labelsForTunnel returns the labels for selecting the resources
@@ -126,6 +132,12 @@ func setupNewTunnel(r GenericTunnelReconciler) error {
 		r.GetLog().Info("Tunnel created on Cloudflare")
 		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Created", "Tunnel created successfully on Cloudflare")
 		r.SetTunnelCreds(creds)
+	} else {
+		secret := &corev1.Secret{}
+		if err := r.GetClient().Get(r.GetContext(), TunnelNamespacedName(r), secret); err != nil {
+			r.GetLog().Error(err, "Error in getting existing secret, tunnel restart will crash, please recreate tunnel")
+		}
+		r.SetTunnelCreds(string(secret.Data[CREDENTIALS_JSON_FILENAME]))
 	}
 
 	// Add finalizer for tunnel
@@ -149,7 +161,7 @@ func cleanupTunnel(r GenericTunnelReconciler) (ctrl.Result, bool, error) {
 		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Deleting", "Starting Tunnel Deletion")
 		cfDeployment := &appsv1.Deployment{}
 		var bypass bool
-		if err := r.GetClient().Get(r.GetContext(), apitypes.NamespacedName{Name: r.GetTunnel().GetName(), Namespace: r.GetTunnel().GetNamespace()}, cfDeployment); err != nil {
+		if err := r.GetClient().Get(r.GetContext(), TunnelNamespacedName(r), cfDeployment); err != nil {
 			r.GetLog().Error(err, "Error in getting deployments, might already be deleted?")
 			bypass = true
 		}
@@ -294,7 +306,7 @@ func secretForTunnel(r GenericTunnelReconciler) *corev1.Secret {
 			Namespace: r.GetTunnel().GetNamespace(),
 			Labels:    ls,
 		},
-		StringData: map[string]string{"credentials.json": r.GetTunnelCreds()},
+		StringData: map[string]string{CREDENTIALS_JSON_FILENAME: r.GetTunnelCreds()},
 	}
 	// Set Tunnel instance as the owner and controller
 	ctrl.SetControllerReference(r.GetTunnel().GetObject(), sec, r.GetScheme())
