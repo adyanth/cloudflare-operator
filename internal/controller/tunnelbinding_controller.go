@@ -59,10 +59,10 @@ type TunnelBindingReconciler struct {
 }
 
 // labelsForBinding returns the labels for selecting the Bindings served by a Tunnel.
-func (r TunnelBindingReconciler) labelsForBinding() map[string]string {
+func labelsForBinding(binding networkingv1alpha1.TunnelBinding) map[string]string {
 	labels := map[string]string{
-		tunnelNameLabel: r.binding.TunnelRef.Name,
-		tunnelKindLabel: r.binding.Kind,
+		tunnelNameLabel: binding.TunnelRef.Name,
+		tunnelKindLabel: binding.Kind,
 	}
 
 	return labels
@@ -253,7 +253,7 @@ func (r *TunnelBindingReconciler) creationLogic() error {
 	if r.binding.Labels == nil {
 		r.binding.Labels = make(map[string]string)
 	}
-	for k, v := range r.labelsForBinding() {
+	for k, v := range labelsForBinding(*r.binding) {
 		r.binding.Labels[k] = v
 	}
 
@@ -532,10 +532,10 @@ func (r *TunnelBindingReconciler) setConfigMapConfiguration(config *Configuratio
 	// Restart pods
 	r.Recorder.Event(r.binding, corev1.EventTypeNormal, "ApplyingConfig", "Applying ConfigMap to Deployment")
 	r.Recorder.Event(cfDeployment, corev1.EventTypeNormal, "ApplyingConfig", "Applying ConfigMap to Deployment")
-	if cfDeployment.Spec.Template.Annotations == nil {
-		cfDeployment.Spec.Template.Annotations = map[string]string{}
+	if cfDeployment.Annotations == nil {
+		cfDeployment.Annotations = map[string]string{}
 	}
-	cfDeployment.Spec.Template.Annotations[tunnelConfigChecksum] = hex.EncodeToString(hash[:])
+	cfDeployment.Annotations[tunnelConfigChecksum] = hex.EncodeToString(hash[:])
 	if err := r.Update(r.ctx, cfDeployment); err != nil {
 		r.log.Error(err, "Failed to update Deployment for restart")
 		r.Recorder.Event(r.binding, corev1.EventTypeWarning, "FailedApplyingConfig", "Failed to apply ConfigMap to Deployment")

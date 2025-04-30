@@ -153,6 +153,9 @@ spec:
                 type: boolean
               kind:
                 description: Kind can be Tunnel or ClusterTunnel
+                enum:
+                - ClusterTunnel
+                - Tunnel
                 type: string
               name:
                 description: Name of the tunnel resource

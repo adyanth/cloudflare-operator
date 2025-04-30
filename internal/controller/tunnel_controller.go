@@ -92,6 +92,16 @@ func (r *TunnelReconciler) SetTunnelCreds(in string) {
 	r.tunnelCreds = in
 }
 
+func (r *TunnelReconciler) GetReconciledObject() client.Object {
+	return r.GetTunnel().GetObject()
+}
+
+func (r *TunnelReconciler) GetReconcilerName() string {
+	return "Tunnel"
+}
+
+var _ GenericTunnelReconciler = &TunnelReconciler{}
+
 func (r *TunnelReconciler) initStruct(ctx context.Context, tunnel Tunnel) error {
 	r.ctx = ctx
 	r.tunnel = tunnel
@@ -151,7 +161,7 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	// Create necessary resources
-	if res, ok, err := createManagedResources(r); !ok {
+	if res, err := createManagedResources(r); err != nil {
 		return res, err
 	}
 
