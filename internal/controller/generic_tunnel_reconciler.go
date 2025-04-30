@@ -4,14 +4,11 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
 	"github.com/adyanth/cloudflare-operator/internal/k8s"
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -352,7 +349,10 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 		volumes = append(volumes, corev1.Volume{
 			Name: "certs",
 			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{SecretName: r.GetTunnel().GetSpec().OriginCaPool},
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  r.GetTunnel().GetSpec().OriginCaPool,
+					DefaultMode: ptr.To(int32(420)),
+				},
 			},
 		})
 	}
@@ -372,24 +372,11 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: ls,
 			},
-			ProgressDeadlineSeconds: ptr.To(int32(600)),
-			RevisionHistoryLimit:    ptr.To(int32(10)),
-			Strategy: appsv1.DeploymentStrategy{
-				Type: appsv1.RollingUpdateDeploymentStrategyType,
-				RollingUpdate: &appsv1.RollingUpdateDeployment{
-					MaxUnavailable: ptr.To(intstr.IntOrString{Type: intstr.String, StrVal: "25%"}),
-					MaxSurge:       ptr.To(intstr.IntOrString{Type: intstr.String, StrVal: "25%"}),
-				},
-			},
-
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: ls,
 				},
 				Spec: corev1.PodSpec{
-					SchedulerName:                 corev1.DefaultSchedulerName,
-					RestartPolicy:                 corev1.RestartPolicyAlways,
-					TerminationGracePeriodSeconds: ptr.To(int64(30)),
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsNonRoot: ptr.To(true),
 						SeccompProfile: &corev1.SeccompProfile{
@@ -397,25 +384,19 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 						},
 					},
 					Containers: []corev1.Container{{
-						Image:                    r.GetTunnel().GetSpec().Image,
-						ImagePullPolicy:          corev1.PullIfNotPresent,
-						Name:                     "cloudflared",
-						Args:                     args,
-						TerminationMessagePolicy: "File",
-						TerminationMessagePath:   "/dev/termination-log",
+						Image: r.GetTunnel().GetSpec().Image,
+						Name:  "cloudflared",
+						Args:  args,
 						LivenessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
 								HTTPGet: &corev1.HTTPGetAction{
-									Path:   "/ready",
-									Port:   intstr.IntOrString{IntVal: 2000},
-									Scheme: corev1.URISchemeHTTP,
+									Path: "/ready",
+									Port: intstr.IntOrString{IntVal: 2000},
 								},
 							},
 							FailureThreshold:    1,
 							InitialDelaySeconds: 10,
 							PeriodSeconds:       10,
-							TimeoutSeconds:      1,
-							SuccessThreshold:    1,
 						},
 						Ports: []corev1.ContainerPort{
 							{
@@ -425,10 +406,6 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 							},
 						},
 						VolumeMounts: volumeMounts,
-						Resources: corev1.ResourceRequirements{
-							Requests: corev1.ResourceList{"memory": resource.MustParse("30Mi"), "cpu": resource.MustParse("10m")},
-							Limits:   corev1.ResourceList{"memory": resource.MustParse("256Mi"), "cpu": resource.MustParse("500m")},
-						},
 						SecurityContext: &corev1.SecurityContext{
 							AllowPrivilegeEscalation: ptr.To(false),
 							ReadOnlyRootFilesystem:   ptr.To(true),
@@ -443,7 +420,6 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 					Volumes:      volumes,
 					NodeSelector: nodeSelector,
 					Tolerations:  tolerations,
-					DNSPolicy:    corev1.DNSClusterFirst,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
@@ -475,11 +451,6 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 			},
 		},
 	}
-	dep.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "apps",
-		Version: "v1",
-		Kind:    "Deployment",
-	})
 	// Set Tunnel instance as the owner and controller
 	ctrl.SetControllerReference(r.GetTunnel().GetObject(), dep, r.GetScheme())
 	return dep
