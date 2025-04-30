@@ -2,11 +2,11 @@
 
 ## Cloudflare Tokens
 
-For the operator to interact with the [Cloudflare API](https://api.cloudflare.com/), an API Token is needed. To clean up and delete the DNS entries and the created tunnels, the Global API Key is needed.
+For the operator to interact with the [Cloudflare API](https://api.cloudflare.com/), an API Token is needed. ~~To clean up and delete the DNS entries and the created tunnels, the Global API Key is needed.~~ This is no longer the case, all operations can be performed with an API Token. API Keys are still a valid form of authentication.
 
 These API tokens can be found under [My Profile > API Tokens](https://dash.cloudflare.com/profile/api-tokens) page in the Cloudflare Dashboard.
 
-For the `CLOUDFLARE_API_KEY`, copy the Global API Key shown at the bottom of the page. This is used to delete the DNS entries and tunnels when the Service and Tunnel resources are deleted.
+For the `CLOUDFLARE_API_KEY`, copy the Global API Key shown at the bottom of the page.
 
 For the `CLOUDFLARE_API_TOKEN`, create a new "custom" token with the following:
 
