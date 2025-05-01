@@ -43,4 +43,12 @@ resources:
   kind: AccessTunnel
   path: github.com/adyanth/cloudflare-operator/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: cfargotunnel.com
+  group: networking
+  kind: ClusterTunnel
+  path: github.com/adyanth/cloudflare-operator/api/v1alpha2
+  version: v1alpha2
 version: "3"

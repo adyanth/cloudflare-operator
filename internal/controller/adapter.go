@@ -1,14 +1,14 @@
 package controller
 
 import (
-	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
+	networkingv1alpha2 "github.com/adyanth/cloudflare-operator/api/v1alpha2"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // TunnelAdapter implementation
 type TunnelAdapter struct {
-	Tunnel *networkingv1alpha1.Tunnel
+	Tunnel *networkingv1alpha2.Tunnel
 }
 
 func (o TunnelAdapter) GetObject() client.Object {
@@ -43,15 +43,15 @@ func (o TunnelAdapter) SetAnnotations(in map[string]string) {
 	o.Tunnel.Annotations = in
 }
 
-func (o TunnelAdapter) GetSpec() networkingv1alpha1.TunnelSpec {
+func (o TunnelAdapter) GetSpec() networkingv1alpha2.TunnelSpec {
 	return o.Tunnel.Spec
 }
 
-func (o TunnelAdapter) GetStatus() networkingv1alpha1.TunnelStatus {
+func (o TunnelAdapter) GetStatus() networkingv1alpha2.TunnelStatus {
 	return o.Tunnel.Status
 }
 
-func (o TunnelAdapter) SetStatus(in networkingv1alpha1.TunnelStatus) {
+func (o TunnelAdapter) SetStatus(in networkingv1alpha2.TunnelStatus) {
 	o.Tunnel.Status = in
 }
 
@@ -63,7 +63,7 @@ func (o TunnelAdapter) DeepCopyTunnel() Tunnel {
 
 // ClusterTunnelAdapter implementation
 type ClusterTunnelAdapter struct {
-	Tunnel    *networkingv1alpha1.ClusterTunnel
+	Tunnel    *networkingv1alpha2.ClusterTunnel
 	Namespace string
 }
 
@@ -99,15 +99,15 @@ func (o ClusterTunnelAdapter) SetAnnotations(in map[string]string) {
 	o.Tunnel.Annotations = in
 }
 
-func (o ClusterTunnelAdapter) GetSpec() networkingv1alpha1.TunnelSpec {
+func (o ClusterTunnelAdapter) GetSpec() networkingv1alpha2.TunnelSpec {
 	return o.Tunnel.Spec
 }
 
-func (o ClusterTunnelAdapter) GetStatus() networkingv1alpha1.TunnelStatus {
+func (o ClusterTunnelAdapter) GetStatus() networkingv1alpha2.TunnelStatus {
 	return o.Tunnel.Status
 }
 
-func (o ClusterTunnelAdapter) SetStatus(in networkingv1alpha1.TunnelStatus) {
+func (o ClusterTunnelAdapter) SetStatus(in networkingv1alpha2.TunnelStatus) {
 	o.Tunnel.Status = in
 }
 

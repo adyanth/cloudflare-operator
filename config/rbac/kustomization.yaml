@@ -25,3 +25,13 @@ resources:
 # if you do not want those helpers be installed with your Project.
 - accesstunnel_editor_role.yaml
 - accesstunnel_viewer_role.yaml
+# For each CRD, "Admin", "Editor" and "Viewer" roles are scaffolded by
+# default, aiding admins in cluster management. Those roles are
+# not used by the {{ .ProjectName }} itself. You can comment the following lines
+# if you do not want those helpers be installed with your Project.
+- clustertunnel_admin_role.yaml
+- clustertunnel_editor_role.yaml
+- clustertunnel_viewer_role.yaml
+- tunnel_admin_role.yaml
+- tunnel_editor_role.yaml
+- tunnel_viewer_role.yaml
