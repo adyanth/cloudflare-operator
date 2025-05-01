@@ -75,10 +75,7 @@ Notes:
 > **Ensure that you have kubectl, kustomize, and helm installed.**
 
 1. Configure a secret with your API token or API key, as described in [the getting started guide](../../getting-started.md#cloudflare-tokens)
-2. Deploy the cloudflare operator
-```shell
- kustomize build ../../../config/default | kubectl apply -f -
-```
+2. Deploy the cloudflare operator as described in [the getting started guide](../../getting-started.md#deploy-the-operator)
 3. Replace all placeholder values formatted `<like-this>`.
    - in `manifests/cloudflare-operator`
       - `<email-address>`: the email address associated with the cloudflare zone.

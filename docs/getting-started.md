@@ -38,7 +38,7 @@ kubectl apply -k https://github.com/adyanth/cloudflare-operator/config/default
 # Correct full format as per https://github.com/kubernetes-sigs/kustomize/blob/master/examples/remoteBuild.md
 kubectl apply -k 'https://github.com/adyanth/cloudflare-operator.git//config/default?ref=main'
 # If you need a specific version, follow the below syntax. Example shown for v0.4.1
-kubectl apply -k 'https://github.com/adyanth/cloudflare-operator.git//config/default?ref=v0.4.1'
+kubectl apply -k 'https://github.com/adyanth/cloudflare-operator.git//config/default?ref=v0.12.0'
 ```
 
 ## Create a Custom ClusterTunnel Resource
