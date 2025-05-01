@@ -146,13 +146,13 @@ tunnelRef:
 apiVersion: networking.cfargotunnel.com/v1alpha1
 kind: TunnelBinding
 metadata:
-  name: ingress-nginx
-subjects:
   # At this time cloudflare-operator does not deterministically sort wildcards to the end of cloudflared's config file.
   # This is important because cloudflared goes through the list in order, and this ingress being before the authelia ingress
   # would mean authelia is impossible to reach.
-  # By prefixing with `zz_` we ensure this is the last route in the cloudflared config file
-  - name: zz_wildcard
+  # By prefixing with `zz-` we ensure this is the last route in the cloudflared config file
+  name: zz-ingress-nginx
+subjects:
+  - name: wildcard
     spec:
       fqdn: "*.<domain>"
       target: https://ingress-nginx-controller.ingress-nginx.svc.cluster.local:443
