@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -84,11 +85,16 @@ type CloudflareDetails struct {
 
 // TunnelSpec defines the desired state of Tunnel
 type TunnelSpec struct {
-	// Deployment patch for the cloudflared deployment.
-	// Follows https://kubernetes.io/docs/reference/kubectl/generated/kubectl_patch/
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="{}"
-	DeployPatch string `json:"deployPatch,omitempty"`
+	//+kubebuilder:validation:Minimum=0
+	//+kubebuilder:default:=1
+	//+kubebuilder:validation:Optional
+	// Size defines the number of Daemon pods to run for this tunnel
+	Size int32 `json:"size,omitempty"`
+
+	//+kubebuilder:default:="cloudflare/cloudflared:2025.4.0"
+	//+kubebuilder:validation:Optional
+	// Image sets the Cloudflared Image to use. Defaults to the image set during the release of the operator.
+	Image string `json:"image,omitempty"`
 
 	//+kubebuilder:default:=false
 	//+kubebuilder:validation:Optional
@@ -98,6 +104,14 @@ type TunnelSpec struct {
 	//+kubebuilder:validation:Optional
 	// OriginCaPool speficies the secret with tls.crt (and other certs as needed to be referred in the service annotation) of the Root CA to be trusted when sending traffic to HTTPS endpoints
 	OriginCaPool string `json:"originCaPool,omitempty"`
+
+	//+kubebuilder:validation:Optional
+	// NodeSelectors specifies the nodeSelectors to apply to the cloudflared tunnel deployment
+	NodeSelectors map[string]string `json:"nodeSelectors,omitempty"`
+
+	//+kubebuilder:validation:Optional
+	// Tolerations specifies the tolerations to apply to the cloudflared tunnel deployment
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
 	//+kubebuilder:validation:Optional
 	//+kubebuilder:validation:Enum={"auto","quic","http2"}
