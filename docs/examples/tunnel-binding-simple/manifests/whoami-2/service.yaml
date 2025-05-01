@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: whoami-2  # Sample service, points to the same deployment
+spec:
+  selector:
+    app: whoami-2
+  ports:
+    - port: 80
+      targetPort: 80
