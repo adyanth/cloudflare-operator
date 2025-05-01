@@ -18,6 +18,9 @@ spec:
     - jsonPath: .status.tunnelId
       name: TunnelID
       type: string
+    deprecated: true
+    deprecationWarning: networking.cfargotunnel.com/v1alpha1 ClusterTunnel is deprecated,
+      see ... for migrating to v1alpha2
     name: v1alpha1
     schema:
       openAPIV3Schema:
