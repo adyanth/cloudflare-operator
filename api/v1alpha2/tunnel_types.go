@@ -117,12 +117,12 @@ type TunnelSpec struct {
 	// +kubebuilder:validation:Optional
 	// Existing tunnel object.
 	// ExistingTunnel and NewTunnel cannot be both empty and are mutually exclusive.
-	ExistingTunnel ExistingTunnel `json:"existingTunnel,omitempty"`
+	ExistingTunnel *ExistingTunnel `json:"existingTunnel,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// New tunnel object.
 	// NewTunnel and ExistingTunnel cannot be both empty and are mutually exclusive.
-	NewTunnel NewTunnel `json:"newTunnel,omitempty"`
+	NewTunnel *NewTunnel `json:"newTunnel,omitempty"`
 }
 
 // TunnelStatus defines the observed state of Tunnel
