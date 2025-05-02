@@ -127,17 +127,17 @@ func (r *TunnelBindingReconciler) initStruct(ctx context.Context, tunnelBinding 
 	return nil
 }
 
-//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnelbindings,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnelbindings/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnelbindings/finalizers,verbs=update
-//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnels,verbs=get
-//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnels/status,verbs=get
-//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels,verbs=get
-//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels/status,verbs=get
-//+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;update;patch
-//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;update;patch
-//+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch
-//+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+// +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnelbindings,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnelbindings/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnelbindings/finalizers,verbs=update
+// +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnels,verbs=get
+// +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnels/status,verbs=get
+// +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels,verbs=get
+// +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels/status,verbs=get
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;update;patch
+// +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

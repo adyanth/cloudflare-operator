@@ -20,11 +20,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:scope=Cluster
-//+kubebuilder:storageversion
-//+kubebuilder:printcolumn:name="TunnelID",type=string,JSONPath=`.status.tunnelId`
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:storageversion
+// +kubebuilder:printcolumn:name="TunnelID",type=string,JSONPath=`.status.tunnelId`
 
 // ClusterTunnel is the Schema for the clustertunnels API
 type ClusterTunnel struct {
@@ -35,7 +35,7 @@ type ClusterTunnel struct {
 	Status TunnelStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ClusterTunnelList contains a list of ClusterTunnel
 type ClusterTunnelList struct {
