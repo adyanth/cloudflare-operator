@@ -21,12 +21,12 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
-	networkingv1alpha2 "github.com/adyanth/cloudflare-operator/api/v1alpha2"
+	"github.com/adyanth/cloudflare-operator/api/v1alpha2"
 )
 
 // ConvertTo converts this ClusterTunnel (v1alpha1) to the Hub version (v1alpha2).
 func (src *ClusterTunnel) ConvertTo(dstRaw conversion.Hub) error {
-	dst := dstRaw.(*networkingv1alpha2.ClusterTunnel)
+	dst := dstRaw.(*v1alpha2.ClusterTunnel)
 	log.Printf("ConvertTo: Converting ClusterTunnel from Spoke version v1alpha1 to Hub version v1alpha2;"+
 		"source: %s/%s, target: %s/%s", src.Namespace, src.Name, dst.Namespace, dst.Name)
 
@@ -43,7 +43,7 @@ func (src *ClusterTunnel) ConvertTo(dstRaw conversion.Hub) error {
 
 // ConvertFrom converts the Hub version (v1alpha2) to this ClusterTunnel (v1alpha1).
 func (dst *ClusterTunnel) ConvertFrom(srcRaw conversion.Hub) error {
-	src := srcRaw.(*networkingv1alpha2.ClusterTunnel)
+	src := srcRaw.(*v1alpha2.ClusterTunnel)
 	log.Printf("ConvertFrom: Converting ClusterTunnel from Hub version v1alpha2 to Spoke version v1alpha1;"+
 		"source: %s/%s, target: %s/%s", src.Namespace, src.Name, dst.Namespace, dst.Name)
 

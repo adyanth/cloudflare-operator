@@ -23,7 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 	"sigs.k8s.io/yaml"
 
-	networkingv1alpha2 "github.com/adyanth/cloudflare-operator/api/v1alpha2"
+	"github.com/adyanth/cloudflare-operator/api/v1alpha2"
 )
 
 // Patch conversion type
@@ -58,7 +58,7 @@ type V1alpha1Tov1alpha2Patch struct {
 
 // ConvertTo converts this Tunnel (v1alpha1) to the Hub version (v1alpha2).
 func (src *Tunnel) ConvertTo(dstRaw conversion.Hub) error {
-	dst := dstRaw.(*networkingv1alpha2.Tunnel)
+	dst := dstRaw.(*v1alpha2.Tunnel)
 	log.Printf("ConvertTo: Converting Tunnel from Spoke version v1alpha1 to Hub version v1alpha2;"+
 		"source: %s/%s, target: %s/%s", src.Namespace, src.Name, dst.Namespace, dst.Name)
 
@@ -73,15 +73,15 @@ func (src *Tunnel) ConvertTo(dstRaw conversion.Hub) error {
 	return nil
 }
 
-func (src TunnelSpec) ConvertTo(dst *networkingv1alpha2.TunnelSpec) error {
+func (src TunnelSpec) ConvertTo(dst *v1alpha2.TunnelSpec) error {
 
 	if (src.NewTunnel != NewTunnel{}) {
-		dst.NewTunnel = (*networkingv1alpha2.NewTunnel)(&src.NewTunnel)
+		dst.NewTunnel = (*v1alpha2.NewTunnel)(&src.NewTunnel)
 	}
 	if (src.ExistingTunnel != ExistingTunnel{}) {
-		dst.ExistingTunnel = (*networkingv1alpha2.ExistingTunnel)(&src.ExistingTunnel)
+		dst.ExistingTunnel = (*v1alpha2.ExistingTunnel)(&src.ExistingTunnel)
 	}
-	dst.Cloudflare = networkingv1alpha2.CloudflareDetails(src.Cloudflare)
+	dst.Cloudflare = v1alpha2.CloudflareDetails(src.Cloudflare)
 	dst.FallbackTarget = src.FallbackTarget
 	dst.Protocol = src.Protocol
 	dst.OriginCaPool = src.OriginCaPool
@@ -134,14 +134,14 @@ func (src TunnelSpec) ConvertTo(dst *networkingv1alpha2.TunnelSpec) error {
 	return nil
 }
 
-func (src TunnelStatus) ConvertTo(dst *networkingv1alpha2.TunnelStatus) error {
-	dst = (*networkingv1alpha2.TunnelStatus)(&src)
+func (src TunnelStatus) ConvertTo(dst *v1alpha2.TunnelStatus) error {
+	dst = (*v1alpha2.TunnelStatus)(&src)
 	return nil
 }
 
 // ConvertFrom converts the Hub version (v1alpha2) to this Tunnel (v1alpha1).
 func (dst *Tunnel) ConvertFrom(srcRaw conversion.Hub) error {
-	src := srcRaw.(*networkingv1alpha2.Tunnel)
+	src := srcRaw.(*v1alpha2.Tunnel)
 	log.Printf("ConvertFrom: Converting Tunnel from Hub version v1alpha2 to Spoke version v1alpha1;"+
 		"source: %s/%s, target: %s/%s", src.Namespace, src.Name, dst.Namespace, dst.Name)
 
@@ -156,7 +156,7 @@ func (dst *Tunnel) ConvertFrom(srcRaw conversion.Hub) error {
 	return nil
 }
 
-func (dst *TunnelSpec) ConvertFrom(src networkingv1alpha2.TunnelSpec) error {
+func (dst *TunnelSpec) ConvertFrom(src v1alpha2.TunnelSpec) error {
 	if src.NewTunnel != nil {
 		dst.NewTunnel = NewTunnel(*src.NewTunnel)
 	}
@@ -219,7 +219,7 @@ func (dst *TunnelSpec) ConvertFrom(src networkingv1alpha2.TunnelSpec) error {
 	return nil
 }
 
-func (dst *TunnelStatus) ConvertFrom(src networkingv1alpha2.TunnelStatus) error {
+func (dst *TunnelStatus) ConvertFrom(src v1alpha2.TunnelStatus) error {
 	dst = (*TunnelStatus)(&src)
 	return nil
 }
