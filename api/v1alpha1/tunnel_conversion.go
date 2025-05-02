@@ -135,7 +135,11 @@ func (src TunnelSpec) ConvertTo(dst *v1alpha2.TunnelSpec) error {
 }
 
 func (src TunnelStatus) ConvertTo(dst *v1alpha2.TunnelStatus) error {
-	dst = (*v1alpha2.TunnelStatus)(&src)
+	// Cannot assign directly to dst
+	dst.TunnelId = src.TunnelId
+	dst.TunnelName = src.TunnelName
+	dst.AccountId = src.AccountId
+	dst.ZoneId = src.ZoneId
 	return nil
 }
 
@@ -220,6 +224,10 @@ func (dst *TunnelSpec) ConvertFrom(src v1alpha2.TunnelSpec) error {
 }
 
 func (dst *TunnelStatus) ConvertFrom(src v1alpha2.TunnelStatus) error {
-	dst = (*TunnelStatus)(&src)
+	// Cannot assign directly to dst
+	dst.TunnelId = src.TunnelId
+	dst.TunnelName = src.TunnelName
+	dst.AccountId = src.AccountId
+	dst.ZoneId = src.ZoneId
 	return nil
 }
