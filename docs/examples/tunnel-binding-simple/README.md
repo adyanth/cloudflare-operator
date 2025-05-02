@@ -35,7 +35,7 @@ All routing is handled by TunnelBinding resources managed by this controller.
 
 > **Ensure that you have kubectl installed.**
 
-To create a ClusterTunnel, we need to store Cloudflare credentials in a Secret. Follow the steps below. Have a look at the [detailed configuration guide](configuration.md) for more details.
+To create a ClusterTunnel, we need to store Cloudflare credentials in a Secret. Follow the steps below. Have a look at the [detailed configuration guide](../../configuration.md) for more details.
 
 1. Configure a secret with your API token or API key, as described in [the getting started guide](../../install.md#cloudflare-tokens)
 2. Deploy the cloudflare operator as described in [the getting started guide](../../install.md#deploy-the-operator)
