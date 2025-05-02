@@ -27,32 +27,32 @@ import (
 )
 
 // Patch conversion type
-type v1alpha1Tov1alpha2PatchSpecTemplateSpecContainer struct {
+type V1alpha1Tov1alpha2PatchSpecTemplateSpecContainer struct {
 	Name   string         `json:"name,omitempty"`
 	Image  string         `json:"image,omitempty"`
 	Extras map[string]any `json:",inline,omitempty"`
 }
 
-type v1alpha1Tov1alpha2PatchSpecTemplateSpec struct {
+type V1alpha1Tov1alpha2PatchSpecTemplateSpec struct {
 	Tolerations  []corev1.Toleration                                `json:"tolerations,omitempty"`
 	NodeSelector map[string]string                                  `json:"nodeSelector,omitempty"`
-	Containers   []v1alpha1Tov1alpha2PatchSpecTemplateSpecContainer `json:"containers,omitempty"`
+	Containers   []V1alpha1Tov1alpha2PatchSpecTemplateSpecContainer `json:"containers,omitempty"`
 	Extras       map[string]any                                     `json:",inline,omitempty"`
 }
 
-type v1alpha1Tov1alpha2PatchSpecTemplate struct {
-	Spec   *v1alpha1Tov1alpha2PatchSpecTemplateSpec `json:"spec,omitempty"`
+type V1alpha1Tov1alpha2PatchSpecTemplate struct {
+	Spec   *V1alpha1Tov1alpha2PatchSpecTemplateSpec `json:"spec,omitempty"`
 	Extras map[string]any                           `json:",inline,omitempty"`
 }
 
-type v1alpha1Tov1alpha2PatchSpec struct {
+type V1alpha1Tov1alpha2PatchSpec struct {
 	Replicas int32                                `json:"replicas,omitempty"`
-	Template *v1alpha1Tov1alpha2PatchSpecTemplate `json:"template,omitempty"`
+	Template *V1alpha1Tov1alpha2PatchSpecTemplate `json:"template,omitempty"`
 	Extras   map[string]any                       `json:",inline,omitempty"`
 }
 
-type v1alpha1Tov1alpha2Patch struct {
-	Spec   *v1alpha1Tov1alpha2PatchSpec `json:"spec,omitempty"`
+type V1alpha1Tov1alpha2Patch struct {
+	Spec   *V1alpha1Tov1alpha2PatchSpec `json:"spec,omitempty"`
 	Extras map[string]any               `json:",inline,omitempty"`
 }
 
@@ -87,24 +87,24 @@ func (src TunnelSpec) ConvertTo(dst *networkingv1alpha2.TunnelSpec) error {
 	dst.OriginCaPool = src.OriginCaPool
 	dst.NoTlsVerify = src.NoTlsVerify
 
-	patch := &v1alpha1Tov1alpha2Patch{}
+	patch := &V1alpha1Tov1alpha2Patch{}
 
 	if src.Size != 0 && src.Size != 1 {
 		if patch.Spec == nil {
-			patch.Spec = &v1alpha1Tov1alpha2PatchSpec{}
+			patch.Spec = &V1alpha1Tov1alpha2PatchSpec{}
 		}
 		patch.Spec.Replicas = src.Size
 	}
 
 	if len(src.NodeSelectors) != 0 || len(src.Tolerations) != 0 || src.Image != "" {
 		if patch.Spec == nil {
-			patch.Spec = &v1alpha1Tov1alpha2PatchSpec{}
+			patch.Spec = &V1alpha1Tov1alpha2PatchSpec{}
 		}
 		if patch.Spec.Template == nil {
-			patch.Spec.Template = &v1alpha1Tov1alpha2PatchSpecTemplate{}
+			patch.Spec.Template = &V1alpha1Tov1alpha2PatchSpecTemplate{}
 		}
 		if patch.Spec.Template.Spec == nil {
-			patch.Spec.Template.Spec = &v1alpha1Tov1alpha2PatchSpecTemplateSpec{}
+			patch.Spec.Template.Spec = &V1alpha1Tov1alpha2PatchSpecTemplateSpec{}
 		}
 
 		if len(src.NodeSelectors) != 0 {
@@ -114,7 +114,7 @@ func (src TunnelSpec) ConvertTo(dst *networkingv1alpha2.TunnelSpec) error {
 			patch.Spec.Template.Spec.Tolerations = src.Tolerations
 		}
 		if src.Image != "" {
-			patch.Spec.Template.Spec.Containers = []v1alpha1Tov1alpha2PatchSpecTemplateSpecContainer{{
+			patch.Spec.Template.Spec.Containers = []V1alpha1Tov1alpha2PatchSpecTemplateSpecContainer{{
 				Name:  "cloudflared",
 				Image: src.Image,
 			}}
@@ -169,7 +169,7 @@ func (dst *TunnelSpec) ConvertFrom(src networkingv1alpha2.TunnelSpec) error {
 	dst.OriginCaPool = src.OriginCaPool
 	dst.NoTlsVerify = src.NoTlsVerify
 
-	patch := &v1alpha1Tov1alpha2Patch{}
+	patch := &V1alpha1Tov1alpha2Patch{}
 	if err := yaml.Unmarshal([]byte(src.DeployPatch), patch); err != nil {
 		return err
 	}
