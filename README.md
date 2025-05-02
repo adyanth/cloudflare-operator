@@ -10,7 +10,7 @@
     A Kubernetes Operator to create and manage Cloudflare Tunnels and DNS records <br /> for (HTTP/TCP/UDP*) Service Resources
     <br />
     <br />
-    <a href="README.md#getting-started"><strong>Getting Started Guide »</strong></a>
+    <a href="./docs/getting-started.md"><strong>Getting Started Guide »</strong></a>
     <br />
     <br />
     <a href="https://github.com/adyanth/cloudflare-operator/issues">Report Bug</a>
@@ -56,19 +56,5 @@ Here is how the operator and the Tunnel Resource fit into your deployment.
 ![Operator Architecture](./docs/images/OperatorArchitecture.png#center)
 
 There is more detailed information on this architecture and the thought process behind it in my [blog post](https://adyanth.site/posts/migration-compose-k8s/cloudflare-tunnel-operator-architecture/).
-
-## Getting Started
-
-To get up and running, you need to:
-1. [Install the operator](./docs/examples/operator-install)
-2. [Deploy a secret with your API token](./docs/examples/operator-authentication)
-3. [Create a Tunnel/ClusterTunnel resource](./docs/examples/tunnel-simple)
-4. Configure routing for your tunnel:
-   - [configure routing directly (simple)](./docs/examples/tunnel-binding-simple)
-   - [configure routing with a reverse proxy](./docs/examples/tunnel-binding-with-reverse-proxy)
-
-Look into the [Configuration](docs/configuration.md) documentation to understand various configurable parameters of this operator.
-
-Look into the [examples](./docs/examples) to see playbooks for expected use cases.
 
 > **_NOTE_**: This is **NOT** an official operator provided/backed by Cloudflare Inc. It utilizes their [v4 API](https://api.cloudflare.com/) and their [`cloudflared`](https://github.com/cloudflare/cloudflared) to automate setting up of tunnels on Kubernetes.

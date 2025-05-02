@@ -1,6 +1,6 @@
 # Bring your own reverse proxy
 
-> This builds on [the getting started guide](../../../README.md#getting-started), and it is recommended to read that first.
+> This builds on [the getting started guide](../../getting-started.md), and it is recommended to read that first.
 
 This example configures cloudflared to send all traffic to a reverse proxy, and then configure routing in the reverse proxy.
 

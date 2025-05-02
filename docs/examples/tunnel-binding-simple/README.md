@@ -1,6 +1,6 @@
 # Using Cloudflared as the reverse proxy
 
-> This builds on [the getting started guide](../../../README.md#getting-started), and it is recommended to read that first.
+> This builds on [the getting started guide](../../getting-started.md), and it is recommended to read that first.
 
 This example shows how to configure cloudflared to route to two (or more) applications you are hosting.
 
@@ -41,7 +41,7 @@ This assumes:
 
 > All steps assume you are working from the directory this README is in.
 
-To create a ClusterTunnel, we need to store Cloudflare credentials in a Secret. Follow the steps below. Have a look at the [detailed configuration guide](../../configuration.md) for more details.
+To create a ClusterTunnel, we need to store Cloudflare credentials in a Secret. Follow the steps below. Have a look at the detailed configuration in `docs/configuration` for more details.
 
 1. Deploy the example applications. This will create a deployment and service for each app.
     ```shell

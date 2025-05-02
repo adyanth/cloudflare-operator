@@ -1,0 +1,10 @@
+apiVersion: networking.cfargotunnel.com/v1alpha1
+kind: TunnelBinding
+metadata:
+  name: whoami-cluster-tun
+subjects:
+  - name: whoami-1  # Points to the first service
+  - name: whoami-2  # Points to the second service
+tunnelRef:
+  kind: ClusterTunnel
+  name: k3s-cluster-tunnel

@@ -1,6 +1,6 @@
 # Deploy a cloudflare tunnel
 
-> This builds on [the getting started guide](../../../README.md#getting-started), and it is recommended to read that first.
+> This builds on [the getting started guide](../../getting-started.md), and it is recommended to read that first.
 
 This example shows how to deploy a cloudflare Tunnel/ClusterTunnel.
 This resource will generate a cloudflared deployment for you.
