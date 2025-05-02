@@ -51,4 +51,22 @@ resources:
   kind: ClusterTunnel
   path: github.com/adyanth/cloudflare-operator/api/v1alpha2
   version: v1alpha2
+  webhooks:
+    conversion: true
+    spoke:
+    - v1alpha1
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: cfargotunnel.com
+  group: networking
+  kind: Tunnel
+  path: github.com/adyanth/cloudflare-operator/api/v1alpha2
+  version: v1alpha2
+  webhooks:
+    conversion: true
+    spoke:
+    - v1alpha1
+    webhookVersion: v1
 version: "3"
