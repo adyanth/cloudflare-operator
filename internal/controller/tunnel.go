@@ -1,7 +1,7 @@
 package controller
 
 import (
-	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
+	networkingv1alpha2 "github.com/adyanth/cloudflare-operator/api/v1alpha2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -13,8 +13,8 @@ type Tunnel interface {
 	SetLabels(map[string]string)
 	GetAnnotations() map[string]string
 	SetAnnotations(map[string]string)
-	GetSpec() networkingv1alpha1.TunnelSpec
-	GetStatus() networkingv1alpha1.TunnelStatus
-	SetStatus(networkingv1alpha1.TunnelStatus)
+	GetSpec() networkingv1alpha2.TunnelSpec
+	GetStatus() networkingv1alpha2.TunnelStatus
+	SetStatus(networkingv1alpha2.TunnelStatus)
 	DeepCopyTunnel() Tunnel
 }

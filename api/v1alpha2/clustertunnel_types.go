@@ -14,17 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1alpha2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // +kubebuilder:object:root=true
+// +kubebuilder:storageversion
+// +kubebuilder:conversion:hub
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:storageversion
 // +kubebuilder:printcolumn:name="TunnelID",type=string,JSONPath=`.status.tunnelId`
-// +kubebuilder:deprecatedversion:warning="networking.cfargotunnel.com/v1alpha1 ClusterTunnel is deprecated, see ... for migrating to v1alpha2"
 
 // ClusterTunnel is the Schema for the clustertunnels API
 type ClusterTunnel struct {

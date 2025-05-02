@@ -37,8 +37,10 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
+	networkingv1alpha2 "github.com/adyanth/cloudflare-operator/api/v1alpha2"
 	"github.com/adyanth/cloudflare-operator/internal/controller"
-	//+kubebuilder:scaffold:imports
+	webhooknetworkingv1alpha2 "github.com/adyanth/cloudflare-operator/internal/webhook/v1alpha2"
+	// +kubebuilder:scaffold:imports
 )
 
 var (
@@ -50,7 +52,8 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(networkingv1alpha1.AddToScheme(scheme))
-	//+kubebuilder:scaffold:scheme
+	utilruntime.Must(networkingv1alpha2.AddToScheme(scheme))
+	// +kubebuilder:scaffold:scheme
 }
 
 func main() {
@@ -134,7 +137,21 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "AccessTunnel")
 		os.Exit(1)
 	}
-	//+kubebuilder:scaffold:builder
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err = webhooknetworkingv1alpha2.SetupTunnelWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Tunnel")
+			os.Exit(1)
+		}
+	}
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err = webhooknetworkingv1alpha2.SetupClusterTunnelWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterTunnel")
+			os.Exit(1)
+		}
+	}
+	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

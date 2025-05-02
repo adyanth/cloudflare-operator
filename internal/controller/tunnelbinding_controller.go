@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
+	networkingv1alpha2 "github.com/adyanth/cloudflare-operator/api/v1alpha2"
 	"github.com/go-logr/logr"
 	yaml "gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
@@ -79,7 +80,7 @@ func (r *TunnelBindingReconciler) initStruct(ctx context.Context, tunnelBinding 
 	switch strings.ToLower(r.binding.TunnelRef.Kind) {
 	case "clustertunnel":
 		namespacedName = apitypes.NamespacedName{Name: r.binding.TunnelRef.Name, Namespace: r.Namespace}
-		clusterTunnel := &networkingv1alpha1.ClusterTunnel{}
+		clusterTunnel := &networkingv1alpha2.ClusterTunnel{}
 		if err := r.Get(r.ctx, namespacedName, clusterTunnel); err != nil {
 			r.log.Error(err, "Failed to get ClusterTunnel", "namespacedName", namespacedName)
 			r.Recorder.Event(tunnelBinding, corev1.EventTypeWarning, "ErrTunnel", "Error getting ClusterTunnel")
@@ -95,7 +96,7 @@ func (r *TunnelBindingReconciler) initStruct(ctx context.Context, tunnelBinding 
 		}
 	case "tunnel":
 		namespacedName = apitypes.NamespacedName{Name: r.binding.TunnelRef.Name, Namespace: r.binding.Namespace}
-		tunnel := &networkingv1alpha1.Tunnel{}
+		tunnel := &networkingv1alpha2.Tunnel{}
 		if err := r.Get(r.ctx, namespacedName, tunnel); err != nil {
 			r.log.Error(err, "Failed to get Tunnel", "namespacedName", namespacedName)
 			r.Recorder.Event(tunnelBinding, corev1.EventTypeWarning, "ErrTunnel", "Error getting Tunnel")
@@ -126,17 +127,17 @@ func (r *TunnelBindingReconciler) initStruct(ctx context.Context, tunnelBinding 
 	return nil
 }
 
-//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnelbindings,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnelbindings/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnelbindings/finalizers,verbs=update
-//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnels,verbs=get
-//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnels/status,verbs=get
-//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels,verbs=get
-//+kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels/status,verbs=get
-//+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;update;patch
-//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;update;patch
-//+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch
-//+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+// +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnelbindings,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnelbindings/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnelbindings/finalizers,verbs=update
+// +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnels,verbs=get
+// +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=tunnels/status,verbs=get
+// +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels,verbs=get
+// +kubebuilder:rbac:groups=networking.cfargotunnel.com,resources=clustertunnels/status,verbs=get
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;update;patch
+// +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

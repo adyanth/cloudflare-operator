@@ -1,0 +1,9 @@
+apiVersion: networking.cfargotunnel.com/v1alpha2
+kind: Tunnel
+metadata:
+  labels:
+    app.kubernetes.io/name: cloudflare-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: tunnel-sample
+spec:
+  # TODO(user): Add fields here

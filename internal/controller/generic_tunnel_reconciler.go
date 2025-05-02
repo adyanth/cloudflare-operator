@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
 	"github.com/adyanth/cloudflare-operator/internal/k8s"
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
@@ -54,8 +53,8 @@ func labelsForTunnel(cf Tunnel) map[string]string {
 }
 
 func setupTunnel(r GenericTunnelReconciler) (ctrl.Result, bool, error) {
-	okNewTunnel := r.GetTunnel().GetSpec().NewTunnel != networkingv1alpha1.NewTunnel{}
-	okExistingTunnel := r.GetTunnel().GetSpec().ExistingTunnel != networkingv1alpha1.ExistingTunnel{}
+	okNewTunnel := r.GetTunnel().GetSpec().NewTunnel != nil
+	okExistingTunnel := r.GetTunnel().GetSpec().ExistingTunnel != nil
 
 	// If both are set (or neither are), we have a problem
 	if okNewTunnel == okExistingTunnel {
