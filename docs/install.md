@@ -17,7 +17,7 @@ For the `CLOUDFLARE_API_TOKEN`, create a new "custom" token with the following:
 1. Permissions
     * Account > Cloudflare Tunnel > Edit : To create new tunnels
     * Account > Account Settings > Read : To get the accountId from Name and the domainId for the selected domain
-    * Zone > DNS > Edit : To get the existing domain and create new entries in DNS for the domain. See [#5](/adyanth/cloudflare-operator/issues/5) for potential unintended consequences if not careful when creating Resources.
+    * Zone > DNS > Edit : To get the existing domain and create new entries in DNS for the domain.
 2. Account Resources: Include > All accounts (or even better, the specific account(s) your zone(s) are in)
 3. Zone Resources: Include > All zones (or even better, the specific zone(s) you want to manage)
 
