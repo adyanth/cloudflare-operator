@@ -264,7 +264,7 @@ func (r *TunnelBindingReconciler) creationLogic() error {
 	}
 
 	// Add finalizer for TunnelBinding if DNS updates are not disabled
-	if r.binding.TunnelRef.DisableDNSUpdates {
+	if r.binding.Spec.TunnelRef.DisableDNSUpdates {
 		return nil
 	}
 
