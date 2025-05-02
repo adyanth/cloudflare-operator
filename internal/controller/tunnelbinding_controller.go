@@ -61,8 +61,8 @@ type TunnelBindingReconciler struct {
 // labelsForBinding returns the labels for selecting the Bindings served by a Tunnel.
 func labelsForBinding(binding networkingv1alpha1.TunnelBinding) map[string]string {
 	labels := map[string]string{
-		tunnelNameLabel: binding.TunnelRef.Name,
-		tunnelKindLabel: binding.Kind,
+		tunnelNameLabel: binding.Spec.TunnelRef.Name,
+		tunnelKindLabel: binding.Spec.TunnelRef.Kind,
 	}
 
 	return labels
@@ -76,9 +76,9 @@ func (r *TunnelBindingReconciler) initStruct(ctx context.Context, tunnelBinding 
 	var namespacedName apitypes.NamespacedName
 
 	// Process based on Tunnel Kind
-	switch strings.ToLower(r.binding.TunnelRef.Kind) {
+	switch strings.ToLower(r.binding.Spec.TunnelRef.Kind) {
 	case "clustertunnel":
-		namespacedName = apitypes.NamespacedName{Name: r.binding.TunnelRef.Name, Namespace: r.Namespace}
+		namespacedName = apitypes.NamespacedName{Name: r.binding.Spec.TunnelRef.Name, Namespace: r.Namespace}
 		clusterTunnel := &networkingv1alpha1.ClusterTunnel{}
 		if err := r.Get(r.ctx, namespacedName, clusterTunnel); err != nil {
 			r.log.Error(err, "Failed to get ClusterTunnel", "namespacedName", namespacedName)
@@ -94,7 +94,7 @@ func (r *TunnelBindingReconciler) initStruct(ctx context.Context, tunnelBinding 
 			return err
 		}
 	case "tunnel":
-		namespacedName = apitypes.NamespacedName{Name: r.binding.TunnelRef.Name, Namespace: r.binding.Namespace}
+		namespacedName = apitypes.NamespacedName{Name: r.binding.Spec.TunnelRef.Name, Namespace: r.binding.Namespace}
 		tunnel := &networkingv1alpha1.Tunnel{}
 		if err := r.Get(r.ctx, namespacedName, tunnel); err != nil {
 			r.log.Error(err, "Failed to get Tunnel", "namespacedName", namespacedName)
@@ -190,9 +190,9 @@ func (r *TunnelBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 }
 
 func (r *TunnelBindingReconciler) setStatus() error {
-	status := make([]networkingv1alpha1.ServiceInfo, 0, len(r.binding.Subjects))
+	status := make([]networkingv1alpha1.ServiceInfo, 0, len(r.binding.Spec.Subjects))
 	var hostnames string
-	for _, sub := range r.binding.Subjects {
+	for _, sub := range r.binding.Spec.Subjects {
 		hostname, target, err := r.getConfigForSubject(sub)
 		if err != nil {
 			r.log.Error(err, "error getting config for service", "svc", sub.Name)
@@ -391,8 +391,8 @@ func (r *TunnelBindingReconciler) deleteDNSLogic(hostname string) error {
 func (r *TunnelBindingReconciler) getRelevantTunnelBindings() ([]networkingv1alpha1.TunnelBinding, error) {
 	// Fetch TunnelBindings from API
 	listOpts := []client.ListOption{client.MatchingLabels(map[string]string{
-		tunnelNameLabel: r.binding.TunnelRef.Name,
-		tunnelKindLabel: r.binding.Kind,
+		tunnelNameLabel: r.binding.Spec.TunnelRef.Name,
+		tunnelKindLabel: r.binding.Spec.TunnelRef.Kind,
 	})}
 	tunnelBindingList := &networkingv1alpha1.TunnelBindingList{}
 	if err := r.List(r.ctx, tunnelBindingList, listOpts...); err != nil {
@@ -567,7 +567,7 @@ func (r *TunnelBindingReconciler) configureCloudflareDaemon() error {
 	// Set to 16 initially
 	finalIngresses := make([]UnvalidatedIngressRule, 0, 16)
 	for _, binding := range bindings {
-		for i, subject := range binding.Subjects {
+		for i, subject := range binding.Spec.Subjects {
 			targetService := ""
 			if subject.Spec.Target != "" {
 				targetService = subject.Spec.Target

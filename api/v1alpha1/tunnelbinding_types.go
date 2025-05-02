@@ -125,18 +125,22 @@ type TunnelBindingStatus struct {
 	Services  []ServiceInfo `json:"services"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:printcolumn:name="FQDNs",type=string,JSONPath=`.status.hostnames`
-
+// TunnelBindingSpec defines the desired state of TunnelBinding
+// Contains Subjects and TunnelRef
+type TunnelBindingSpec struct {
+	Subjects  []TunnelBindingSubject `json:"subjects"`
+	TunnelRef TunnelRef              `json:"tunnelRef"`
+}
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="FQDNs",type=string,JSONPath=`.status.hostnames`
 // TunnelBinding is the Schema for the tunnelbindings API
 type TunnelBinding struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Subjects  []TunnelBindingSubject `json:"subjects"`
-	TunnelRef TunnelRef              `json:"tunnelRef"`
-	Status    TunnelBindingStatus    `json:"status,omitempty"`
+	Spec   TunnelBindingSpec   `json:"spec,omitempty"`
+	Status TunnelBindingStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
