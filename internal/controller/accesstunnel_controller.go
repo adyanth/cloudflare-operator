@@ -75,7 +75,7 @@ func (r *AccessTunnelReconciler) GetReconcilerName() string {
 
 var _ k8s.GenericReconciler = &AccessTunnelReconciler{}
 
-func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel, secret *corev1.Secret) (*appsv1.Deployment, *corev1.Service) {
+func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel, secret *corev1.Secret, scheme *runtime.Scheme) (*appsv1.Deployment, *corev1.Service) {
 	svcName := accessTunnel.GetName()
 	if accessTunnel.Target.Svc.Name != "" {
 		svcName = accessTunnel.Target.Svc.Name
@@ -101,15 +101,6 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 		args = append(args, "--service-token-id", string(id), "--service-token-secret", string(token))
 	}
 
-	// Instead of using: ctrl.SetControllerReference(accessTunnel, &appsv1.Deployment{}, scheme)
-	ownerRefs := []metav1.OwnerReference{{
-		APIVersion:         accessTunnel.APIVersion,
-		Kind:               accessTunnel.Kind,
-		Name:               accessTunnel.Name,
-		UID:                accessTunnel.UID,
-		Controller:         ptr.To(true),
-		BlockOwnerDeletion: ptr.To(true),
-	}}
 	ls := map[string]string{"app": "cloudflared", "name": accessTunnel.Name}
 	return &appsv1.Deployment{
 			TypeMeta: metav1.TypeMeta{
@@ -117,10 +108,9 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 				Kind:       "Deployment",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name:            accessTunnel.Name,
-				Namespace:       namespace,
-				Labels:          ls,
-				OwnerReferences: ownerRefs,
+				Name:      accessTunnel.Name,
+				Namespace: namespace,
+				Labels:    ls,
 			},
 			Spec: appsv1.DeploymentSpec{
 				Replicas: ptr.To(int32(1)),
@@ -200,10 +190,9 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 				Kind:       "Service",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name:            svcName,
-				Namespace:       namespace,
-				Labels:          ls,
-				OwnerReferences: ownerRefs,
+				Name:      svcName,
+				Namespace: namespace,
+				Labels:    ls,
 			},
 			Spec: corev1.ServiceSpec{
 				Selector: ls,
@@ -266,7 +255,9 @@ func (r *AccessTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Create/Update deployment
-	dep, svc := cloudflaredDeploymentService(accessTunnel, secret)
+	dep, svc := cloudflaredDeploymentService(accessTunnel, secret, r.Scheme)
+	ctrl.SetControllerReference(accessTunnel, dep, r.Scheme)
+	ctrl.SetControllerReference(accessTunnel, svc, r.Scheme)
 
 	if err := k8s.Apply(r, dep); err != nil {
 		return ctrl.Result{}, err
