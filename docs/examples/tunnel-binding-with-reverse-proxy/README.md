@@ -1,20 +1,9 @@
 # Bring your own reverse proxy
 
-> This builds on [the getting started guide](../../getting-started.md), and it is recommended to read that first.
+> This builds on [the getting started guide](../../install.md), and it is recommended to read that first.
 
-## Motivation
+This example configures cloudflared to send all traffic to a reverse proxy, and then configure routing in the reverse proxy.
 
-Cloudflare tunnels can be used as a reverse proxy, or can forward traffic to an existing reverse proxy.
-This example shows how to configure cloudflared using the cloudflare-operator to front a reverse proxy. 
-In effect, we are using it as a layer 4 or 7 load balancer depending on whether we forward TCP/UDP or HTTP/HTTPS traffic respectively.
-
-This configuration has a few use cases:
-- You have significant existing reverse proxy configuration, which you may or may not want to migrate to cloudflared.
-  This configuration allows additional routes to be added with a tunnel binding to use this reverse proxy in combination with other routes.
-- You require reverse proxy functionality that cloudflared does not have
-- You want to keep your reverse proxy configuration modular, so that you can use any load balancer implementation
-- You use a service mesh with its own ingress implementation
-- You have multiple load balancers pointing at your ingress. For example a lab might include metallb + DNS entries so that you are not traversing the internet when on the same network as your cluster
 ```
 +----------------------+
 |   internet users     |
@@ -35,6 +24,20 @@ This configuration has a few use cases:
 | App #1  | |  App #2  |
 +---------+ +----------+
 ```
+
+## Motivation
+
+Cloudflare tunnels can be used as a reverse proxy, or can forward traffic to an existing reverse proxy.
+This example shows how to configure cloudflared using the cloudflare-operator to front a reverse proxy. 
+In effect, we are using it as a layer 4 or 7 load balancer depending on whether we forward TCP/UDP or HTTP/HTTPS traffic respectively.
+
+This configuration has a few use cases:
+- You have significant existing reverse proxy configuration, which you may or may not want to migrate to cloudflared.
+  This configuration allows additional routes to be added with a tunnel binding to use this reverse proxy in combination with other routes.
+- You require reverse proxy functionality that cloudflared does not have
+- You want to keep your reverse proxy configuration modular, so that you can use any load balancer implementation
+- You use a service mesh with its own ingress implementation
+- You have multiple load balancers pointing at your ingress. For example a lab might include metallb + DNS entries so that you are not traversing the internet when on the same network as your cluster
 
 ## What have we got here
 
@@ -74,8 +77,8 @@ Notes:
 
 > **Ensure that you have kubectl, kustomize, and helm installed.**
 
-1. Configure a secret with your API token or API key, as described in [the getting started guide](../../getting-started.md#cloudflare-tokens)
-2. Deploy the cloudflare operator as described in [the getting started guide](../../getting-started.md#deploy-the-operator)
+1. Configure a secret with your API token or API key, as described in [the getting started guide](../../install.md#cloudflare-tokens)
+2. Deploy the cloudflare operator as described in [the getting started guide](../../install.md#deploy-the-operator)
 3. Replace all placeholder values formatted `<like-this>`.
    - in `manifests/cloudflare-operator`
       - `<email-address>`: the email address associated with the cloudflare zone.

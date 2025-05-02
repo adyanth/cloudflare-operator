@@ -2,7 +2,7 @@
 
 <div align="center">
   <a href="https://github.com/adyanth/cloudflare-operator">
-    <img src="images/CloudflareOperatorLogo.png" alt="Logo" height="250">
+    <img src="docs/images/CloudflareOperatorLogo.png" alt="Logo" height="250">
   </a>
   <br />
 
@@ -10,7 +10,7 @@
     A Kubernetes Operator to create and manage Cloudflare Tunnels and DNS records <br /> for (HTTP/TCP/UDP*) Service Resources
     <br />
     <br />
-    <a href="docs/getting-started.md"><strong>Getting Started Guide »</strong></a>
+    <a href="docs/install.md"><strong>Getting Started Guide »</strong></a>
     <br />
     <br />
     <a href="https://github.com/adyanth/cloudflare-operator/issues">Report Bug</a>
@@ -53,14 +53,16 @@ The Cloudflare Operator aims to provide a new way of dynamically deploying the [
 
 Here is how the operator and the Tunnel Resource fit into your deployment.
 
-![Operator Architecture](images/OperatorArchitecture.png#center)
+![Operator Architecture](docs/images/OperatorArchitecture.png#center)
 
 There is more detailed information on this architecture and the thought process behind it in my [blog post](https://adyanth.site/posts/migration-compose-k8s/cloudflare-tunnel-operator-architecture/).
 
 ## Getting Started
 
-Go through the dedicated documentation on [Getting Started](docs/getting-started.md) to learn how to deploy this operator and a sample tunnel along with a service to expose.
+Go through the dedicated documentation on [Getting Started](docs/install.md) to learn how to deploy this operator and a sample tunnel along with a service to expose.
 
 Look into the [Configuration](docs/configuration.md) documentation to understand various configurable parameters of this operator.
+
+Look into the [examples](./docs/examples) to see playbooks for expected use cases.
 
 > **_NOTE_**: This is **NOT** an official operator provided/backed by Cloudflare Inc. It utilizes their [v4 API](https://api.cloudflare.com/) and their [`cloudflared`](https://github.com/cloudflare/cloudflared) to automate setting up of tunnels on Kubernetes.
