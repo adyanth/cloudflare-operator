@@ -12,7 +12,7 @@ permissions:
   pull-requests: read
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
