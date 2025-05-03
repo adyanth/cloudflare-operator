@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-demo
+  labels:
+    app: hello-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello-demo
+  template:
+    metadata:
+      labels:
+        app: hello-demo
+    spec:
+      containers:
+        - name: hello
+          image: nginxdemos/hello:latest
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
