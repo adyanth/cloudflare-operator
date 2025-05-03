@@ -36,7 +36,7 @@ linters:
         - name: exported
           disabled: true
         - name: line-length-limit
-          arguments: 150
+          arguments: [150]
         - name: function-length
           disabled: true
         - name: add-constant
@@ -64,7 +64,8 @@ formatters:
     - goimports
   settings:
     goimports:
-      local-prefixes: github.com/adyanth/cloudflare-operator
+      local-prefixes:
+        - github.com/adyanth/cloudflare-operator
   exclusions:
     generated: lax
     paths:
