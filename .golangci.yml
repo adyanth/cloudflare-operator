@@ -1,33 +1,18 @@
+version: "2"
+
 run:
+  go: '1.24'
   timeout: 5m
   allow-parallel-runners: true
 
-issues:
-  # don't skip warning about doc comments
-  # don't exclude the default set of lint
-  exclude-use-default: false
-  # restore some of the defaults
-  # (fill in the rest as needed)
-  exclude-rules:
-    - path: "api/*"
-      linters:
-        - lll
-    - path: "internal/*"
-      linters:
-        - dupl
-        - lll
 linters:
-  disable-all: true
+  default: none
   enable:
     - dupl
     - errcheck
-    - exportloopref
     - ginkgolinter
     - goconst
     - gocyclo
-    - gofmt
-    - goimports
-    - gosimple
     - govet
     - ineffassign
     - lll
@@ -39,8 +24,50 @@ linters:
     - unconvert
     - unparam
     - unused
-
-linters-settings:
-  revive:
+    - errname
+    - gocritic
+    - nilerr
+    - interfacebloat
+    - usestdlibvars
+  settings:
+    revive:
+      enable-all-rules: true
+      rules:
+        - name: exported
+          disabled: true
+        - name: line-length-limit
+          arguments: 150
+        - name: function-length
+          disabled: true
+        - name: add-constant
+          disabled: true
+    interfacebloat:
+      max: 15
+  exclusions:
+    generated: lax
     rules:
-      - name: comment-spacings
+      - linters:
+          - lll
+          - revive
+        path: api/*
+      - linters:
+          - dupl
+          - lll
+        path: internal/*
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes: github.com/adyanth/cloudflare-operator
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
