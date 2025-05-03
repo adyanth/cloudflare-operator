@@ -150,7 +150,7 @@ type TunnelStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="TunnelID",type=string,JSONPath=`.status.tunnelId`
-// +kubebuilder:deprecatedversion:warning="networking.cfargotunnel.com/v1alpha1 Tunnel is deprecated, see ... for migrating to v1alpha2"
+// +kubebuilder:deprecatedversion:warning="networking.cfargotunnel.com/v1alpha1 Tunnel is deprecated, see https://github.com/adyanth/cloudflare-operator/tree/v0.13.0/docs/migration/crd/v1alpha2.md for migrating to v1alpha2"
 
 // Tunnel is the Schema for the tunnels API
 type Tunnel struct {

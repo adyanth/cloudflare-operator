@@ -20,7 +20,8 @@ spec:
       type: string
     deprecated: true
     deprecationWarning: networking.cfargotunnel.com/v1alpha1 ClusterTunnel is deprecated,
-      see ... for migrating to v1alpha2
+      see https://github.com/adyanth/cloudflare-operator/tree/v0.13.0/docs/migration/crd/v1alpha2.md
+      for migrating to v1alpha2
     name: v1alpha1
     schema:
       openAPIV3Schema:

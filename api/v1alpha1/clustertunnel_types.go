@@ -24,7 +24,7 @@ import (
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="TunnelID",type=string,JSONPath=`.status.tunnelId`
-// +kubebuilder:deprecatedversion:warning="networking.cfargotunnel.com/v1alpha1 ClusterTunnel is deprecated, see ... for migrating to v1alpha2"
+// +kubebuilder:deprecatedversion:warning="networking.cfargotunnel.com/v1alpha1 ClusterTunnel is deprecated, see https://github.com/adyanth/cloudflare-operator/tree/v0.13.0/docs/migration/crd/v1alpha2.md for migrating to v1alpha2"
 
 // ClusterTunnel is the Schema for the clustertunnels API
 type ClusterTunnel struct {
