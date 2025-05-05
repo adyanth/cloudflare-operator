@@ -254,7 +254,14 @@ func createManagedResources(r GenericTunnelReconciler) (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
+	// Create Deployment if it does not exist and scale it
 	if err := k8s.Apply(r, deploymentForTunnel(r)); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Create dummy TunnelBinding
+	tunnelBinding := dummyTunnelBindingForTunnel(r)
+	if err := k8s.Apply(r, tunnelBinding); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -473,4 +480,26 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 	// Set Tunnel instance as the owner and controller
 	ctrl.SetControllerReference(r.GetTunnel().GetObject(), dep, r.GetScheme())
 	return dep
+}
+
+func dummyTunnelBindingForTunnel(r GenericTunnelReconciler) *networkingv1alpha1.TunnelBinding {
+	tunnelBinding := &networkingv1alpha1.TunnelBinding{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: networkingv1alpha1.GroupVersion.String(),
+			Kind:       "TunnelBinding",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      r.GetTunnel().GetName(),
+			Namespace: r.GetTunnel().GetNamespace(),
+		},
+		Subjects: []networkingv1alpha1.TunnelBindingSubject{},
+		TunnelRef: networkingv1alpha1.TunnelRef{
+			Kind:              r.GetTunnel().GetObject().GetObjectKind().GroupVersionKind().Kind,
+			Name:              r.GetTunnel().GetName(),
+			DisableDNSUpdates: true, // Nothing to update
+		},
+	}
+	tunnelBinding.SetLabels(labelsForBinding(*tunnelBinding))
+	ctrl.SetControllerReference(r.GetTunnel().GetObject(), tunnelBinding, r.GetScheme())
+	return tunnelBinding
 }
