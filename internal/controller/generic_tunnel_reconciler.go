@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	CREDENTIALS_JSON_FILENAME string = "credentials.json"
-	CLOUDFLARED_LATEST_IMAGE  string = "cloudflare/cloudflared:latest"
+	CredentialsJsonFilename string = "credentials.json"
+	CloudflaredLatestImage  string = "cloudflare/cloudflared:latest"
 )
 
 type GenericTunnelReconciler interface {
@@ -137,7 +137,7 @@ func setupNewTunnel(r GenericTunnelReconciler) error {
 		if err := r.GetClient().Get(r.GetContext(), TunnelNamespacedName(r), secret); err != nil {
 			r.GetLog().Error(err, "Error in getting existing secret, tunnel restart will crash, please recreate tunnel")
 		}
-		r.SetTunnelCreds(string(secret.Data[CREDENTIALS_JSON_FILENAME]))
+		r.SetTunnelCreds(string(secret.Data[CredentialsJsonFilename]))
 	}
 
 	// Add finalizer for tunnel
@@ -319,7 +319,7 @@ func secretForTunnel(r GenericTunnelReconciler) *corev1.Secret {
 			Namespace: r.GetTunnel().GetNamespace(),
 			Labels:    ls,
 		},
-		StringData: map[string]string{CREDENTIALS_JSON_FILENAME: r.GetTunnelCreds()},
+		StringData: map[string]string{CredentialsJsonFilename: r.GetTunnelCreds()},
 	}
 	// Set Tunnel instance as the owner and controller
 	ctrl.SetControllerReference(r.GetTunnel().GetObject(), sec, r.GetScheme())
@@ -405,7 +405,7 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 						},
 					},
 					Containers: []corev1.Container{{
-						Image: CLOUDFLARED_LATEST_IMAGE,
+						Image: CloudflaredLatestImage,
 						Name:  "cloudflared",
 						Args:  args,
 						LivenessProbe: &corev1.Probe{
