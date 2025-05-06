@@ -1,11 +1,10 @@
-apiVersion: networking.cfargotunnel.com/v1alpha1
+apiVersion: networking.cfargotunnel.com/v1alpha2
 kind: Tunnel
 metadata:
   name: example-tunnel
 spec:
   newTunnel:
     name: example-tunnel
-  size: 1
   cloudflare:
     email: <email-address>
     domain: <domain>

@@ -1,0 +1,14 @@
+apiVersion: networking.cfargotunnel.com/v1alpha2
+kind: ClusterTunnel
+metadata:
+  name: example-tunnel      # The ClusterTunnel Custom Resource Name
+spec:
+  newTunnel:
+    name: my-k8s-tunnel         # Name of your new tunnel on Cloudflare
+  cloudflare:
+    email: email@example.com     # Your email used to login to the Cloudflare Dashboard
+    domain: example.com         # Domain under which the tunnel runs and adds DNS entries to
+    secret: cloudflare-secrets  # The secret created before
+    # accountId and accountName cannot be both empty. If both are provided, Account ID is used if valid, else falls back to Account Name.
+    accountName: <Cloudflare account name>
+    accountId: <Cloudflare account ID>

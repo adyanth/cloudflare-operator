@@ -89,7 +89,7 @@ This assumes:
    - in `manifests/hello/ingress.yaml`
      - `<domain>`: the domain associated with the cloudflare zone you are managing.
        This should match your tunnel/clusterTunnel.
-   - in `manifests/tunnel-binding.yaml`
+   - in `manifests/cloudflare-operator/tunnel-binding.yaml`
        - `<domain>`: the domain associated with the cloudflare zone you are managing.
          This should match your tunnel/clusterTunnel.
 1. deploy the TunnelBinding

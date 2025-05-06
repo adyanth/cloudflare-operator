@@ -63,9 +63,12 @@ kubectl apply -k 'https://github.com/adyanth/cloudflare-operator/config/default'
 Now that the operator is installed, we can make it useful.
 
 1. [Deploy a secret with your API token](./docs/examples/operator-authentication)
-1. [Create a Tunnel/ClusterTunnel resource](./docs/examples/tunnel-simple)
-1. Configure routing for your tunnel by following one of:
+2. [Create a Tunnel/ClusterTunnel resource](./docs/examples/tunnel-simple)
+3. Configure routing for your tunnel by following one of:
     - [configure routing directly (simple)](./docs/examples/tunnel-binding-simple)
     - [configure routing with a reverse proxy](./docs/examples/tunnel-binding-with-reverse-proxy)
 
-Look into the documentation in `docs/configuration` to understand various configurable parameters of this operator.
+## Additional Info
+
+* Look into the documentation in `docs/configuration` to understand various configurable parameters of this operator.
+* Look at migration documentation in `docs/migrations` for upgrades.
