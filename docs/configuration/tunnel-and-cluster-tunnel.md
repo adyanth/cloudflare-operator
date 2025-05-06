@@ -7,10 +7,10 @@ The Tunnel and the ClusterTunnel have the exact same configuration options. The 
 kubectl explain tunnel.spec
 ```
 
-Here is an overview of a ClusterTunnel as YAML.
+Here is an overview of a ClusterTunnel as YAML for `v1alpha2`. Also look at migration docs for [`v1alpha1`](../migrations/crd/v1alpha2.md)
 
 ```yaml
-apiVersion: networking.cfargotunnel.com/v1alpha1
+apiVersion: networking.cfargotunnel.com/v1alpha2
 kind: ClusterTunnel     # or Tunnel
 metadata:
   name: tunnel-cr-name
@@ -43,8 +43,14 @@ spec:
 
   # cloudflared configuration
   fallbackTarget: http_status:404           # The default service to point cloudflared to. Defaults to http_status:404
-  image: cloudflare/cloudflared:2025.4.0    # Image to run. Used for running an up-to-date image. Can be swapped out to an arm based image if needed
   noTlsVerify: false                        # Disables the TLS verification to backend services globally
   originCaPool: homelab-ca                  # Secret containing CA certificates to trust. Must contain tls.crt to be trusted globally and optionally other certificates (see the caPool service annotation for usage)
-  size: 1                                   # Replica count for the tunnel deployment
+  deployPatch: |
+    spec:
+      replicas: 2
+        template:
+          spec:
+            containers:
+              - name: cloudflared
+                image: cloudflare/cloudflared:2025.4.0 # Image to run. Used for running a pinned image. Can be swapped out to an arm based image if needed
 ```
