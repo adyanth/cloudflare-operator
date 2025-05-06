@@ -1,6 +1,10 @@
 package controller
 
 import (
+	"cmp"
+	"fmt"
+	"slices"
+	"strings"
 	"time"
 )
 
@@ -76,4 +80,46 @@ type IngressIPRule struct {
 	Prefix *string `yaml:"prefix,omitempty"`
 	Ports  []int   `yaml:"ports,omitempty"`
 	Allow  bool    `yaml:"allow,omitempty"`
+}
+
+// Custom representation of the `Configuration` object to allow ease of use
+type MapConfiguration struct {
+	Ingress map[string]UnvalidatedIngressRule
+	c       Configuration
+}
+
+func (i UnvalidatedIngressRule) SelectKey() string {
+	key := fmt.Sprintf("%s/%s", strings.ReplaceAll(i.Hostname, "*", "zzzzzzzzz"), i.Path)
+	if key == "/" {
+		key = "zzzzzzzzz"
+	}
+	return key
+}
+
+func (c Configuration) ToMapConfig() MapConfiguration {
+	var m MapConfiguration
+	m.Ingress = make(map[string]UnvalidatedIngressRule)
+	for _, ingress := range c.Ingress {
+		m.Ingress[ingress.SelectKey()] = ingress
+	}
+	m.c = c
+	return m
+}
+
+func (m MapConfiguration) ToConfig() Configuration {
+	m.c.Ingress = []UnvalidatedIngressRule{}
+	keys := SortByKey(m.Ingress)
+	for _, k := range keys {
+		m.c.Ingress = append(m.c.Ingress, m.Ingress[k])
+	}
+	return m.c
+}
+
+func SortByKey[K cmp.Ordered, V any](m map[K]V) []K {
+	keys := make([]K, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	return keys
 }
