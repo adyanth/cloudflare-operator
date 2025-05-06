@@ -2,13 +2,16 @@ package k8s
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 )
 
 type GenericReconciler interface {
@@ -55,4 +58,23 @@ func MergeOrApply(r GenericReconciler, object client.Object) (err error) {
 		return Apply(r, object)
 	}
 	return
+}
+
+func StrategicPatch(original interface{}, patch string, output client.Object) error {
+	originalJSON, err := json.Marshal(original)
+	if err != nil {
+		return err
+	}
+	patchJSON, err := yaml.YAMLToJSON([]byte(patch))
+	if err != nil {
+		return err
+	}
+	patchedJSON, err := strategicpatch.StrategicMergePatch(originalJSON, patchJSON, output)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(patchedJSON, output); err != nil {
+		return err
+	}
+	return nil
 }

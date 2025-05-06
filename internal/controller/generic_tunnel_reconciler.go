@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
 	"github.com/adyanth/cloudflare-operator/internal/k8s"
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
@@ -19,7 +18,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-const CREDENTIALS_JSON_FILENAME string = "credentials.json"
+const (
+	CredentialsJsonFilename string = "credentials.json"
+	CloudflaredLatestImage  string = "cloudflare/cloudflared:latest"
+)
 
 type GenericTunnelReconciler interface {
 	k8s.GenericReconciler
@@ -50,13 +52,9 @@ func labelsForTunnel(cf Tunnel) map[string]string {
 	}
 }
 
-func nodeSelectorsForTunnel(cf Tunnel) map[string]string {
-	return cf.GetSpec().NodeSelectors
-}
-
 func setupTunnel(r GenericTunnelReconciler) (ctrl.Result, bool, error) {
-	okNewTunnel := r.GetTunnel().GetSpec().NewTunnel != networkingv1alpha1.NewTunnel{}
-	okExistingTunnel := r.GetTunnel().GetSpec().ExistingTunnel != networkingv1alpha1.ExistingTunnel{}
+	okNewTunnel := r.GetTunnel().GetSpec().NewTunnel != nil
+	okExistingTunnel := r.GetTunnel().GetSpec().ExistingTunnel != nil
 
 	// If both are set (or neither are), we have a problem
 	if okNewTunnel == okExistingTunnel {
@@ -139,7 +137,7 @@ func setupNewTunnel(r GenericTunnelReconciler) error {
 		if err := r.GetClient().Get(r.GetContext(), TunnelNamespacedName(r), secret); err != nil {
 			r.GetLog().Error(err, "Error in getting existing secret, tunnel restart will crash, please recreate tunnel")
 		}
-		r.SetTunnelCreds(string(secret.Data[CREDENTIALS_JSON_FILENAME]))
+		r.SetTunnelCreds(string(secret.Data[CredentialsJsonFilename]))
 	}
 
 	// Add finalizer for tunnel
@@ -159,7 +157,7 @@ func cleanupTunnel(r GenericTunnelReconciler) (ctrl.Result, bool, error) {
 		// Run finalization logic. If the finalization logic fails,
 		// don't remove the finalizer so that we can retry during the next reconciliation.
 
-		r.GetLog().Info("starting deletion cycle", "size", r.GetTunnel().GetSpec().Size)
+		r.GetLog().Info("starting deletion cycle")
 		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Deleting", "Starting Tunnel Deletion")
 		cfDeployment := &appsv1.Deployment{}
 		var bypass bool
@@ -177,7 +175,7 @@ func cleanupTunnel(r GenericTunnelReconciler) (ctrl.Result, bool, error) {
 				r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedScaling", "Failed to scale down cloudflared")
 				return ctrl.Result{}, false, err
 			}
-			r.GetLog().Info("Scaling down successful", "size", r.GetTunnel().GetSpec().Size)
+			r.GetLog().Info("Scaling down successful")
 			r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Scaled", "Scaling down cloudflared successful")
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, false, nil
 		}
@@ -254,7 +252,15 @@ func createManagedResources(r GenericTunnelReconciler) (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
-	if err := k8s.Apply(r, deploymentForTunnel(r)); err != nil {
+	// Apply patch to deployment
+	dep := deploymentForTunnel(r)
+	if err := k8s.StrategicPatch(dep, r.GetTunnel().GetSpec().DeployPatch, dep); err != nil {
+		r.GetLog().Error(err, "unable to patch deployment, check patch")
+		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedPatch", "Failed to patch deployment, check patch")
+		return ctrl.Result{}, err
+	}
+
+	if err := k8s.Apply(r, dep); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -313,7 +319,7 @@ func secretForTunnel(r GenericTunnelReconciler) *corev1.Secret {
 			Namespace: r.GetTunnel().GetNamespace(),
 			Labels:    ls,
 		},
-		StringData: map[string]string{CREDENTIALS_JSON_FILENAME: r.GetTunnelCreds()},
+		StringData: map[string]string{CredentialsJsonFilename: r.GetTunnelCreds()},
 	}
 	// Set Tunnel instance as the owner and controller
 	ctrl.SetControllerReference(r.GetTunnel().GetObject(), sec, r.GetScheme())
@@ -323,9 +329,6 @@ func secretForTunnel(r GenericTunnelReconciler) *corev1.Secret {
 // deploymentForTunnel returns a tunnel Deployment object
 func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 	ls := labelsForTunnel(r.GetTunnel())
-	replicas := r.GetTunnel().GetSpec().Size
-	nodeSelector := nodeSelectorsForTunnel(r.GetTunnel())
-	tolerations := r.GetTunnel().GetSpec().Tolerations
 	protocol := r.GetTunnel().GetSpec().Protocol
 
 	args := []string{"tunnel", "--protocol", protocol, "--config", "/etc/cloudflared/config/config.yaml", "--metrics", "0.0.0.0:2000", "run"}
@@ -387,7 +390,6 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 			Labels:    ls,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: ls,
 			},
@@ -403,7 +405,7 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 						},
 					},
 					Containers: []corev1.Container{{
-						Image: r.GetTunnel().GetSpec().Image,
+						Image: CloudflaredLatestImage,
 						Name:  "cloudflared",
 						Args:  args,
 						LivenessProbe: &corev1.Probe{
@@ -436,9 +438,7 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 							},
 						},
 					}},
-					Volumes:      volumes,
-					NodeSelector: nodeSelector,
-					Tolerations:  tolerations,
+					Volumes: volumes,
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{

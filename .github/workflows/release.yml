@@ -14,6 +14,10 @@ on:
 
 jobs:
   docker:
+    # Need's repo owner login creds
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.user.login == github.repository_owner) ||
+      github.actor == github.repository_owner
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

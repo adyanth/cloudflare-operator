@@ -10,7 +10,7 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
+	networkingv1alpha2 "github.com/adyanth/cloudflare-operator/api/v1alpha2"
 )
 
 const (
@@ -47,7 +47,7 @@ var tunnelValidProtoMap = map[string]bool{
 	tunnelProtoUDP:   true,
 }
 
-func getAPIDetails(ctx context.Context, c client.Client, log logr.Logger, tunnelSpec networkingv1alpha1.TunnelSpec, tunnelStatus networkingv1alpha1.TunnelStatus, namespace string) (*CloudflareAPI, *corev1.Secret, error) {
+func getAPIDetails(ctx context.Context, c client.Client, log logr.Logger, tunnelSpec networkingv1alpha2.TunnelSpec, tunnelStatus networkingv1alpha2.TunnelStatus, namespace string) (*CloudflareAPI, *corev1.Secret, error) {
 
 	// Get secret containing API token
 	cfSecret := &corev1.Secret{}

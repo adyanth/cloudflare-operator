@@ -18,6 +18,10 @@ spec:
     - jsonPath: .status.tunnelId
       name: TunnelID
       type: string
+    deprecated: true
+    deprecationWarning: networking.cfargotunnel.com/v1alpha1 Tunnel is deprecated,
+      see https://github.com/adyanth/cloudflare-operator/tree/v0.13.0/docs/migration/crd/v1alpha2.md
+      for migrating to v1alpha2
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -200,6 +204,165 @@ spec:
                       type: string
                   type: object
                 type: array
+            required:
+            - cloudflare
+            type: object
+          status:
+            description: TunnelStatus defines the observed state of Tunnel
+            properties:
+              accountId:
+                type: string
+              tunnelId:
+                type: string
+              tunnelName:
+                type: string
+              zoneId:
+                type: string
+            required:
+            - accountId
+            - tunnelId
+            - tunnelName
+            - zoneId
+            type: object
+        type: object
+    served: true
+    storage: false
+    subresources:
+      status: {}
+  - additionalPrinterColumns:
+    - jsonPath: .status.tunnelId
+      name: TunnelID
+      type: string
+    name: v1alpha2
+    schema:
+      openAPIV3Schema:
+        description: Tunnel is the Schema for the tunnels API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: TunnelSpec defines the desired state of Tunnel
+            properties:
+              cloudflare:
+                description: Cloudflare Credentials
+                properties:
+                  CLOUDFLARE_API_KEY:
+                    default: CLOUDFLARE_API_KEY
+                    description: |-
+                      Key in the secret to use for Cloudflare API Key, defaults to CLOUDFLARE_API_KEY. Needs Email also to be provided.
+                      For Delete operations for new tunnels only, or as an alternate to API Token
+                    type: string
+                  CLOUDFLARE_API_TOKEN:
+                    default: CLOUDFLARE_API_TOKEN
+                    description: Key in the secret to use for Cloudflare API token,
+                      defaults to CLOUDFLARE_API_TOKEN
+                    type: string
+                  CLOUDFLARE_TUNNEL_CREDENTIAL_FILE:
+                    default: CLOUDFLARE_TUNNEL_CREDENTIAL_FILE
+                    description: Key in the secret to use as credentials.json for
+                      an existing tunnel, defaults to CLOUDFLARE_TUNNEL_CREDENTIAL_FILE
+                    type: string
+                  CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET:
+                    default: CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET
+                    description: Key in the secret to use as tunnel secret for an
+                      existing tunnel, defaults to CLOUDFLARE_TUNNEL_CREDENTIAL_SECRET
+                    type: string
+                  accountId:
+                    description: Account ID in Cloudflare. AccountId and AccountName
+                      cannot be both empty. If both are provided, Account ID is used
+                      if valid, else falls back to Account Name.
+                    type: string
+                  accountName:
+                    description: Account Name in Cloudflare. AccountName and AccountId
+                      cannot be both empty. If both are provided, Account ID is used
+                      if valid, else falls back to Account Name.
+                    type: string
+                  domain:
+                    description: Cloudflare Domain to which this tunnel belongs to
+                    type: string
+                  email:
+                    description: Email to use along with API Key for Delete operations
+                      for new tunnels only, or as an alternate to API Token
+                    type: string
+                  secret:
+                    description: Secret containing Cloudflare API key/token
+                    type: string
+                required:
+                - domain
+                - secret
+                type: object
+              deployPatch:
+                default: '{}'
+                description: |-
+                  Deployment patch for the cloudflared deployment.
+                  Follows https://kubernetes.io/docs/reference/kubectl/generated/kubectl_patch/
+                type: string
+              existingTunnel:
+                description: |-
+                  Existing tunnel object.
+                  ExistingTunnel and NewTunnel cannot be both empty and are mutually exclusive.
+                properties:
+                  id:
+                    description: Existing Tunnel ID to run on. Tunnel ID and Tunnel
+                      Name cannot be both empty. If both are provided, ID is used
+                      if valid, else falls back to Name.
+                    type: string
+                  name:
+                    description: Existing Tunnel name to run on. Tunnel Name and Tunnel
+                      ID cannot be both empty. If both are provided, ID is used if
+                      valid, else falls back to Name.
+                    type: string
+                type: object
+              fallbackTarget:
+                default: http_status:404
+                description: FallbackTarget speficies the target for requests that
+                  do not match an ingress. Defaults to http_status:404
+                type: string
+              newTunnel:
+                description: |-
+                  New tunnel object.
+                  NewTunnel and ExistingTunnel cannot be both empty and are mutually exclusive.
+                properties:
+                  name:
+                    description: Tunnel name to create on Cloudflare.
+                    type: string
+                required:
+                - name
+                type: object
+              noTlsVerify:
+                default: false
+                description: NoTlsVerify disables origin TLS certificate checks when
+                  the endpoint is HTTPS.
+                type: boolean
+              originCaPool:
+                description: OriginCaPool speficies the secret with tls.crt (and other
+                  certs as needed to be referred in the service annotation) of the
+                  Root CA to be trusted when sending traffic to HTTPS endpoints
+                type: string
+              protocol:
+                default: auto
+                description: Protocol specifies the protocol to use for the tunnel.
+                  Defaults to auto. Options are "auto", "quic" and "http2"
+                enum:
+                - auto
+                - quic
+                - http2
+                type: string
             required:
             - cloudflare
             type: object
