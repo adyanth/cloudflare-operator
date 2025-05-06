@@ -227,7 +227,7 @@ spec:
                 - --health-probe-bind-address=:8081
                 command:
                 - /manager
-                image: adyanth/cloudflare-operator:0.12.0
+                image: adyanth/cloudflare-operator:0.13.0
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -341,4 +341,4 @@ spec:
   provider:
     name: adyanth.dev
     url: https://github.com/adyanth/cloudflare-operator
-  version: 0.12.0
+  version: 0.13.0

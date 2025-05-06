@@ -44,7 +44,7 @@ In general, one should pick a specific tag.
 [You can find the latest tag here](https://github.com/adyanth/cloudflare-operator/tags)
 
 ```bash
-kubectl apply -k 'https://github.com/adyanth/cloudflare-operator.git//config/default?ref=v0.12.0'
+kubectl apply -k 'https://github.com/adyanth/cloudflare-operator.git//config/default?ref=v0.13.0'
 ```
 
 #### Install the latest version
