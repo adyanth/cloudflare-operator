@@ -1,6 +1,6 @@
 # Bring your own reverse proxy
 
-> This builds on [the getting started guide](../../install.md), and it is recommended to read that first.
+> This builds on [the getting started guide](../../getting-started.md), and it is recommended to read that first.
 
 This example configures cloudflared to send all traffic to a reverse proxy, and then configure routing in the reverse proxy.
 
@@ -71,35 +71,42 @@ Notes:
         └── values.yaml
 ```
 
+## Prerequisites
+
+This assumes:
+1. `kubectl` is installed
+1. `kustomize` is installed
+1. `helm` is installed
+1. [You have deployed a secret to enable cloudflare-operator to authenticate to cloudflare](../operator-authentication)
+1. [You have deployed cloudflare-operator](../operator-install)
+1. [You have deployed a Tunnel/ClusterTunnel](../tunnel-simple)
+
 ## Steps
 
 > All steps assume you are working from the directory this README is in.
 
-> **Ensure that you have kubectl, kustomize, and helm installed.**
-
-1. Configure a secret with your API token or API key, as described in [the getting started guide](../../install.md#cloudflare-tokens)
-2. Deploy the cloudflare operator as described in [the getting started guide](../../install.md#deploy-the-operator)
-3. Replace all placeholder values formatted `<like-this>`.
-   - in `manifests/cloudflare-operator`
-      - `<email-address>`: the email address associated with the cloudflare zone.
-      - `<domain>`: the domain associated with the cloudflare zone you are managing.
-      - `<secret-name>`: the name of the secret containing your cloudflare credentials.
-      - `<account-id>`: the account ID associated with the cloudflare zone you are managing.
+1. Replace all placeholder values formatted `<like-this>`.
    - in `manifests/hello/ingress.yaml`
      - `<domain>`: the domain associated with the cloudflare zone you are managing.
-4. deploy the cluster tunnel and tunnelbinding
-```shell
-kubectl apply -f manifests/cloudflare-operator/
-```
-5. deploy the reverse proxy
-```shell
-kustomize build --enable-helm manifests/ingress-nginx | kubectl apply -f - 
-```
-6. deploy the example application
-```shell
-kubectl apply -f manifests/hello/
-```
-7. You should now be able to access the service on `hello.<domain>`
+       This should match your tunnel/clusterTunnel.
+   - in `manifests/tunnel-binding.yaml`
+       - `<domain>`: the domain associated with the cloudflare zone you are managing.
+         This should match your tunnel/clusterTunnel.
+1. deploy the TunnelBinding
+   ```shell
+   kubectl apply -f manifests/tunne-binding.yaml
+   ```
+
+1. deploy the reverse proxy
+   ```shell
+   kustomize build --enable-helm manifests/ingress-nginx | kubectl apply -f - 
+   ```
+1. deploy the example application
+   ```shell
+   kubectl apply -f manifests/hello/
+   ```
+
+1. You should now be able to access the service on `hello.<domain>`
 
 ## Extending this example
 
@@ -118,7 +125,7 @@ metadata:
   name: <app>
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    # in order to direct cloudflare tunnel to ingress-nginx, we have a single tunnelBinding resource in ingress-nginx.
+    # in order to direct cloudflare tunnel to ingress-nginx, we have a single TunnelBinding resource in ingress-nginx.
     # this is what controls ingress to ingress-nginx and allows us to put 2fa infront of apps that don't support it natively.
     nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/auth-method: "GET"
