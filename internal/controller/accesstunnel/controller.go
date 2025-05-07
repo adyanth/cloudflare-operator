@@ -70,7 +70,7 @@ func (r *Reconciler) GetReconciledObject() client.Object {
 func (r *Reconciler) GetContext() context.Context {
 	return r.ctx
 }
-func (_ *Reconciler) GetReconcilerName() string {
+func (*Reconciler) GetReconcilerName() string {
 	return "AccessTunnel"
 }
 
@@ -216,7 +216,7 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 
 // Reconcile the access object
 //
-// nolint:cognitive-complexity,cyclomatic // this was only checked because it was moved, and I want to avoid editing the logic
+// nolint:cognitive-complexity,cyclomatic,cognitive-complexity // this was only checked because it was moved, and I want to avoid editing the logic
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.ctx = ctx
 	r.log = ctrllog.FromContext(ctx)
