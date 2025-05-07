@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"github.com/adyanth/cloudflare-operator/internal/k8s"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -143,9 +144,14 @@ func (r *ClusterTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if err := r.Get(ctx, req.NamespacedName, tunnel); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Tunnel object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
-			r.log.Info("Tunnel deleted, nothing to do")
+			// Owned objects are automatically garbage collected.
+			secretClient, err := k8s.NewSecretClient(r.Client, &r.log)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			if err := secretClient.RemoveFinalizer(ctx, r.GetTunnel().GetSpec().Cloudflare.Secret, r.GetTunnel().GetNamespace(), tunnelFinalizer); err != nil {
+				return ctrl.Result{}, err
+			}
 			return ctrl.Result{}, nil
 		}
 		r.log.Error(err, "unable to fetch Tunnel")
@@ -153,6 +159,14 @@ func (r *ClusterTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	if err := r.initStruct(ctx, ClusterTunnelAdapter{tunnel, r.Namespace}); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	secretClient, err := k8s.NewSecretClient(r.Client, &r.log)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := secretClient.EnsureFinalizer(ctx, r.GetTunnel().GetSpec().Cloudflare.Secret, r.GetTunnel().GetNamespace(), tunnelFinalizer); err != nil {
 		return ctrl.Result{}, err
 	}
 
