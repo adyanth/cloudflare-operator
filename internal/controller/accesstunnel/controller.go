@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package accesstunnel contains the code associated with the reconciliation process for the accessTunnel resource
 package accesstunnel
 
 import (
@@ -69,6 +70,8 @@ func (r *Reconciler) GetReconciledObject() client.Object {
 func (r *Reconciler) GetContext() context.Context {
 	return r.ctx
 }
+
+// nolint:unused-receiver
 func (r *Reconciler) GetReconcilerName() string {
 	return "AccessTunnel"
 }
@@ -214,6 +217,8 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile the access object
+//
+// nolint:cognitive-complexity // this was only checked because it was moved, and I want to avoid editing the logic
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.ctx = ctx
 	r.log = ctrllog.FromContext(ctx)
@@ -256,8 +261,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	// Create/Update deployment
 	dep, svc := cloudflaredDeploymentService(accessTunnel, secret, r.Scheme)
-	ctrl.SetControllerReference(accessTunnel, dep, r.Scheme)
-	ctrl.SetControllerReference(accessTunnel, svc, r.Scheme)
+	if err := ctrl.SetControllerReference(accessTunnel, dep, r.Scheme); err != nil {
+		r.log.Error(err, "unable to set owner reference on Deployment")
+		return ctrl.Result{}, err
+	}
+	if err := ctrl.SetControllerReference(accessTunnel, svc, r.Scheme); err != nil {
+		r.log.Error(err, "unable to set owner reference on Service")
+		return ctrl.Result{}, err
+	}
 
 	if err := k8s.Apply(r, dep); err != nil {
 		return ctrl.Result{}, err

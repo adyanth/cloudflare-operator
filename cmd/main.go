@@ -19,10 +19,11 @@ package main
 import (
 	"crypto/tls"
 	"flag"
-	"github.com/adyanth/cloudflare-operator/internal/controller/accesstunnel"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/adyanth/cloudflare-operator/internal/controller/accesstunnel"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
