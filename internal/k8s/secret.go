@@ -2,28 +2,29 @@ package k8s
 
 import (
 	"context"
-	"fmt"
+	"errors"
+
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type SecretClient struct {
-	client client.Client
-	log    *logr.Logger
+	k8sClient client.Client
+	log       *logr.Logger
 }
 
-func NewSecretClient(client client.Client, log *logr.Logger) (*SecretClient, error) {
-	if client == nil {
-		return nil, fmt.Errorf("client cannot be nil")
+func NewSecretClient(k8sClient client.Client, log *logr.Logger) (*SecretClient, error) {
+	if k8sClient == nil {
+		return nil, errors.New("k8sClient cannot be nil")
 	}
 	if log == nil {
-		return nil, fmt.Errorf("logger cannot be nil")
+		return nil, errors.New("logger cannot be nil")
 	}
 	return &SecretClient{
-		client: client,
-		log:    log,
+		k8sClient: k8sClient,
+		log:       log,
 	}, nil
 }
 
@@ -34,12 +35,12 @@ func (s *SecretClient) EnsureFinalizer(ctx context.Context, secretName, secretNa
 		Name:      secretName,
 		Namespace: secretNamespace,
 	}
-	if err := s.client.Get(ctx, secretKey, &secret); err != nil {
+	if err := s.k8sClient.Get(ctx, secretKey, &secret); err != nil {
 		return err
 	}
 
 	// if finalizer already exists, we are happy
-	for _, existingFinalizer := range secret.ObjectMeta.Finalizers {
+	for _, existingFinalizer := range secret.Finalizers {
 		if finalizer == existingFinalizer {
 			return nil
 		}
@@ -47,7 +48,7 @@ func (s *SecretClient) EnsureFinalizer(ctx context.Context, secretName, secretNa
 
 	s.log.WithValues("finalizer", finalizer).Info("creating finalizer")
 	secret.Finalizers = append(secret.Finalizers, finalizer)
-	return s.client.Update(ctx, &secret)
+	return s.k8sClient.Update(ctx, &secret)
 }
 
 // RemoveFinalizer removes the first instance of the finalizer from the given secret
@@ -57,8 +58,8 @@ func (s *SecretClient) RemoveFinalizer(ctx context.Context, secretName, secretNa
 		Name:      secretName,
 		Namespace: secretNamespace,
 	}
-	if err := s.client.Get(ctx, secretKey, &secret); err != nil {
-		if errors.IsNotFound(err) {
+	if err := s.k8sClient.Get(ctx, secretKey, &secret); err != nil {
+		if k8serrors.IsNotFound(err) {
 			return nil
 		}
 		return err
@@ -66,7 +67,7 @@ func (s *SecretClient) RemoveFinalizer(ctx context.Context, secretName, secretNa
 
 	s.log.WithValues("finalizer", finalizer).Info("deleting finalizer")
 	secret.Finalizers = removeString(secret.Finalizers, finalizer)
-	return s.client.Update(ctx, &secret)
+	return s.k8sClient.Update(ctx, &secret)
 }
 
 // removeString returns a copy of list with the first (only) occurrence

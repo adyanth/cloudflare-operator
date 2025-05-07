@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+
 	"github.com/adyanth/cloudflare-operator/internal/k8s"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -149,7 +150,8 @@ func (r *ClusterTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			if err := secretClient.RemoveFinalizer(ctx, r.GetTunnel().GetSpec().Cloudflare.Secret, r.GetTunnel().GetNamespace(), tunnelFinalizer); err != nil {
+			err = secretClient.RemoveFinalizer(ctx, r.GetTunnel().GetSpec().Cloudflare.Secret, r.GetTunnel().GetNamespace(), tunnelFinalizer)
+			if err != nil {
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{}, nil
@@ -166,7 +168,8 @@ func (r *ClusterTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	if err := secretClient.EnsureFinalizer(ctx, r.GetTunnel().GetSpec().Cloudflare.Secret, r.GetTunnel().GetNamespace(), tunnelFinalizer); err != nil {
+	err = secretClient.EnsureFinalizer(ctx, r.GetTunnel().GetSpec().Cloudflare.Secret, r.GetTunnel().GetNamespace(), tunnelFinalizer)
+	if err != nil {
 		return ctrl.Result{}, err
 	}
 
