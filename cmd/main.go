@@ -238,7 +238,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterTunnel")
 		os.Exit(1)
 	}
-	if err = (&accesstunnel.AccessTunnelReconciler{
+	if err = (&accesstunnel.Reconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {

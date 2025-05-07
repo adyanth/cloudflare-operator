@@ -72,7 +72,7 @@ var _ = Describe("AccessTunnel Controller", func() {
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &AccessTunnelReconciler{
+			controllerReconciler := &Reconciler{
 				Client:   controller.k8sClient,
 				Scheme:   controller.k8sClient.Scheme(),
 				Recorder: record.NewFakeRecorder(100),
