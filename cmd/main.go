@@ -19,6 +19,7 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"github.com/adyanth/cloudflare-operator/internal/controller/accesstunnel"
 	"os"
 	"path/filepath"
 	"time"
@@ -237,7 +238,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterTunnel")
 		os.Exit(1)
 	}
-	if err = (&controller.AccessTunnelReconciler{
+	if err = (&accesstunnel.AccessTunnelReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {

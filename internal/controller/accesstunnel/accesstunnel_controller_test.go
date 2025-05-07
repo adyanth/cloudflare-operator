@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package accesstunnel
 
 import (
 	"context"
+	"github.com/adyanth/cloudflare-operator/internal/controller"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -45,7 +46,7 @@ var _ = Describe("AccessTunnel Controller", func() {
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind AccessTunnel")
-			err := k8sClient.Get(ctx, typeNamespacedName, accesstunnel)
+			err := controller.k8sClient.Get(ctx, typeNamespacedName, accesstunnel)
 			if err != nil && errors.IsNotFound(err) {
 				resource := &networkingv1alpha1.AccessTunnel{
 					ObjectMeta: metav1.ObjectMeta{
@@ -56,24 +57,24 @@ var _ = Describe("AccessTunnel Controller", func() {
 						Fqdn: "test.example.com",
 					},
 				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+				Expect(controller.k8sClient.Create(ctx, resource)).To(Succeed())
 			}
 		})
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
 			resource := &networkingv1alpha1.AccessTunnel{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
+			err := controller.k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Cleanup the specific resource instance AccessTunnel")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			Expect(controller.k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
 			controllerReconciler := &AccessTunnelReconciler{
-				Client:   k8sClient,
-				Scheme:   k8sClient.Scheme(),
+				Client:   controller.k8sClient,
+				Scheme:   controller.k8sClient.Scheme(),
 				Recorder: record.NewFakeRecorder(100),
 			}
 
