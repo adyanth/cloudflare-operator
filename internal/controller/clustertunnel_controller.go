@@ -159,6 +159,9 @@ func (r *ClusterTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				},
 				tunnelFinalizer,
 			)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
 			return ctrl.Result{}, nil
 		}
 		r.log.Error(err, "unable to fetch Tunnel")

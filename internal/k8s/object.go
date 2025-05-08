@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -42,8 +43,13 @@ func (s *ObjectClient) EnsureFinalizer(ctx context.Context, key client.ObjectKey
 		return nil
 	}
 
-	base := obj.DeepCopyObject().(client.Object)
 	controllerutil.AddFinalizer(obj, finalizer)
+
+	base, err := s.deepCopyObject(obj)
+	if err != nil {
+		return err
+	}
+
 	s.log.
 		WithValues("finalizer", finalizer).
 		WithValues("object", fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())).
@@ -69,8 +75,13 @@ func (s *ObjectClient) RemoveFinalizer(ctx context.Context, key client.ObjectKey
 		return nil
 	}
 
-	base := obj.DeepCopyObject().(client.Object)
 	controllerutil.RemoveFinalizer(obj, finalizer)
+
+	base, err := s.deepCopyObject(obj)
+	if err != nil {
+		return err
+	}
+
 	s.log.
 		WithValues("finalizer", finalizer).
 		WithValues("object", fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())).
@@ -79,4 +90,16 @@ func (s *ObjectClient) RemoveFinalizer(ctx context.Context, key client.ObjectKey
 		return fmt.Errorf("could not remove finalizer %q: %w", finalizer, err)
 	}
 	return nil
+}
+
+func (*ObjectClient) deepCopyObject(obj client.Object) (client.Object, error) {
+	objDeepCopy := obj.DeepCopyObject()
+	if objDeepCopy == nil {
+		return nil, errors.New("received nil object from DeepCopyObject")
+	}
+	base, ok := objDeepCopy.(client.Object)
+	if !ok {
+		return nil, errors.New("failed to convert object to client.Object")
+	}
+	return base, nil
 }
