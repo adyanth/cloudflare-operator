@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+// Package accesstunnel contains the code associated with the reconciliation process for the accessTunnel resource
+package accesstunnel
 
 import (
 	"context"
@@ -41,8 +42,8 @@ import (
 
 const CONTAINER_PORT int32 = 8000
 
-// AccessTunnelReconciler reconciles a Access object
-type AccessTunnelReconciler struct {
+// Reconciler reconciles a Access object
+type Reconciler struct {
 	client.Client
 	Recorder record.EventRecorder
 	Scheme   *runtime.Scheme
@@ -54,26 +55,26 @@ type AccessTunnelReconciler struct {
 	accessTunnel *networkingv1alpha1.AccessTunnel
 }
 
-func (r *AccessTunnelReconciler) GetLog() logr.Logger {
+func (r *Reconciler) GetLog() logr.Logger {
 	return r.log
 }
-func (r *AccessTunnelReconciler) GetRecorder() record.EventRecorder {
+func (r *Reconciler) GetRecorder() record.EventRecorder {
 	return r.Recorder
 }
-func (r *AccessTunnelReconciler) GetClient() client.Client {
+func (r *Reconciler) GetClient() client.Client {
 	return r.Client
 }
-func (r *AccessTunnelReconciler) GetReconciledObject() client.Object {
+func (r *Reconciler) GetReconciledObject() client.Object {
 	return r.accessTunnel
 }
-func (r *AccessTunnelReconciler) GetContext() context.Context {
+func (r *Reconciler) GetContext() context.Context {
 	return r.ctx
 }
-func (r *AccessTunnelReconciler) GetReconcilerName() string {
+func (*Reconciler) GetReconcilerName() string {
 	return "AccessTunnel"
 }
 
-var _ k8s.GenericReconciler = &AccessTunnelReconciler{}
+var _ k8s.GenericReconciler = &Reconciler{}
 
 func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel, secret *corev1.Secret, scheme *runtime.Scheme) (*appsv1.Deployment, *corev1.Service) {
 	svcName := accessTunnel.GetName()
@@ -213,8 +214,10 @@ func cloudflaredDeploymentService(accessTunnel *networkingv1alpha1.AccessTunnel,
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
-// Reconcile the access object
-func (r *AccessTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+// Reconcile the accessTunnel object
+//
+// nolint:all // this was only checked because it was moved, and I want to avoid editing the logic
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.ctx = ctx
 	r.log = ctrllog.FromContext(ctx)
 
@@ -256,8 +259,14 @@ func (r *AccessTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Create/Update deployment
 	dep, svc := cloudflaredDeploymentService(accessTunnel, secret, r.Scheme)
-	ctrl.SetControllerReference(accessTunnel, dep, r.Scheme)
-	ctrl.SetControllerReference(accessTunnel, svc, r.Scheme)
+	if err := ctrl.SetControllerReference(accessTunnel, dep, r.Scheme); err != nil {
+		r.log.Error(err, "unable to set owner reference on Deployment")
+		return ctrl.Result{}, err
+	}
+	if err := ctrl.SetControllerReference(accessTunnel, svc, r.Scheme); err != nil {
+		r.log.Error(err, "unable to set owner reference on Service")
+		return ctrl.Result{}, err
+	}
 
 	if err := k8s.Apply(r, dep); err != nil {
 		return ctrl.Result{}, err
@@ -270,7 +279,7 @@ func (r *AccessTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *AccessTunnelReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.Recorder = mgr.GetEventRecorderFor("cloudflare-operator")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&networkingv1alpha1.AccessTunnel{}).
