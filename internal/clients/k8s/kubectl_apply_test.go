@@ -2,9 +2,10 @@ package k8s_test
 
 import (
 	"encoding/json"
-	"github.com/adyanth/cloudflare-operator/internal/clients/k8s"
 	"slices"
 	"testing"
+
+	"github.com/adyanth/cloudflare-operator/internal/clients/k8s"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"

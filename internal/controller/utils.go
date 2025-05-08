@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+
 	"github.com/adyanth/cloudflare-operator/internal/clients/cf"
 
 	"github.com/cloudflare/cloudflare-go"

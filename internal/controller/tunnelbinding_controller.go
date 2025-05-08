@@ -21,9 +21,10 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"github.com/adyanth/cloudflare-operator/internal/clients/cf"
 	"sort"
 	"strings"
+
+	"github.com/adyanth/cloudflare-operator/internal/clients/cf"
 
 	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
 	networkingv1alpha2 "github.com/adyanth/cloudflare-operator/api/v1alpha2"
