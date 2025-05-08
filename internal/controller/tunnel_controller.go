@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-
 	"github.com/adyanth/cloudflare-operator/internal/k8s"
 
 	corev1 "k8s.io/api/core/v1"
@@ -141,11 +140,18 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if apierrors.IsNotFound(err) {
 			// Tunnel object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected.
-			secretClient, err := k8s.NewSecretClient(r.Client, &r.log)
+			objectClient, err := k8s.NewObjectClient(r.Client, &r.log)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			err = secretClient.RemoveFinalizer(ctx, r.GetTunnel().GetSpec().Cloudflare.Secret, r.GetTunnel().GetNamespace(), tunnelFinalizer)
+			err = objectClient.RemoveFinalizer(
+				ctx,
+				client.ObjectKey{
+					Namespace: r.GetTunnel().GetNamespace(),
+					Name:      r.GetTunnel().GetSpec().Cloudflare.Secret,
+				},
+				tunnelFinalizer,
+			)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -159,11 +165,19 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	secretClient, err := k8s.NewSecretClient(r.Client, &r.log)
+	objectClient, err := k8s.NewObjectClient(r.Client, &r.log)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	err = secretClient.EnsureFinalizer(ctx, r.GetTunnel().GetSpec().Cloudflare.Secret, r.GetTunnel().GetNamespace(), tunnelFinalizer)
+	// ensure the secret associated with the tunnel has a finalizer
+	err = objectClient.EnsureFinalizer(
+		ctx,
+		client.ObjectKey{
+			Namespace: r.GetTunnel().GetNamespace(),
+			Name:      r.GetTunnel().GetSpec().Cloudflare.Secret,
+		},
+		tunnelFinalizer,
+	)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

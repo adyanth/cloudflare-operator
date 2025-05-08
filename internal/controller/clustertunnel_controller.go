@@ -146,14 +146,19 @@ func (r *ClusterTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		if apierrors.IsNotFound(err) {
 			// Tunnel object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected.
-			secretClient, err := k8s.NewSecretClient(r.Client, &r.log)
+			objectClient, err := k8s.NewObjectClient(r.Client, &r.log)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			err = secretClient.RemoveFinalizer(ctx, r.GetTunnel().GetSpec().Cloudflare.Secret, r.GetTunnel().GetNamespace(), tunnelFinalizer)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
+			// ensure the secret associated with the tunnel has the finalizer removed
+			err = objectClient.RemoveFinalizer(
+				ctx,
+				client.ObjectKey{
+					Namespace: r.GetTunnel().GetNamespace(),
+					Name:      r.GetTunnel().GetSpec().Cloudflare.Secret,
+				},
+				tunnelFinalizer,
+			)
 			return ctrl.Result{}, nil
 		}
 		r.log.Error(err, "unable to fetch Tunnel")
@@ -164,11 +169,19 @@ func (r *ClusterTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	secretClient, err := k8s.NewSecretClient(r.Client, &r.log)
+	objectClient, err := k8s.NewObjectClient(r.Client, &r.log)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	err = secretClient.EnsureFinalizer(ctx, r.GetTunnel().GetSpec().Cloudflare.Secret, r.GetTunnel().GetNamespace(), tunnelFinalizer)
+	// ensure the secret associated with the tunnel has a finalizer
+	err = objectClient.EnsureFinalizer(
+		ctx,
+		client.ObjectKey{
+			Namespace: r.GetTunnel().GetNamespace(),
+			Name:      r.GetTunnel().GetSpec().Cloudflare.Secret,
+		},
+		tunnelFinalizer,
+	)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
