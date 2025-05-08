@@ -50,7 +50,6 @@ var tunnelValidProtoMap = map[string]bool{
 }
 
 func getAPIDetails(ctx context.Context, c client.Client, log logr.Logger, tunnelSpec networkingv1alpha2.TunnelSpec, tunnelStatus networkingv1alpha2.TunnelStatus, namespace string) (*cf.API, *corev1.Secret, error) {
-
 	// Get secret containing API token
 	cfSecret := &corev1.Secret{}
 	if err := c.Get(ctx, apitypes.NamespacedName{Name: tunnelSpec.Cloudflare.Secret, Namespace: namespace}, cfSecret); err != nil {
