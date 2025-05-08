@@ -272,20 +272,20 @@ func createManagedResources(r GenericTunnelReconciler) (ctrl.Result, error) {
 func configMapForTunnel(r GenericTunnelReconciler) *corev1.ConfigMap {
 	ls := labelsForTunnel(r.GetTunnel())
 	noTlsVerify := r.GetTunnel().GetSpec().NoTlsVerify
-	originRequest := OriginRequestConfig{
+	originRequest := cf.OriginRequestConfig{
 		NoTLSVerify: &noTlsVerify,
 	}
 	if r.GetTunnel().GetSpec().OriginCaPool != "" {
 		defaultCaPool := "/etc/cloudflared/certs/tls.crt"
 		originRequest.CAPool = &defaultCaPool
 	}
-	initialConfigBytes, _ := yaml.Marshal(Configuration{
+	initialConfigBytes, _ := yaml.Marshal(cf.Configuration{
 		TunnelId:      r.GetTunnel().GetStatus().TunnelId,
 		SourceFile:    "/etc/cloudflared/creds/credentials.json",
 		Metrics:       "0.0.0.0:2000",
 		NoAutoUpdate:  true,
 		OriginRequest: originRequest,
-		Ingress: []UnvalidatedIngressRule{{
+		Ingress: []cf.UnvalidatedIngressRule{{
 			Service: r.GetTunnel().GetSpec().FallbackTarget,
 		}},
 	})

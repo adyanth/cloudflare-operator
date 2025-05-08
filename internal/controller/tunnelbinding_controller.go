@@ -491,24 +491,24 @@ func (r *TunnelBindingReconciler) getServiceProto(tunnelProto string, validProto
 	return serviceProto
 }
 
-func (r *TunnelBindingReconciler) getConfigMapConfiguration() (*Configuration, error) {
+func (r *TunnelBindingReconciler) getConfigMapConfiguration() (*cf.Configuration, error) {
 	// Read ConfigMap YAML
 	configStr, ok := r.configmap.Data[configmapKey]
 	if !ok {
 		err := fmt.Errorf("unable to find key `%s` in ConfigMap", configmapKey)
 		r.log.Error(err, "unable to find key in ConfigMap", "key", configmapKey)
-		return &Configuration{}, err
+		return &cf.Configuration{}, err
 	}
 
-	config := &Configuration{}
+	config := &cf.Configuration{}
 	if err := yaml.Unmarshal([]byte(configStr), config); err != nil {
 		r.log.Error(err, "unable to read config as YAML")
-		return &Configuration{}, err
+		return &cf.Configuration{}, err
 	}
 	return config, nil
 }
 
-func (r *TunnelBindingReconciler) setConfigMapConfiguration(config *Configuration) error {
+func (r *TunnelBindingReconciler) setConfigMapConfiguration(config *cf.Configuration) error {
 	// Push updated changes
 	var configStr string
 	if configBytes, err := yaml.Marshal(config); err == nil {
@@ -551,7 +551,7 @@ func (r *TunnelBindingReconciler) setConfigMapConfiguration(config *Configuratio
 }
 
 func (r *TunnelBindingReconciler) configureCloudflareDaemon() error {
-	var config *Configuration
+	var config *cf.Configuration
 	var err error
 
 	if config, err = r.getConfigMapConfiguration(); err != nil {
@@ -567,7 +567,7 @@ func (r *TunnelBindingReconciler) configureCloudflareDaemon() error {
 
 	// Total number of ingresses is the number of services + 1 for the catchall ingress
 	// Set to 16 initially
-	finalIngresses := make([]UnvalidatedIngressRule, 0, 16)
+	finalIngresses := make([]cf.UnvalidatedIngressRule, 0, 16)
 	for _, binding := range bindings {
 		for i, subject := range binding.Subjects {
 			targetService := ""
@@ -576,7 +576,7 @@ func (r *TunnelBindingReconciler) configureCloudflareDaemon() error {
 			} else {
 				targetService = binding.Status.Services[i].Target
 			}
-			originRequest := OriginRequestConfig{}
+			originRequest := cf.OriginRequestConfig{}
 			originRequest.NoTLSVerify = &subject.Spec.NoTlsVerify
 			originRequest.Http2Origin = &subject.Spec.Http2Origin
 			originRequest.ProxyAddress = &subject.Spec.ProxyAddress
@@ -587,7 +587,7 @@ func (r *TunnelBindingReconciler) configureCloudflareDaemon() error {
 				originRequest.CAPool = &caPath
 			}
 
-			finalIngresses = append(finalIngresses, UnvalidatedIngressRule{
+			finalIngresses = append(finalIngresses, cf.UnvalidatedIngressRule{
 				Hostname:      binding.Status.Services[i].Hostname,
 				Service:       targetService,
 				Path:          subject.Spec.Path,
@@ -597,7 +597,7 @@ func (r *TunnelBindingReconciler) configureCloudflareDaemon() error {
 	}
 
 	// Catchall ingress
-	finalIngresses = append(finalIngresses, UnvalidatedIngressRule{
+	finalIngresses = append(finalIngresses, cf.UnvalidatedIngressRule{
 		Service: r.fallbackTarget,
 	})
 
