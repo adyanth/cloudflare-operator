@@ -3,9 +3,10 @@ package controller
 import (
 	"errors"
 	"fmt"
+	"github.com/adyanth/cloudflare-operator/internal/clients/cf"
+	"github.com/adyanth/cloudflare-operator/internal/clients/k8s"
 	"time"
 
-	"github.com/adyanth/cloudflare-operator/internal/k8s"
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -28,8 +29,8 @@ type GenericTunnelReconciler interface {
 
 	GetScheme() *runtime.Scheme
 	GetTunnel() Tunnel
-	GetCfAPI() *CloudflareAPI
-	SetCfAPI(*CloudflareAPI)
+	GetCfAPI() *cf.CloudflareAPI
+	SetCfAPI(*cf.CloudflareAPI)
 	GetCfSecret() *corev1.Secret
 	GetTunnelCreds() string
 	SetTunnelCreds(string)

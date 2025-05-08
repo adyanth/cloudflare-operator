@@ -21,6 +21,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"github.com/adyanth/cloudflare-operator/internal/clients/cf"
 	"sort"
 	"strings"
 
@@ -56,7 +57,7 @@ type TunnelBindingReconciler struct {
 	binding        *networkingv1alpha1.TunnelBinding
 	configmap      *corev1.ConfigMap
 	fallbackTarget string
-	cfAPI          *CloudflareAPI
+	cfAPI          *cf.CloudflareAPI
 }
 
 // labelsForBinding returns the labels for selecting the Bindings served by a Tunnel.
