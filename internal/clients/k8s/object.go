@@ -43,13 +43,14 @@ func (s *ObjectClient) EnsureFinalizer(ctx context.Context, key client.ObjectKey
 		return nil
 	}
 
-	controllerutil.AddFinalizer(obj, finalizer)
 	//nolint:revive // we know this will serialise, even if the compiler doesn't
 	base := obj.DeepCopyObject().(client.Object)
+	controllerutil.AddFinalizer(obj, finalizer)
 
 	s.log.
 		WithValues("finalizer", finalizer).
 		WithValues("object", fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())).
+		WithValues("kind", obj.GetObjectKind().GroupVersionKind().Kind).
 		Info("creating finalizer")
 	if err := s.k8sClient.Patch(ctx, obj, client.MergeFrom(base)); err != nil {
 		return fmt.Errorf("could not add finalizer %q: %w", finalizer, err)
@@ -71,9 +72,9 @@ func (s *ObjectClient) RemoveFinalizer(ctx context.Context, key client.ObjectKey
 		return nil
 	}
 
-	controllerutil.RemoveFinalizer(obj, finalizer)
 	//nolint:revive // we know this will serialise, even if the compiler doesn't
 	base := obj.DeepCopyObject().(client.Object)
+	controllerutil.RemoveFinalizer(obj, finalizer)
 
 	s.log.
 		WithValues("finalizer", finalizer).

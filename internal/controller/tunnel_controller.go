@@ -147,7 +147,7 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			var secret *corev1.Secret
+			secret := &corev1.Secret{}
 			err = objectClient.RemoveFinalizer(
 				ctx,
 				client.ObjectKey{
@@ -175,7 +175,7 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 	// ensure the secret associated with the tunnel has a finalizer
-	var secret *corev1.Secret
+	secret := &corev1.Secret{}
 	err = objectClient.EnsureFinalizer(
 		ctx,
 		client.ObjectKey{

@@ -153,7 +153,7 @@ func (r *ClusterTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				return ctrl.Result{}, err
 			}
 			// ensure the secret associated with the tunnel has the finalizer removed
-			var secret *corev1.Secret
+			secret := &corev1.Secret{}
 			err = objectClient.RemoveFinalizer(
 				ctx,
 				client.ObjectKey{
@@ -181,7 +181,7 @@ func (r *ClusterTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 	// ensure the secret associated with the tunnel has a finalizer
-	var secret *corev1.Secret
+	secret := &corev1.Secret{}
 	err = objectClient.EnsureFinalizer(
 		ctx,
 		client.ObjectKey{
