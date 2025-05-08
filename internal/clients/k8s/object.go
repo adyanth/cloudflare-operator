@@ -32,8 +32,7 @@ func NewObjectClient(k8sClient client.Client, log *logr.Logger) (*ObjectClient, 
 //   - It NO-OPs if the finalizer is already there.
 //   - It uses a strategic-merge Patch so you don’t overwrite concurrent changes.
 //   - obj must be a pointer that already contains the latest copy from the API server.
-func (s *ObjectClient) EnsureFinalizer(ctx context.Context, key client.ObjectKey, finalizer string) error {
-	var obj client.Object
+func (s *ObjectClient) EnsureFinalizer(ctx context.Context, key client.ObjectKey, obj client.Object, finalizer string) error {
 	err := s.k8sClient.Get(ctx, key, obj)
 	if err != nil {
 		return err
@@ -64,8 +63,7 @@ func (s *ObjectClient) EnsureFinalizer(ctx context.Context, key client.ObjectKey
 //   - NO-OPs if the finalizer is already gone.
 //   - Uses a strategic-merge Patch so you never clobber concurrent changes.
 //   - obj must be a *live* copy fetched from the API server.
-func (s *ObjectClient) RemoveFinalizer(ctx context.Context, key client.ObjectKey, finalizer string) error {
-	var obj client.Object
+func (s *ObjectClient) RemoveFinalizer(ctx context.Context, key client.ObjectKey, obj client.Object, finalizer string) error {
 	err := s.k8sClient.Get(ctx, key, obj)
 	if err != nil {
 		return err

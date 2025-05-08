@@ -146,12 +146,14 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			if err != nil {
 				return ctrl.Result{}, err
 			}
+			var secret *corev1.Secret
 			err = objectClient.RemoveFinalizer(
 				ctx,
 				client.ObjectKey{
 					Namespace: r.GetTunnel().GetNamespace(),
 					Name:      r.GetTunnel().GetSpec().Cloudflare.Secret,
 				},
+				secret,
 				tunnelFinalizer,
 			)
 			if err != nil {
@@ -172,12 +174,14 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 	// ensure the secret associated with the tunnel has a finalizer
+	var secret *corev1.Secret
 	err = objectClient.EnsureFinalizer(
 		ctx,
 		client.ObjectKey{
 			Namespace: r.GetTunnel().GetNamespace(),
 			Name:      r.GetTunnel().GetSpec().Cloudflare.Secret,
 		},
+		secret,
 		tunnelFinalizer,
 	)
 	if err != nil {
