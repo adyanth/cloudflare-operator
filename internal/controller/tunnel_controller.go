@@ -44,7 +44,7 @@ type TunnelReconciler struct {
 	ctx         context.Context
 	log         logr.Logger
 	tunnel      Tunnel
-	cfAPI       *cf.CloudflareAPI
+	cfAPI       *cf.API
 	cfSecret    *corev1.Secret
 	tunnelCreds string
 }
@@ -73,11 +73,11 @@ func (r *TunnelReconciler) GetTunnel() Tunnel {
 	return r.tunnel
 }
 
-func (r *TunnelReconciler) GetCfAPI() *cf.CloudflareAPI {
+func (r *TunnelReconciler) GetCfAPI() *cf.API {
 	return r.cfAPI
 }
 
-func (r *TunnelReconciler) SetCfAPI(in *cf.CloudflareAPI) {
+func (r *TunnelReconciler) SetCfAPI(in *cf.API) {
 	r.cfAPI = in
 }
 

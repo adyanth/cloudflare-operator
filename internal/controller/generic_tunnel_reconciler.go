@@ -29,8 +29,8 @@ type GenericTunnelReconciler interface {
 
 	GetScheme() *runtime.Scheme
 	GetTunnel() Tunnel
-	GetCfAPI() *cf.CloudflareAPI
-	SetCfAPI(*cf.CloudflareAPI)
+	GetCfAPI() *cf.API
+	SetCfAPI(*cf.API)
 	GetCfSecret() *corev1.Secret
 	GetTunnelCreds() string
 	SetTunnelCreds(string)
@@ -123,7 +123,7 @@ func setupNewTunnel(r GenericTunnelReconciler) error {
 	if r.GetTunnel().GetStatus().TunnelId == "" {
 		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Creating", "Tunnel is being created")
 		r.GetCfAPI().TunnelName = r.GetTunnel().GetSpec().NewTunnel.Name
-		_, creds, err := r.GetCfAPI().CreateCloudflareTunnel()
+		_, creds, err := r.GetCfAPI().CreateTunnel()
 		if err != nil {
 			r.GetLog().Error(err, "unable to create Tunnel")
 			r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedCreate", "Unable to create Tunnel on Cloudflare")
@@ -181,7 +181,7 @@ func cleanupTunnel(r GenericTunnelReconciler) (ctrl.Result, bool, error) {
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, false, nil
 		}
 		if bypass || *cfDeployment.Spec.Replicas == 0 {
-			if err := r.GetCfAPI().DeleteCloudflareTunnel(); err != nil {
+			if err := r.GetCfAPI().DeleteTunnel(); err != nil {
 				r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedDeleting", "Tunnel deletion failed")
 				return ctrl.Result{}, false, err
 			}

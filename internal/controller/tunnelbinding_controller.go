@@ -57,7 +57,7 @@ type TunnelBindingReconciler struct {
 	binding        *networkingv1alpha1.TunnelBinding
 	configmap      *corev1.ConfigMap
 	fallbackTarget string
-	cfAPI          *cf.CloudflareAPI
+	cfAPI          *cf.API
 }
 
 // labelsForBinding returns the labels for selecting the Bindings served by a Tunnel.

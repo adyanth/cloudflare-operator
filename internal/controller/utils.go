@@ -48,13 +48,13 @@ var tunnelValidProtoMap = map[string]bool{
 	tunnelProtoUDP:   true,
 }
 
-func getAPIDetails(ctx context.Context, c client.Client, log logr.Logger, tunnelSpec networkingv1alpha2.TunnelSpec, tunnelStatus networkingv1alpha2.TunnelStatus, namespace string) (*cf.CloudflareAPI, *corev1.Secret, error) {
+func getAPIDetails(ctx context.Context, c client.Client, log logr.Logger, tunnelSpec networkingv1alpha2.TunnelSpec, tunnelStatus networkingv1alpha2.TunnelStatus, namespace string) (*cf.API, *corev1.Secret, error) {
 
 	// Get secret containing API token
 	cfSecret := &corev1.Secret{}
 	if err := c.Get(ctx, apitypes.NamespacedName{Name: tunnelSpec.Cloudflare.Secret, Namespace: namespace}, cfSecret); err != nil {
 		log.Error(err, "secret not found", "secret", tunnelSpec.Cloudflare.Secret)
-		return &cf.CloudflareAPI{}, &corev1.Secret{}, err
+		return &cf.API{}, &corev1.Secret{}, err
 	}
 
 	// Read secret for API Token
@@ -76,10 +76,10 @@ func getAPIDetails(ctx context.Context, c client.Client, log logr.Logger, tunnel
 	cloudflareClient, err := getCloudflareClient(apiKey, apiEmail, apiToken)
 	if err != nil {
 		log.Error(err, "error initializing cloudflare api client", "client", cloudflareClient)
-		return &cf.CloudflareAPI{}, &corev1.Secret{}, err
+		return &cf.API{}, &corev1.Secret{}, err
 	}
 
-	cfAPI := &cf.CloudflareAPI{
+	cfAPI := &cf.API{
 		Log:              log,
 		AccountName:      tunnelSpec.Cloudflare.AccountName,
 		AccountId:        tunnelSpec.Cloudflare.AccountId,

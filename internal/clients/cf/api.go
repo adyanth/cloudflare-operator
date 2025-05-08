@@ -15,8 +15,8 @@ import (
 // TXT_PREFIX is the prefix added to TXT records for whom the corresponding DNS records are managed by the operator.
 const TXT_PREFIX = "_managed."
 
-// CloudflareAPI config object holding all relevant fields to use the API
-type CloudflareAPI struct {
+// API config object holding all relevant fields to use the API
+type API struct {
 	Log              logr.Logger
 	TunnelName       string
 	TunnelId         string
@@ -30,8 +30,8 @@ type CloudflareAPI struct {
 	CloudflareClient *cloudflare.API
 }
 
-// CloudflareTunnelCredentialsFile object containing the fields that make up a Cloudflare Tunnel's credentials
-type CloudflareTunnelCredentialsFile struct {
+// TunnelCredentialsFile object containing the fields that make up a Cloudflare Tunnel's credentials
+type TunnelCredentialsFile struct {
 	AccountTag   string `json:"AccountTag"`
 	TunnelID     string `json:"TunnelID"`
 	TunnelName   string `json:"TunnelName"`
@@ -45,8 +45,8 @@ type DnsManagedRecordTxt struct {
 	TunnelId   string // TunnelId of the managed record
 }
 
-// CreateCloudflareTunnel creates a Cloudflare Tunnel and returns the tunnel Id and credentials file
-func (c *CloudflareAPI) CreateCloudflareTunnel() (string, string, error) {
+// CreateTunnel creates a Cloudflare Tunnel and returns the tunnel Id and credentials file
+func (c *API) CreateTunnel() (string, string, error) {
 	if _, err := c.GetAccountId(); err != nil {
 		c.Log.Error(err, "error code in getting account ID")
 		return "", "", err
@@ -78,7 +78,7 @@ func (c *CloudflareAPI) CreateCloudflareTunnel() (string, string, error) {
 	c.ValidTunnelId = tunnel.ID
 	c.ValidTunnelName = tunnel.Name
 
-	credentialsFile := CloudflareTunnelCredentialsFile{
+	credentialsFile := TunnelCredentialsFile{
 		AccountTag:   c.ValidAccountId,
 		TunnelID:     tunnel.ID,
 		TunnelName:   tunnel.Name,
@@ -90,8 +90,8 @@ func (c *CloudflareAPI) CreateCloudflareTunnel() (string, string, error) {
 	return tunnel.ID, string(creds), err
 }
 
-// DeleteCloudflareTunnel deletes a Cloudflare Tunnel
-func (c *CloudflareAPI) DeleteCloudflareTunnel() error {
+// DeleteTunnel deletes a Cloudflare Tunnel
+func (c *API) DeleteTunnel() error {
 	if err := c.ValidateAll(); err != nil {
 		c.Log.Error(err, "Error in validation")
 		return err
@@ -117,8 +117,8 @@ func (c *CloudflareAPI) DeleteCloudflareTunnel() error {
 	return nil
 }
 
-// ValidateAll validates the contents of the CloudflareAPI struct
-func (c *CloudflareAPI) ValidateAll() error {
+// ValidateAll validates the contents of the API struct
+func (c *API) ValidateAll() error {
 	c.Log.Info("In validation")
 	if _, err := c.GetAccountId(); err != nil {
 		return err
@@ -137,7 +137,7 @@ func (c *CloudflareAPI) ValidateAll() error {
 }
 
 // GetAccountId gets AccountId from Account Name
-func (c *CloudflareAPI) GetAccountId() (string, error) {
+func (c *API) GetAccountId() (string, error) {
 	if c.ValidAccountId != "" {
 		return c.ValidAccountId, nil
 	}
@@ -161,7 +161,7 @@ func (c *CloudflareAPI) GetAccountId() (string, error) {
 	return c.ValidAccountId, nil
 }
 
-func (c CloudflareAPI) validateAccountId() bool {
+func (c *API) validateAccountId() bool {
 	if c.AccountId == "" {
 		c.Log.Info("Account ID not provided")
 		return false
@@ -178,7 +178,7 @@ func (c CloudflareAPI) validateAccountId() bool {
 	return account.ID == c.AccountId
 }
 
-func (c *CloudflareAPI) getAccountIdByName() (string, error) {
+func (c *API) getAccountIdByName() (string, error) {
 	ctx := context.Background()
 	params := cloudflare.AccountsListParams{
 		Name: c.AccountName,
@@ -204,7 +204,7 @@ func (c *CloudflareAPI) getAccountIdByName() (string, error) {
 }
 
 // GetTunnelId gets Tunnel Id from available information
-func (c *CloudflareAPI) GetTunnelId() (string, error) {
+func (c *API) GetTunnelId() (string, error) {
 	if c.ValidTunnelId != "" {
 		return c.ValidTunnelId, nil
 	}
@@ -231,7 +231,7 @@ func (c *CloudflareAPI) GetTunnelId() (string, error) {
 	return c.ValidTunnelId, nil
 }
 
-func (c *CloudflareAPI) validateTunnelId() bool {
+func (c *API) validateTunnelId() bool {
 	if c.TunnelId == "" {
 		c.Log.Info("Tunnel ID not provided")
 		return false
@@ -254,7 +254,7 @@ func (c *CloudflareAPI) validateTunnelId() bool {
 	return tunnel.ID == c.TunnelId
 }
 
-func (c *CloudflareAPI) getTunnelIdByName() (string, error) {
+func (c *API) getTunnelIdByName() (string, error) {
 	if _, err := c.GetAccountId(); err != nil {
 		c.Log.Error(err, "error in getting account ID")
 		return "", err
@@ -288,7 +288,7 @@ func (c *CloudflareAPI) getTunnelIdByName() (string, error) {
 }
 
 // GetTunnelCreds gets Tunnel Credentials from Tunnel secret
-func (c *CloudflareAPI) GetTunnelCreds(tunnelSecret string) (string, error) {
+func (c *API) GetTunnelCreds(tunnelSecret string) (string, error) {
 	if _, err := c.GetAccountId(); err != nil {
 		c.Log.Error(err, "error in getting account ID")
 		return "", err
@@ -310,7 +310,7 @@ func (c *CloudflareAPI) GetTunnelCreds(tunnelSecret string) (string, error) {
 }
 
 // GetZoneId gets Zone Id from DNS domain
-func (c *CloudflareAPI) GetZoneId() (string, error) {
+func (c *API) GetZoneId() (string, error) {
 	if c.ValidZoneId != "" {
 		return c.ValidZoneId, nil
 	}
@@ -329,7 +329,7 @@ func (c *CloudflareAPI) GetZoneId() (string, error) {
 	return c.ValidZoneId, nil
 }
 
-func (c *CloudflareAPI) getZoneIdByName() (string, error) {
+func (c *API) getZoneIdByName() (string, error) {
 	ctx := context.Background()
 	zones, err := c.CloudflareClient.ListZones(ctx, c.Domain)
 
@@ -353,7 +353,7 @@ func (c *CloudflareAPI) getZoneIdByName() (string, error) {
 }
 
 // InsertOrUpdateCName upsert DNS CNAME record for the given FQDN to point to the tunnel
-func (c *CloudflareAPI) InsertOrUpdateCName(fqdn, dnsId string) (string, error) {
+func (c *API) InsertOrUpdateCName(fqdn, dnsId string) (string, error) {
 	ctx := context.Background()
 	rc := cloudflare.ZoneIdentifier(c.ValidZoneId)
 	if dnsId != "" {
@@ -395,7 +395,7 @@ func (c *CloudflareAPI) InsertOrUpdateCName(fqdn, dnsId string) (string, error) 
 }
 
 // DeleteDNSId deletes DNS entry for the given dnsId
-func (c *CloudflareAPI) DeleteDNSId(fqdn, dnsId string, created bool) error {
+func (c *API) DeleteDNSId(fqdn, dnsId string, created bool) error {
 	// Do not delete if we did not create the DNS in this cycle
 	if !created {
 		return nil
@@ -414,7 +414,7 @@ func (c *CloudflareAPI) DeleteDNSId(fqdn, dnsId string, created bool) error {
 }
 
 // GetDNSCNameId returns the ID of the CNAME record requested
-func (c *CloudflareAPI) GetDNSCNameId(fqdn string) (string, error) {
+func (c *API) GetDNSCNameId(fqdn string) (string, error) {
 	if _, err := c.GetZoneId(); err != nil {
 		c.Log.Error(err, "error in getting Zone ID")
 		return "", err
@@ -447,7 +447,7 @@ func (c *CloudflareAPI) GetDNSCNameId(fqdn string) (string, error) {
 }
 
 // GetManagedDnsTxt gets the TXT record corresponding to the fqdn
-func (c *CloudflareAPI) GetManagedDnsTxt(fqdn string) (string, DnsManagedRecordTxt, bool, error) {
+func (c *API) GetManagedDnsTxt(fqdn string) (string, DnsManagedRecordTxt, bool, error) {
 	if _, err := c.GetZoneId(); err != nil {
 		c.Log.Error(err, "error in getting Zone ID")
 		return "", DnsManagedRecordTxt{}, false, err
@@ -488,7 +488,7 @@ func (c *CloudflareAPI) GetManagedDnsTxt(fqdn string) (string, DnsManagedRecordT
 }
 
 // InsertOrUpdateTXT upsert DNS TXT record for the given FQDN to point to the tunnel
-func (c *CloudflareAPI) InsertOrUpdateTXT(fqdn, txtId, dnsId string) error {
+func (c *API) InsertOrUpdateTXT(fqdn, txtId, dnsId string) error {
 	content, err := json.Marshal(DnsManagedRecordTxt{
 		DnsId:      dnsId,
 		TunnelId:   c.ValidTunnelId,

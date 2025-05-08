@@ -45,7 +45,7 @@ type ClusterTunnelReconciler struct {
 	ctx         context.Context
 	log         logr.Logger
 	tunnel      Tunnel
-	cfAPI       *cf.CloudflareAPI
+	cfAPI       *cf.API
 	cfSecret    *corev1.Secret
 	tunnelCreds string
 }
@@ -74,11 +74,11 @@ func (r *ClusterTunnelReconciler) GetTunnel() Tunnel {
 	return r.tunnel
 }
 
-func (r *ClusterTunnelReconciler) GetCfAPI() *cf.CloudflareAPI {
+func (r *ClusterTunnelReconciler) GetCfAPI() *cf.API {
 	return r.cfAPI
 }
 
-func (r *ClusterTunnelReconciler) SetCfAPI(in *cf.CloudflareAPI) {
+func (r *ClusterTunnelReconciler) SetCfAPI(in *cf.API) {
 	r.cfAPI = in
 }
 
