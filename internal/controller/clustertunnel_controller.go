@@ -19,6 +19,8 @@ package controller
 import (
 	"context"
 
+	"github.com/adyanth/cloudflare-operator/internal/clients/cf"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -44,7 +46,7 @@ type ClusterTunnelReconciler struct {
 	ctx         context.Context
 	log         logr.Logger
 	tunnel      Tunnel
-	cfAPI       *CloudflareAPI
+	cfAPI       *cf.API
 	cfSecret    *corev1.Secret
 	tunnelCreds string
 }
@@ -73,11 +75,11 @@ func (r *ClusterTunnelReconciler) GetTunnel() Tunnel {
 	return r.tunnel
 }
 
-func (r *ClusterTunnelReconciler) GetCfAPI() *CloudflareAPI {
+func (r *ClusterTunnelReconciler) GetCfAPI() *cf.API {
 	return r.cfAPI
 }
 
-func (r *ClusterTunnelReconciler) SetCfAPI(in *CloudflareAPI) {
+func (r *ClusterTunnelReconciler) SetCfAPI(in *cf.API) {
 	r.cfAPI = in
 }
 

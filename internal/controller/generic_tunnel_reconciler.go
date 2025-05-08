@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/adyanth/cloudflare-operator/internal/k8s"
+	"github.com/adyanth/cloudflare-operator/internal/clients/cf"
+	"github.com/adyanth/cloudflare-operator/internal/clients/k8s"
+
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -28,8 +30,8 @@ type GenericTunnelReconciler interface {
 
 	GetScheme() *runtime.Scheme
 	GetTunnel() Tunnel
-	GetCfAPI() *CloudflareAPI
-	SetCfAPI(*CloudflareAPI)
+	GetCfAPI() *cf.API
+	SetCfAPI(*cf.API)
 	GetCfSecret() *corev1.Secret
 	GetTunnelCreds() string
 	SetTunnelCreds(string)
@@ -122,7 +124,7 @@ func setupNewTunnel(r GenericTunnelReconciler) error {
 	if r.GetTunnel().GetStatus().TunnelId == "" {
 		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "Creating", "Tunnel is being created")
 		r.GetCfAPI().TunnelName = r.GetTunnel().GetSpec().NewTunnel.Name
-		_, creds, err := r.GetCfAPI().CreateCloudflareTunnel()
+		_, creds, err := r.GetCfAPI().CreateTunnel()
 		if err != nil {
 			r.GetLog().Error(err, "unable to create Tunnel")
 			r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedCreate", "Unable to create Tunnel on Cloudflare")
@@ -180,7 +182,7 @@ func cleanupTunnel(r GenericTunnelReconciler) (ctrl.Result, bool, error) {
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, false, nil
 		}
 		if bypass || *cfDeployment.Spec.Replicas == 0 {
-			if err := r.GetCfAPI().DeleteCloudflareTunnel(); err != nil {
+			if err := r.GetCfAPI().DeleteTunnel(); err != nil {
 				r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedDeleting", "Tunnel deletion failed")
 				return ctrl.Result{}, false, err
 			}
@@ -271,20 +273,20 @@ func createManagedResources(r GenericTunnelReconciler) (ctrl.Result, error) {
 func configMapForTunnel(r GenericTunnelReconciler) *corev1.ConfigMap {
 	ls := labelsForTunnel(r.GetTunnel())
 	noTlsVerify := r.GetTunnel().GetSpec().NoTlsVerify
-	originRequest := OriginRequestConfig{
+	originRequest := cf.OriginRequestConfig{
 		NoTLSVerify: &noTlsVerify,
 	}
 	if r.GetTunnel().GetSpec().OriginCaPool != "" {
 		defaultCaPool := "/etc/cloudflared/certs/tls.crt"
 		originRequest.CAPool = &defaultCaPool
 	}
-	initialConfigBytes, _ := yaml.Marshal(Configuration{
+	initialConfigBytes, _ := yaml.Marshal(cf.Configuration{
 		TunnelId:      r.GetTunnel().GetStatus().TunnelId,
 		SourceFile:    "/etc/cloudflared/creds/credentials.json",
 		Metrics:       "0.0.0.0:2000",
 		NoAutoUpdate:  true,
 		OriginRequest: originRequest,
-		Ingress: []UnvalidatedIngressRule{{
+		Ingress: []cf.UnvalidatedIngressRule{{
 			Service: r.GetTunnel().GetSpec().FallbackTarget,
 		}},
 	})
