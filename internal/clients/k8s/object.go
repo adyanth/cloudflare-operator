@@ -1,3 +1,4 @@
+// Package k8s provides client abstractions to the kubernetes API
 package k8s
 
 import (
@@ -43,11 +44,8 @@ func (s *ObjectClient) EnsureFinalizer(ctx context.Context, key client.ObjectKey
 	}
 
 	controllerutil.AddFinalizer(obj, finalizer)
-
-	base, err := s.deepCopyObject(obj)
-	if err != nil {
-		return err
-	}
+	//nolint:revive // we know this will serialise, even if the compiler doesn't
+	base := obj.DeepCopyObject().(client.Object)
 
 	s.log.
 		WithValues("finalizer", finalizer).
@@ -74,11 +72,8 @@ func (s *ObjectClient) RemoveFinalizer(ctx context.Context, key client.ObjectKey
 	}
 
 	controllerutil.RemoveFinalizer(obj, finalizer)
-
-	base, err := s.deepCopyObject(obj)
-	if err != nil {
-		return err
-	}
+	//nolint:revive // we know this will serialise, even if the compiler doesn't
+	base := obj.DeepCopyObject().(client.Object)
 
 	s.log.
 		WithValues("finalizer", finalizer).
@@ -88,16 +83,4 @@ func (s *ObjectClient) RemoveFinalizer(ctx context.Context, key client.ObjectKey
 		return fmt.Errorf("could not remove finalizer %q: %w", finalizer, err)
 	}
 	return nil
-}
-
-func (*ObjectClient) deepCopyObject(obj client.Object) (client.Object, error) {
-	objDeepCopy := obj.DeepCopyObject()
-	if objDeepCopy == nil {
-		return nil, errors.New("received nil object from DeepCopyObject")
-	}
-	base, ok := objDeepCopy.(client.Object)
-	if !ok {
-		return nil, errors.New("failed to convert object to client.Object")
-	}
-	return base, nil
 }

@@ -31,8 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
-	networkingv1alpha2 "github.com/adyanth/cloudflare-operator/api/v1alpha2"
 	"github.com/go-logr/logr"
+
+	networkingv1alpha2 "github.com/adyanth/cloudflare-operator/api/v1alpha2"
 )
 
 // ClusterTunnelReconciler reconciles a ClusterTunnel object
