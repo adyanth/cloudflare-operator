@@ -79,6 +79,7 @@ func (s *ObjectClient) RemoveFinalizer(ctx context.Context, key client.ObjectKey
 	s.log.
 		WithValues("finalizer", finalizer).
 		WithValues("object", fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())).
+		WithValues("kind", obj.GetObjectKind().GroupVersionKind().Kind).
 		Info("removing finalizer")
 	if err := s.k8sClient.Patch(ctx, obj, client.MergeFrom(base)); err != nil {
 		return fmt.Errorf("could not remove finalizer %q: %w", finalizer, err)
