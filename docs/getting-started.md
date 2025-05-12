@@ -22,7 +22,7 @@ To install this operator, you need the following:
    namespace: cloudflare-operator-system
    resources:
      # ensure you update the ref in this line to the latest version
-     - https://github.com/adyanth/cloudflare-operator.git/config/default?ref=v0.11.1
+     - https://github.com/adyanth/cloudflare-operator.git/config/default?ref=v0.13.0
    ```
 
 1. deploy the application from the directory you placed the kustomization.yaml in
@@ -62,11 +62,11 @@ kubectl apply -k 'https://github.com/adyanth/cloudflare-operator/config/default'
 
 Now that the operator is installed, we can make it useful.
 
-1. [Deploy a secret with your API token](./docs/examples/operator-authentication)
-2. [Create a Tunnel/ClusterTunnel resource](./docs/examples/tunnel-simple)
+1. [Deploy a secret with your API token](./examples/operator-authentication)
+2. [Create a Tunnel/ClusterTunnel resource](./examples/tunnel-simple)
 3. Configure routing for your tunnel by following one of:
-    - [configure routing directly (simple)](./docs/examples/tunnel-binding-simple)
-    - [configure routing with a reverse proxy](./docs/examples/tunnel-binding-with-reverse-proxy)
+    - [configure routing directly (simple)](./examples/tunnel-binding-simple)
+    - [configure routing with a reverse proxy](./examples/tunnel-binding-with-reverse-proxy)
 
 ## Additional Info
 
