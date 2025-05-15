@@ -1,8 +1,9 @@
 package controller
 
 import (
-	networkingv1alpha2 "github.com/adyanth/cloudflare-operator/api/v1alpha2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	networkingv1alpha2 "github.com/adyanth/cloudflare-operator/api/v1alpha2"
 )
 
 type Tunnel interface {
