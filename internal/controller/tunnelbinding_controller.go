@@ -54,12 +54,13 @@ type TunnelBindingReconciler struct {
 
 	// Custom data for ease of (re)use
 
-	ctx            context.Context
-	log            logr.Logger
-	binding        *networkingv1alpha1.TunnelBinding
-	configmap      *corev1.ConfigMap
-	fallbackTarget string
-	cfAPI          *cf.API
+	ctx              context.Context
+	log              logr.Logger
+	binding          *networkingv1alpha1.TunnelBinding
+	configmap        *corev1.ConfigMap
+	fallbackTarget   string
+	cfAPI            *cf.API
+	removedHostnames []string
 }
 
 // labelsForBinding returns the labels for selecting the Bindings served by a Tunnel.
@@ -75,6 +76,7 @@ func labelsForBinding(binding networkingv1alpha1.TunnelBinding) map[string]strin
 func (r *TunnelBindingReconciler) initStruct(ctx context.Context, tunnelBinding *networkingv1alpha1.TunnelBinding) error {
 	r.ctx = ctx
 	r.binding = tunnelBinding
+	r.removedHostnames = []string{}
 
 	var err error
 	var namespacedName apitypes.NamespacedName
@@ -195,12 +197,24 @@ func (r *TunnelBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if err := r.creationLogic(); err != nil {
 		return ctrl.Result{}, err
 	}
+
+	if err := r.cleanupDNSLogic(); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
 func (r *TunnelBindingReconciler) setStatus() error {
 	status := make([]networkingv1alpha1.ServiceInfo, 0, len(r.binding.Subjects))
 	var hostnames string
+	shouldRemoveHostnames := map[string]bool{}
+
+	for _, svc := range r.binding.Status.Services {
+		// Mark hostname for cleanup
+		shouldRemoveHostnames[svc.Hostname] = true
+	}
+
 	for _, sub := range r.binding.Subjects {
 		hostname, target, err := r.getConfigForSubject(sub)
 		if err != nil {
@@ -210,6 +224,15 @@ func (r *TunnelBindingReconciler) setStatus() error {
 		}
 		status = append(status, networkingv1alpha1.ServiceInfo{Hostname: hostname, Target: target})
 		hostnames += hostname + ","
+
+		// Keep / Insert / Update hostname
+		shouldRemoveHostnames[hostname] = false
+	}
+
+	for hostname, shouldRemove := range shouldRemoveHostnames {
+		if shouldRemove {
+			r.removedHostnames = append(r.removedHostnames, hostname)
+		}
 	}
 
 	r.binding.Status.Services = status
@@ -256,8 +279,28 @@ func (r *TunnelBindingReconciler) deletionLogic() error {
 	return nil
 }
 
-func (r *TunnelBindingReconciler) creationLogic() error {
+func (r *TunnelBindingReconciler) cleanupDNSLogic() error {
+	if r.binding.TunnelRef.DisableDNSUpdates || len(r.removedHostnames) < 1 {
+		return nil
+	}
 
+	errors := false
+	var err error
+	for _, hostname := range r.removedHostnames {
+		if err = r.deleteDNSLogic(hostname); err != nil {
+			errors = true
+		}
+	}
+
+	if errors {
+		r.Recorder.Event(r.binding, corev1.EventTypeWarning, "FailedDNSCleanupPartial", "Some DNS entries failed to cleanup")
+		return err
+	}
+
+	return nil
+}
+
+func (r *TunnelBindingReconciler) creationLogic() error {
 	// Add labels for TunnelBinding
 	if r.binding.Labels == nil {
 		r.binding.Labels = make(map[string]string)
