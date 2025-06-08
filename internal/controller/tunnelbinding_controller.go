@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/adyanth/cloudflare-operator/internal/clients/cf"
 
@@ -156,7 +157,11 @@ func (r *TunnelBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			// TunnelBinding object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			r.log.Info("TunnelBinding deleted, nothing to do")
+			r.log.Info("TunnelBinding deleted, updating config")
+			if err = r.configureCloudflareDaemon(); err != nil {
+				r.log.Error(err, "unable to update config")
+				return ctrl.Result{}, err
+			}
 			return ctrl.Result{}, nil
 		}
 		r.log.Error(err, "unable to fetch TunnelBinding")
@@ -170,7 +175,8 @@ func (r *TunnelBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// Check if TunnelBinding is marked for deletion
 	if r.binding.GetDeletionTimestamp() != nil {
-		return ctrl.Result{}, r.deletionLogic()
+		// Requeue to update configmap above
+		return ctrl.Result{RequeueAfter: time.Second}, r.deletionLogic()
 	}
 
 	if err := r.setStatus(); err != nil {
