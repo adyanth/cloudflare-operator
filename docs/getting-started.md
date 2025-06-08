@@ -22,7 +22,7 @@ To install this operator, you need the following:
    namespace: cloudflare-operator-system
    resources:
      # ensure you update the ref in this line to the latest version
-     - https://github.com/adyanth/cloudflare-operator.git/config/default?ref=v0.13.0
+     - https://github.com/adyanth/cloudflare-operator.git/config/default?ref=v0.13.1
    ```
 
 1. deploy the application from the directory you placed the kustomization.yaml in
@@ -44,7 +44,7 @@ In general, one should pick a specific tag.
 [You can find the latest tag here](https://github.com/adyanth/cloudflare-operator/tags)
 
 ```bash
-kubectl apply -k 'https://github.com/adyanth/cloudflare-operator.git//config/default?ref=v0.13.0'
+kubectl apply -k 'https://github.com/adyanth/cloudflare-operator.git//config/default?ref=v0.13.1'
 ```
 
 #### Install the latest version
