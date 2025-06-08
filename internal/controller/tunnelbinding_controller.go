@@ -535,10 +535,10 @@ func (r *TunnelBindingReconciler) setConfigMapConfiguration(config *cf.Configura
 	// Restart pods
 	r.Recorder.Event(r.binding, corev1.EventTypeNormal, "ApplyingConfig", "Applying ConfigMap to Deployment")
 	r.Recorder.Event(cfDeployment, corev1.EventTypeNormal, "ApplyingConfig", "Applying ConfigMap to Deployment")
-	if cfDeployment.Annotations == nil {
-		cfDeployment.Annotations = map[string]string{}
+	if cfDeployment.Spec.Template.Annotations == nil {
+		cfDeployment.Spec.Template.Annotations = map[string]string{}
 	}
-	cfDeployment.Annotations[tunnelConfigChecksum] = hex.EncodeToString(hash[:])
+	cfDeployment.Spec.Template.Annotations[tunnelConfigChecksum] = hex.EncodeToString(hash[:])
 	if err := r.Update(r.ctx, cfDeployment); err != nil {
 		r.log.Error(err, "Failed to update Deployment for restart")
 		r.Recorder.Event(r.binding, corev1.EventTypeWarning, "FailedApplyingConfig", "Failed to apply ConfigMap to Deployment")

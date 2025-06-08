@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -250,12 +252,13 @@ func createManagedResources(r GenericTunnelReconciler) (ctrl.Result, error) {
 	}
 
 	// Check if ConfigMap already exists, else create it
-	if err := k8s.MergeOrApply(r, configMapForTunnel(r)); err != nil {
+	cm := configMapForTunnel(r)
+	if err := k8s.MergeOrApply(r, cm); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Apply patch to deployment
-	dep := deploymentForTunnel(r)
+	dep := deploymentForTunnel(r, cm.Data[configmapKey])
 	if err := k8s.StrategicPatch(dep, r.GetTunnel().GetSpec().DeployPatch, dep); err != nil {
 		r.GetLog().Error(err, "unable to patch deployment, check patch")
 		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "FailedPatch", "Failed to patch deployment, check patch")
@@ -329,9 +332,10 @@ func secretForTunnel(r GenericTunnelReconciler) *corev1.Secret {
 }
 
 // deploymentForTunnel returns a tunnel Deployment object
-func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
+func deploymentForTunnel(r GenericTunnelReconciler, configStr string) *appsv1.Deployment {
 	ls := labelsForTunnel(r.GetTunnel())
 	protocol := r.GetTunnel().GetSpec().Protocol
+	hash := md5.Sum([]byte(configStr))
 
 	args := []string{"tunnel", "--protocol", protocol, "--config", "/etc/cloudflared/config/config.yaml", "--metrics", "0.0.0.0:2000", "run"}
 	volumes := []corev1.Volume{{
@@ -398,6 +402,9 @@ func deploymentForTunnel(r GenericTunnelReconciler) *appsv1.Deployment {
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: ls,
+					Annotations: map[string]string{
+						tunnelConfigChecksum: hex.EncodeToString(hash[:]),
+					},
 				},
 				Spec: corev1.PodSpec{
 					SecurityContext: &corev1.PodSecurityContext{
