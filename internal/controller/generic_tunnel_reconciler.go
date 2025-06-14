@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"time"
 
 	"github.com/adyanth/cloudflare-operator/internal/clients/cf"
@@ -199,6 +200,27 @@ func cleanupTunnel(r GenericTunnelReconciler) (ctrl.Result, bool, error) {
 				return ctrl.Result{}, false, err
 			}
 			r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeNormal, "FinalizerUnset", "Tunnel Finalizer removed")
+
+			// ensure the secret associated with the tunnel has the finalizer removed, only once the tunnel finalizer can be removed
+			log := r.GetLog()
+			objectClient, err := k8s.NewObjectClient(r.GetClient(), &log)
+			if err != nil {
+				return ctrl.Result{}, false, err
+			}
+			secret := &corev1.Secret{}
+			err = objectClient.RemoveFinalizer(
+				r.GetContext(),
+				client.ObjectKey{
+					Namespace: r.GetTunnel().GetNamespace(),
+					Name:      r.GetTunnel().GetSpec().Cloudflare.Secret,
+				},
+				secret,
+				tunnelFinalizer,
+			)
+			if err != nil {
+				return ctrl.Result{}, false, err
+			}
+
 			return ctrl.Result{}, true, nil
 		}
 	}

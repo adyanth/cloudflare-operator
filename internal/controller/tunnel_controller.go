@@ -143,23 +143,6 @@ func (r *TunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if apierrors.IsNotFound(err) {
 			// Tunnel object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected.
-			objectClient, err := k8s.NewObjectClient(r.Client, &r.log)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			secret := &corev1.Secret{}
-			err = objectClient.RemoveFinalizer(
-				ctx,
-				client.ObjectKey{
-					Namespace: r.GetTunnel().GetNamespace(),
-					Name:      r.GetTunnel().GetSpec().Cloudflare.Secret,
-				},
-				secret,
-				tunnelFinalizer,
-			)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
 			return ctrl.Result{}, nil
 		}
 		r.log.Error(err, "unable to fetch Tunnel")
