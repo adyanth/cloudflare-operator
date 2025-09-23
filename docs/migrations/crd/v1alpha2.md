@@ -17,15 +17,15 @@ apiVersion: networking.cfargotunnel.com/v1alpha2
 kind: ClusterTunnel
 ...
 spec:
-    deployPatch: |
+  deployPatch: |
+    spec:
+      replicas: 2 # instead of size
+      template:
         spec:
-          replicas: 2 # instead of size
-            template:
-              spec:
-                tolerations: ... # tolerations as before
-                nodeSelector: ... # nodeSelectors as before. Note the plural v/s singular
-                containers:
-                  - name: cloudflared # Note the usage of cloudflared name to select the container to patch
-                    image: ... # image as before
+          tolerations: ... # tolerations as before
+          nodeSelector: ... # nodeSelectors as before. Note the plural v/s singular
+          containers:
+          - name: cloudflared # Note the usage of cloudflared name to select the container to patch
+            image: ... # image as before
 ...
 ```
