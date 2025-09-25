@@ -27,8 +27,6 @@ import (
 
 	"github.com/adyanth/cloudflare-operator/internal/clients/cf"
 
-	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
-	networkingv1alpha2 "github.com/adyanth/cloudflare-operator/api/v1alpha2"
 	"github.com/go-logr/logr"
 	yaml "gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
@@ -39,6 +37,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+
+	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
+	networkingv1alpha2 "github.com/adyanth/cloudflare-operator/api/v1alpha2"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/client-go/tools/record"
