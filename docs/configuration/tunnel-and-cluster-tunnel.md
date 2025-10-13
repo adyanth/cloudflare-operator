@@ -48,9 +48,9 @@ spec:
   deployPatch: |
     spec:
       replicas: 2
-        template:
-          spec:
-            containers:
-              - name: cloudflared
-                image: cloudflare/cloudflared:2025.4.0 # Image to run. Used for running a pinned image. Can be swapped out to an arm based image if needed
+      template:
+        spec:
+          containers:
+            - name: cloudflared
+              image: cloudflare/cloudflared:2025.4.0 # Image to run. Used for running a pinned image. Can be swapped out to an arm based image if needed
 ```
