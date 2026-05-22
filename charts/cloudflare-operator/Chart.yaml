@@ -1,0 +1,19 @@
+apiVersion: v2
+name: cloudflare-operator
+description: >
+  Helm chart for the Cloudflare Operator controller manager.
+  Installs the controller Deployment, CRDs, RBAC, and ServiceAccount
+  required to manage Cloudflare Tunnels via Kubernetes custom resources.
+type: application
+version: 0.1.0
+appVersion: "0.13.1"
+keywords:
+  - cloudflare
+  - tunnel
+  - operator
+home: https://github.com/adyanth/cloudflare-operator
+sources:
+  - https://github.com/adyanth/cloudflare-operator
+maintainers:
+  - name: adyanth
+    url: https://github.com/adyanth

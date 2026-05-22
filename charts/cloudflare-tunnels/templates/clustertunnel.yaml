@@ -1,0 +1,68 @@
+{{- range .Values.tunnels }}
+{{- $tunnel := . }}
+{{- $replicas      := $tunnel.replicas      | default $.Values.defaults.replicas }}
+{{- $protocol      := $tunnel.protocol      | default $.Values.defaults.protocol }}
+{{- $edgeIpVersion := $tunnel.edgeIpVersion | default $.Values.defaults.edgeIpVersion }}
+{{- $strategy      := $tunnel.strategy      | default $.Values.defaults.strategy }}
+
+{{/* Validate protocol */}}
+{{- if not (has $protocol (list "http2" "h2mux" "quic" "auto")) }}
+  {{- fail (printf "tunnel %q: invalid protocol %q — must be one of: http2, h2mux, quic, auto" $tunnel.name $protocol) }}
+{{- end }}
+
+{{/* Validate edgeIpVersion */}}
+{{- if not (has $edgeIpVersion (list "auto" "4" "6")) }}
+  {{- fail (printf "tunnel %q: invalid edgeIpVersion %q — must be one of: auto, 4, 6" $tunnel.name $edgeIpVersion) }}
+{{- end }}
+
+{{/* Validate replicas is a positive integer */}}
+{{- if lt (int $replicas) 1 }}
+  {{- fail (printf "tunnel %q: replicas must be >= 1, got %d" $tunnel.name (int $replicas)) }}
+{{- end }}
+---
+apiVersion: networking.cfargotunnel.com/v1alpha2
+kind: ClusterTunnel
+metadata:
+  name: cloudflared-tunnel-{{ $tunnel.name }}
+spec:
+  newTunnel:
+    name: {{ $tunnel.name }}
+  cloudflare:
+    email: {{ $.Values.cloudflare.email }}
+    domain: {{ $tunnel.domain }}
+    secret: {{ $.Values.cloudflare.secret }}
+    accountId: {{ $.Values.cloudflare.accountId }}
+  protocol: {{ $protocol }}
+  deployPatch: |
+    spec:
+      replicas: {{ $replicas }}
+      strategy:
+        rollingUpdate:
+          maxSurge: {{ $strategy.maxSurge }}
+          maxUnavailable: {{ $strategy.maxUnavailable }}
+      template:
+        spec:
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                      - key: cfargotunnel.com/name
+                        operator: In
+                        values:
+                          - {{ $tunnel.name }}
+                  topologyKey: kubernetes.io/hostname
+          containers:
+            - name: cloudflared
+              args:
+                - "tunnel"
+                - "--protocol"
+                - {{ $protocol | quote }}
+                - "--edge-ip-version"
+                - {{ $edgeIpVersion | quote }}
+                - "--config"
+                - "/etc/cloudflared/config/config.yaml"
+                - "--metrics"
+                - "0.0.0.0:2000"
+                - "run"
+{{- end }}

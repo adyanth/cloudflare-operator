@@ -1,0 +1,177 @@
+---
+# manager ClusterRole — full API access required by the controller
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "cloudflare-operator.fullname" . }}-manager-role
+  labels:
+    {{- include "cloudflare-operator.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - secrets
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - services
+    verbs:
+      - create
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - networking.cfargotunnel.com
+    resources:
+      - accesstunnels
+      - clustertunnels
+      - tunnelbindings
+      - tunnels
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - networking.cfargotunnel.com
+    resources:
+      - accesstunnels/status
+      - clustertunnels/status
+      - tunnelbindings/status
+      - tunnels/status
+    verbs:
+      - get
+      - patch
+      - update
+  - apiGroups:
+      - networking.cfargotunnel.com
+    resources:
+      - clustertunnels/finalizers
+      - tunnelbindings/finalizers
+      - tunnels/finalizers
+    verbs:
+      - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "cloudflare-operator.fullname" . }}-manager-rolebinding
+  labels:
+    {{- include "cloudflare-operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "cloudflare-operator.fullname" . }}-manager-role
+subjects:
+- kind: ServiceAccount
+  name: {{ include "cloudflare-operator.serviceAccountName" . }}
+  namespace: {{ include "cloudflare-operator.namespace" . }}
+---
+# leader-election Role — namespace-scoped
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "cloudflare-operator.fullname" . }}-leader-election-role
+  namespace: {{ include "cloudflare-operator.namespace" . }}
+  labels:
+    {{- include "cloudflare-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: [configmaps]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: [coordination.k8s.io]
+  resources: [leases]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: [""]
+  resources: [events]
+  verbs: [create, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "cloudflare-operator.fullname" . }}-leader-election-rolebinding
+  namespace: {{ include "cloudflare-operator.namespace" . }}
+  labels:
+    {{- include "cloudflare-operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "cloudflare-operator.fullname" . }}-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: {{ include "cloudflare-operator.serviceAccountName" . }}
+  namespace: {{ include "cloudflare-operator.namespace" . }}
+---
+# metrics-auth ClusterRole — allows the controller to authenticate metric scrapes
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "cloudflare-operator.fullname" . }}-metrics-auth-role
+  labels:
+    {{- include "cloudflare-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups: [authentication.k8s.io]
+  resources: [tokenreviews]
+  verbs: [create]
+- apiGroups: [authorization.k8s.io]
+  resources: [subjectaccessreviews]
+  verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "cloudflare-operator.fullname" . }}-metrics-auth-rolebinding
+  labels:
+    {{- include "cloudflare-operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "cloudflare-operator.fullname" . }}-metrics-auth-role
+subjects:
+- kind: ServiceAccount
+  name: {{ include "cloudflare-operator.serviceAccountName" . }}
+  namespace: {{ include "cloudflare-operator.namespace" . }}
+---
+# metrics-reader ClusterRole — grants read access to /metrics endpoint
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "cloudflare-operator.fullname" . }}-metrics-reader
+  labels:
+    {{- include "cloudflare-operator.labels" . | nindent 4 }}
+rules:
+- nonResourceURLs: ["/metrics"]
+  verbs: [get]

@@ -1,0 +1,70 @@
+# Namespace where the operator will be installed.
+namespace: cloudflare-operator-system
+
+# Whether to create the namespace resource.
+# Set to false if the namespace already exists.
+createNamespace: true
+
+# Override the chart name used in resource names and labels.
+nameOverride: ""
+# Override the full resource name prefix (defaults to chart name).
+fullnameOverride: ""
+
+image:
+  repository: adyanth/cloudflare-operator
+  tag: "0.13.1"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 200Mi
+  requests:
+    cpu: 100m
+    memory: 100Mi
+
+# Node selector applied to the controller Deployment.
+nodeSelector: {}
+
+# Tolerations applied to the controller Deployment.
+tolerations: []
+
+# Additional affinity rules. The chart already applies a nodeAffinity for
+# amd64/arm64 Linux nodes (mirroring the upstream kustomize manifest).
+affinity: {}
+
+# Annotations to add to the controller Pod.
+podAnnotations: {}
+
+# ServiceAccount name used by the controller.
+serviceAccountName: cloudflare-operator-controller-manager
+
+# Webhook TLS configuration.
+# The operator always starts a conversion webhook server and requires TLS certs.
+webhook:
+  # Name of the Secret (in the operator namespace) containing tls.crt and tls.key.
+  # Created automatically when certManager.enabled is true.
+  secretName: webhook-server-cert
+
+  certManager:
+    # Set to true to create a self-signed cert-manager Issuer and Certificate.
+    # Requires cert-manager to be installed in the cluster.
+    # Set to false if you prefer to provision the Secret yourself.
+    enabled: true
+
+rbac:
+  # Install editor, viewer, and admin ClusterRoles for each CRD.
+  # These are not used by the operator itself but are useful helpers for
+  # granting end-users fine-grained access to cloudflare-operator resources.
+  installHelperRoles: true
+
+metrics:
+  serviceMonitor:
+    # Set to true to create a Prometheus ServiceMonitor for the metrics endpoint.
+    # Requires the Prometheus Operator (monitoring.coreos.com/v1 CRD) to be installed.
+    enabled: false
+    # Additional labels to add to the ServiceMonitor (e.g. to match your Prometheus
+    # instance's serviceMonitorSelector).
+    additionalLabels: {}

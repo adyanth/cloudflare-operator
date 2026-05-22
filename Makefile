@@ -95,8 +95,20 @@ help: ## Display this help.
 ##@ Development
 
 .PHONY: manifests
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+manifests: controller-gen helm-sync-crds helm-sync-versions helm-sync-rbac ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+
+.PHONY: helm-sync-crds
+helm-sync-crds: ## Sync CRD YAMLs from config/crd/bases into charts/cloudflare-operator/crds/
+	cp config/crd/bases/*.yaml charts/cloudflare-operator/crds/
+
+.PHONY: helm-sync-versions
+helm-sync-versions: ## Sync appVersion in charts/cloudflare-operator/Chart.yaml from VERSION
+	sed -i "s/^appVersion:.*/appVersion: \"$(VERSION)\"/" charts/cloudflare-operator/Chart.yaml
+
+.PHONY: helm-sync-rbac
+helm-sync-rbac: ## Sync manager ClusterRole rules from config/rbac/role.yaml into charts/cloudflare-operator/templates/rbac.yaml
+	python3 hack/helm-sync-rbac.py
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -215,7 +227,7 @@ GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.4.3
-CONTROLLER_TOOLS_VERSION ?= v0.16.1
+CONTROLLER_TOOLS_VERSION ?= v0.21.0
 ENVTEST_VERSION ?= release-0.19
 GOLANGCI_LINT_VERSION ?= v2.1.5
 

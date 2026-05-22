@@ -1,0 +1,52 @@
+# Shared Cloudflare account credentials applied to every tunnel.
+# These must be set — there are no defaults.
+cloudflare:
+  # Cloudflare account email address.
+  email: ""
+  # Cloudflare account ID.
+  accountId: ""
+  # Name of the Kubernetes Secret that holds the Cloudflare API token.
+  # The Secret must exist in the same namespace as the operator.
+  secret: cloudflare-secrets
+
+# Defaults applied to every tunnel unless overridden per-tunnel.
+defaults:
+  # cloudflared tunnel protocol.
+  # Valid values: http2, h2mux, quic, auto
+  # quic is recommended: QUIC (UDP) has sub-second 0-RTT reconnects, whereas
+  # http2 (TCP) can take 10-20s to reconnect if the initial SYN is dropped
+  # during Cloudflare edge rotation.
+  protocol: quic
+
+  # Cloudflare edge IP version preference for outbound connections.
+  # Valid values: auto, 4, 6
+  # auto allows cloudflared to connect over IPv4 or IPv6, spreading load
+  # across more Cloudflare PoPs and reducing the reconnect window during
+  # Cloudflare edge maintenance events.
+  edgeIpVersion: auto
+
+  # Number of cloudflared pod replicas per tunnel.
+  # When using hard pod anti-affinity this must not exceed the number of nodes.
+  replicas: 2
+
+  # Rolling update strategy.
+  # maxSurge must be 0 when replicas == node count and hard anti-affinity is
+  # in use; surge pods cannot be scheduled until an existing pod is evicted.
+  strategy:
+    maxSurge: 0
+    maxUnavailable: 1
+
+# List of ClusterTunnels to create.
+# Each entry must supply: name, domain.
+# Optional per-tunnel overrides: replicas, protocol, edgeIpVersion, strategy.
+#
+# Example:
+# tunnels:
+#   - name: my-tunnel
+#     domain: example.com
+#   - name: another-tunnel
+#     domain: other.example.com
+#     replicas: 3
+#     protocol: quic
+#     edgeIpVersion: auto
+tunnels: []

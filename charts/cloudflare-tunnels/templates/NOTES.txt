@@ -1,0 +1,24 @@
+{{- if not .Values.tunnels }}
+No ClusterTunnel resources were created because .Values.tunnels is empty.
+
+To create tunnels, set the tunnels list in your values file:
+
+  cloudflare:
+    email: you@example.com
+    accountId: <your-account-id>
+    secret: cloudflare-secrets   # name of the pre-existing K8s Secret
+
+  tunnels:
+    - name: my-site
+      domain: example.com
+
+See the cloudflare-operator chart to install the controller first.
+{{- else }}
+The following ClusterTunnel resources have been created:
+{{- range .Values.tunnels }}
+  - cloudflared-tunnel-{{ .name }} ({{ .domain }})
+{{- end }}
+
+It may take a few minutes for cloudflared pods to become Ready while the
+operator provisions the tunnels with Cloudflare.
+{{- end }}

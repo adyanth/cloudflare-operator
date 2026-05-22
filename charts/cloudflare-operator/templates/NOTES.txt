@@ -1,0 +1,10 @@
+Cloudflare Operator has been installed!
+
+Controller manager is running in namespace: {{ include "cloudflare-operator.namespace" . }}
+
+To verify the installation:
+  kubectl get pods -n {{ include "cloudflare-operator.namespace" . }}
+
+To create a Cloudflare Tunnel, see the cloudflare-tunnels chart or the
+ClusterTunnel / Tunnel CRD documentation:
+  https://github.com/adyanth/cloudflare-operator/tree/main/docs

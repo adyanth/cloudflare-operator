@@ -1,0 +1,19 @@
+apiVersion: v2
+name: cloudflare-tunnels
+description: >
+  Renders ClusterTunnel CRs for the cloudflare-operator.
+  Centralises shared deployment settings (protocol, rolling strategy,
+  cloudflared args, anti-affinity) so individual tunnel definitions only
+  need to supply their unique fields (name, domain).
+  Requires the cloudflare-operator chart to be installed first.
+type: application
+version: 0.1.0
+keywords:
+  - cloudflare
+  - tunnel
+home: https://github.com/adyanth/cloudflare-operator
+sources:
+  - https://github.com/adyanth/cloudflare-operator
+maintainers:
+  - name: adyanth
+    url: https://github.com/adyanth

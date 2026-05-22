@@ -1,0 +1,9 @@
+{{- if .Values.createNamespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "cloudflare-operator.namespace" . }}
+  labels:
+    control-plane: controller-manager
+    {{- include "cloudflare-operator.labels" . | nindent 4 }}
+{{- end }}

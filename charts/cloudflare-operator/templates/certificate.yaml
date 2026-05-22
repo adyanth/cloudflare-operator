@@ -1,0 +1,28 @@
+{{- if .Values.webhook.certManager.enabled }}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "cloudflare-operator.fullname" . }}-selfsigned-issuer
+  namespace: {{ include "cloudflare-operator.namespace" . }}
+  labels:
+    {{- include "cloudflare-operator.labels" . | nindent 4 }}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "cloudflare-operator.fullname" . }}-serving-cert
+  namespace: {{ include "cloudflare-operator.namespace" . }}
+  labels:
+    {{- include "cloudflare-operator.labels" . | nindent 4 }}
+spec:
+  dnsNames:
+    - {{ include "cloudflare-operator.fullname" . }}-webhook-service.{{ include "cloudflare-operator.namespace" . }}.svc
+    - {{ include "cloudflare-operator.fullname" . }}-webhook-service.{{ include "cloudflare-operator.namespace" . }}.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: {{ include "cloudflare-operator.fullname" . }}-selfsigned-issuer
+  secretName: {{ .Values.webhook.secretName }}
+{{- end }}
