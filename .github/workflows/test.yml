@@ -11,15 +11,15 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5
       - name: Setup Go 1.24
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
           go-version: 1.24
       - name: Test
         run: make test
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: code-coverage
           path: cover.out
@@ -33,8 +33,8 @@ jobs:
       actions:       read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v2
-      - uses: fgrosse/go-coverage-report@v1.1.1
+      - uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5
+      - uses: fgrosse/go-coverage-report@ba3f798d6f32b9b16faea37cc7192261bb25b192
         with:
           coverage-artifact-name: "code-coverage"
           coverage-file-name: "cover.out"
