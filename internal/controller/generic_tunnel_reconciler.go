@@ -103,7 +103,9 @@ func setupExistingTunnel(r GenericTunnelReconciler) error {
 
 	if !okCredFile && !okSecret {
 		err := fmt.Errorf("neither key not found in secret")
-		r.GetLog().Error(err, "neither key not found in secret", "secret", r.GetTunnel().GetSpec().Cloudflare.Secret, "key1", credFileKey, "key2", credSecretKey)
+		r.GetLog().Error(
+			err, "neither key not found in secret", "secret", r.GetTunnel().GetSpec().Cloudflare.Secret, "key1", credFileKey, "key2", credSecretKey,
+		)
 		r.GetRecorder().Event(r.GetTunnel().GetObject(), corev1.EventTypeWarning, "ErrSpecSecret", "Neither Key found in Secret")
 		return err
 	}
