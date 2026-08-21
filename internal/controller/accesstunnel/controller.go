@@ -37,8 +37,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
-	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
 	"github.com/go-logr/logr"
+
+	networkingv1alpha1 "github.com/adyanth/cloudflare-operator/api/v1alpha1"
 )
 
 const CONTAINER_PORT int32 = 8000

@@ -1,9 +1,10 @@
 package controller
 
 import (
-	networkingv1alpha2 "github.com/adyanth/cloudflare-operator/api/v1alpha2"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	networkingv1alpha2 "github.com/adyanth/cloudflare-operator/api/v1alpha2"
 )
 
 // TunnelAdapter implementation
