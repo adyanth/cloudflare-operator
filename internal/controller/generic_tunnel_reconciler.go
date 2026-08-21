@@ -279,11 +279,12 @@ func createManagedResources(r GenericTunnelReconciler) (ctrl.Result, error) {
 // configMapForTunnel returns a tunnel ConfigMap object
 func configMapForTunnel(r GenericTunnelReconciler) *corev1.ConfigMap {
 	ls := labelsForTunnel(r.GetTunnel())
-	noTlsVerify := r.GetTunnel().GetSpec().NoTlsVerify
+	spec := r.GetTunnel().GetSpec()
+	noTlsVerify := spec.NoTlsVerify
 	originRequest := cf.OriginRequestConfig{
 		NoTLSVerify: &noTlsVerify,
 	}
-	if r.GetTunnel().GetSpec().OriginCaPool != "" {
+	if spec.OriginCaPool != "" {
 		defaultCaPool := "/etc/cloudflared/certs/tls.crt"
 		originRequest.CAPool = &defaultCaPool
 	}
@@ -293,6 +294,7 @@ func configMapForTunnel(r GenericTunnelReconciler) *corev1.ConfigMap {
 		Metrics:       "0.0.0.0:2000",
 		NoAutoUpdate:  true,
 		OriginRequest: originRequest,
+		WarpRouting:   cf.WarpRoutingConfig{Enabled: spec.WarpRouting},
 		Ingress: []cf.UnvalidatedIngressRule{{
 			Service: r.GetTunnel().GetSpec().FallbackTarget,
 		}},

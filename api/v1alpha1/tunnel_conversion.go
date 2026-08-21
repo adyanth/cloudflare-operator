@@ -90,6 +90,7 @@ func (src TunnelSpec) ConvertTo(dst *v1alpha2.TunnelSpec) error {
 	dst.Protocol = src.Protocol
 	dst.OriginCaPool = src.OriginCaPool
 	dst.NoTlsVerify = src.NoTlsVerify
+	dst.WarpRouting = src.WarpRouting
 
 	patch := &V1alpha1Tov1alpha2Patch{}
 
@@ -176,6 +177,7 @@ func (dst *TunnelSpec) ConvertFrom(src v1alpha2.TunnelSpec) error {
 	dst.Protocol = src.Protocol
 	dst.OriginCaPool = src.OriginCaPool
 	dst.NoTlsVerify = src.NoTlsVerify
+	dst.WarpRouting = src.WarpRouting
 
 	patch := &V1alpha1Tov1alpha2Patch{}
 	if err := yaml.Unmarshal([]byte(src.DeployPatch), patch); err != nil {

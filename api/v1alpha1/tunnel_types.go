@@ -164,6 +164,11 @@ type TunnelSpec struct {
 	// NoTlsVerify disables origin TLS certificate checks when the endpoint is HTTPS.
 	NoTlsVerify bool `json:"noTlsVerify,omitempty"`
 
+	// Whether to enable warp routing for the tunnel.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=false
+	WarpRouting bool `json:"warpRouting,omitempty"`
+
 	// +kubebuilder:validation:Optional
 	// OriginCaPool speficies the secret with tls.crt (and other certs as needed to be referred in the service annotation) of the Root CA to be trusted when sending traffic to HTTPS endpoints
 	OriginCaPool string `json:"originCaPool,omitempty"`

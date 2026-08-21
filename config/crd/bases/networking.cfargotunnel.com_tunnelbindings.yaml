@@ -138,6 +138,23 @@ spec:
                         Target specified where the tunnel should proxy to.
                         Defaults to the form of <protocol>://<service.metadata.name>.<service.metadata.namespace>.svc:<port>
                       type: string
+                    originServerName:
+                      description: |-
+                         OriginServerName informs cloudflared what hostname it should expect from your origin server's TLS certificate.
+                         Only useful if the protocol is HTTPS. If not specified, defaults to the service URL.
+                      type: string
+                    matchSNItoHost:
+                      default: false
+                      description: |-
+                        When true, cloudflared will automatically set the Server Name Indication (SNI)
+                        during the TLS handshake to the hostname of the incoming request.
+                      type: boolean
+                    tlsTimeout:
+                      default: 10
+                      description: |-
+                        TlsTimeout configures the TLS handshake timeout in seconds.
+                      minimum: 0
+                      type: integer
                   type: object
               required:
               - name

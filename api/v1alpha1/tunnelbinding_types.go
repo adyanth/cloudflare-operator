@@ -61,6 +61,23 @@ type TunnelBindingSubjectSpec struct {
 	// +kubebuilder:validation:Optional
 	CaPool string `json:"caPool,omitempty"`
 
+	// MatchSNIToHost causes cloudflared to automatically set the Server Name Indication (SNI) during the TLS
+	// handshake to the hostname of the incoming request. Origin must be configured as https. Defaults to false.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=false
+	MatchSNIToHost bool `json:"matchSNItoHost"`
+
+	// OriginServerName informs cloudflared what hostname it should expect from your origin server's TLS certificate.
+	// Only useful if the protocol is HTTPS. If not specified, defaults to the service URL.
+	// +kubebuilder:validation:Optional
+	OriginServerName string `json:"originServerName,omitempty"`
+
+	// TlsTimeout configures the maximum time (in seconds) to wait for TLS handshake with the origin.
+	// Only useful if the protocol is HTTPS. Default is 10 seconds.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=10
+	TlsTimeout uint `json:"tlsTimeout,omitempty"`
+
 	// NoTlsVerify disables TLS verification for this service.
 	// Only useful if the protocol is HTTPS.
 	// +kubebuilder:validation:Optional

@@ -153,6 +153,11 @@ type TunnelSpec struct {
 	// +kubebuilder:default:="{}"
 	DeployPatch string `json:"deployPatch,omitempty"`
 
+	// Whether to enable warp routing for the tunnel.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=false
+	WarpRouting bool `json:"warpRouting,omitempty"`
+
 	// +kubebuilder:default:=false
 	// +kubebuilder:validation:Optional
 	// NoTlsVerify disables origin TLS certificate checks when the endpoint is HTTPS.

@@ -152,6 +152,10 @@ spec:
                 description: NoTlsVerify disables origin TLS certificate checks when
                   the endpoint is HTTPS.
                 type: boolean
+              warpRouting:
+                default: false
+                description: Whether to enable warp routing for the tunnel.
+                type: boolean
               nodeSelectors:
                 additionalProperties:
                   type: string
@@ -342,6 +346,10 @@ spec:
                   Deployment patch for the cloudflared deployment.
                   Follows https://kubernetes.io/docs/reference/kubectl/generated/kubectl_patch/
                 type: string
+              warpRouting:
+                default: false
+                description: Whether to enable warp routing for the tunnel.
+                type: boolean 
               existingTunnel:
                 description: |-
                   Existing tunnel object.

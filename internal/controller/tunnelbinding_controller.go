@@ -583,8 +583,14 @@ func (r *TunnelBindingReconciler) configureCloudflareDaemon() error {
 			} else {
 				targetService = binding.Status.Services[i].Target
 			}
+
+			tlsTimeout := new(time.Duration)
+			*tlsTimeout = time.Duration(subject.Spec.TlsTimeout) * time.Second
+
 			originRequest := cf.OriginRequestConfig{}
+			originRequest.TLSTimeout = tlsTimeout
 			originRequest.NoTLSVerify = &subject.Spec.NoTlsVerify
+			originRequest.MatchSNItoHost = &subject.Spec.MatchSNIToHost
 			originRequest.Http2Origin = &subject.Spec.Http2Origin
 			originRequest.ProxyAddress = &subject.Spec.ProxyAddress
 			originRequest.ProxyPort = &subject.Spec.ProxyPort
@@ -592,6 +598,9 @@ func (r *TunnelBindingReconciler) configureCloudflareDaemon() error {
 			if caPool := subject.Spec.CaPool; caPool != "" {
 				caPath := fmt.Sprintf("/etc/cloudflared/certs/%s", caPool)
 				originRequest.CAPool = &caPath
+			}
+			if subject.Spec.OriginServerName != "" {
+				originRequest.OriginServerName = &subject.Spec.OriginServerName
 			}
 
 			finalIngresses = append(finalIngresses, cf.UnvalidatedIngressRule{

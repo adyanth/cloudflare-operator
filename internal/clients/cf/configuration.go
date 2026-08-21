@@ -54,6 +54,9 @@ type OriginRequestConfig struct {
 	// Will allow any certificate from the origin to be accepted.
 	// Note: The connection from your machine to Cloudflare's Edge is still encrypted.
 	NoTLSVerify *bool `yaml:"noTLSVerify,omitempty"`
+	// When true, cloudflared will automatically set the Server Name Indication (SNI) during the TLS handshake
+	// to the hostname of the incoming request.
+	MatchSNItoHost *bool `yaml:"matchSNItoHost,omitempty"`
 	// Attempt to connect to origin using HTTP2. Origin must be configured as https.
 	Http2Origin *bool `yaml:"http2Origin,omitempty"`
 	// Disables chunked transfer encoding.
