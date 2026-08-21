@@ -76,7 +76,7 @@ func main() {
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.StringVar(&clusterResourceNamespace, "cluster-resource-namespace", "cloudflare-operator-system", "The default namespace for cluster scoped resources.")
+	flag.StringVar(&clusterResourceNamespace, "cluster-resource-namespace", "", "The default namespace for cluster scoped resources.")
 	flag.BoolVar(&overwriteUnmanaged, "overwrite-unmanaged-dns", false, "Overwrite DNS records that do not have a corresponding managed TXT record, defaults to false.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", true,
 		"Enable leader election for controller manager. "+
